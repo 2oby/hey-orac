@@ -1,0 +1,35 @@
+# Audio settings
+audio:
+  mic_index: 0                    # USB microphone device index
+  sample_rate: 16000             # Audio sample rate
+  channels: 1                     # Mono audio
+  chunk_size: 512                 # Audio chunk size for processing
+
+# Wake-word settings
+wake_word:
+  model_path: /app/models/porcupine/orac.ppn
+  sensitivity: 0.6               # Detection sensitivity (0.0-1.0)
+  keyword: "ORAC"                # Wake-word to detect
+
+# Buffer settings
+buffer:
+  preroll_seconds: 1.0           # Audio to capture before wake-word
+  postroll_seconds: 2.0          # Audio to capture after wake-word
+  max_duration: 4.0              # Maximum audio clip duration
+
+# Network settings
+network:
+  jetson_endpoint: http://jetson-orin:8000/speech
+  timeout_seconds: 5.0           # HTTP request timeout
+  retry_attempts: 3              # Number of retry attempts
+
+# Logging
+logging:
+  level: INFO                    # Log level (DEBUG, INFO, WARNING, ERROR)
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: /app/logs/hey-orac.log
+
+# Performance
+performance:
+  cpu_affinity: null             # CPU core affinity (null for auto)
+  memory_limit_mb: 200           # Memory limit in MB 

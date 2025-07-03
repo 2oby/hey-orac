@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  hey-orac:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: hey-orac
+    restart: unless-stopped
+    volumes:
+      # Mount audio devices
+      - /dev/snd:/dev/snd
+      # Mount configuration for easy updates
+      - ./src/config.yaml:/app/config.yaml:ro
+      # Mount models directory
+      - ./models:/app/models:ro
+      # Mount logs directory
+      - ./logs:/app/logs
+    devices:
+      # Access to audio devices
+      - /dev/snd:/dev/snd
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    networks:
+      - hey-orac-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  hey-orac-network:
+    driver: bridge
+
+volumes:
+  logs:
+    driver: local 

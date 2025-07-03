@@ -54,8 +54,8 @@ USB Microphone → Raspberry Pi (wake-word detection)
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/pi-wakeword-streamer.git
-   cd pi-wakeword-streamer
+   git clone https://github.com/2oby/hey-orac.git
+cd hey-orac
    ```
 
 2. **Generate Porcupine wake-word model**
@@ -114,17 +114,17 @@ docker run --rm pi-wakeword-streamer --help
 ### Pi Testing
 ```bash
 # SSH to Pi and run tests
-ssh pi@your-pi-ip "cd pi-wakeword-streamer && python -m pytest tests/ -v"
+ssh pi@your-pi-ip "cd hey-orac && python -m pytest tests/ -v"
 
 # Test with real microphone
-ssh pi@your-pi-ip "cd pi-wakeword-streamer && docker-compose up"
+ssh pi@your-pi-ip "cd hey-orac && docker-compose up"
 # Then speak "ORAC" into the microphone
 ```
 
 ## 📁 Project Structure
 
 ```
-pi-wakeword-streamer/
+hey-orac/
 ├── docker/                 # Docker configuration
 │   ├── Dockerfile         # Container definition
 │   ├── docker-compose.yml # Service orchestration
@@ -236,7 +236,7 @@ This is Phase 1a of the **ORAC Voice-Control Architecture**. Future phases inclu
 ## 🆘 Support
 
 - 📖 Check [INSTRUCTIONS.txt](docs/INSTRUCTIONS.txt) for detailed setup procedures
-- 🐛 Create [GitHub Issues](https://github.com/yourusername/pi-wakeword-streamer/issues) for bugs
+- 🐛 Create [GitHub Issues](https://github.com/2oby/hey-orac/issues) for bugs
 - 💡 Review [DEV_LOG.txt](docs/DEV_LOG.txt) for known issues and solutions
 
 ---

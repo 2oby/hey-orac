@@ -207,6 +207,7 @@ tmp/
 config.local.yaml
 .env.local
 secrets.yaml
+LOCAL_ENVIRONMENT.md
 
 # SSH keys and certificates
 *.pem

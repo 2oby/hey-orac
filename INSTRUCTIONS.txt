@@ -62,8 +62,8 @@ python -m pytest tests/
 
 ### 2. Raspberry Pi Setup
 ```bash
-# SSH into your Pi
-ssh pi@your-pi-ip
+# SSH into your Pi (see LOCAL_ENVIRONMENT.md for your specific IP)
+ssh pi
 
 # Install Docker (if not already installed)
 curl -fsSL https://get.docker.com -o get-docker.sh
@@ -84,11 +84,11 @@ ssh pi@your-pi-ip
 # On development machine, generate SSH key if needed
 ssh-keygen -t rsa -b 4096 -C "your-email@example.com"
 
-# Copy public key to Pi
-ssh-copy-id pi@your-pi-ip
+# Copy public key to Pi (replace with your Pi's IP from LOCAL_ENVIRONMENT.md)
+ssh-copy-id 2oby@192.168.8.99
 
 # Test SSH connection
-ssh pi@your-pi-ip "echo 'SSH connection successful'"
+ssh pi "echo 'SSH connection successful'"
 ```
 
 ### 4. Porcupine Model Generation
@@ -152,9 +152,9 @@ git commit -m "Your commit message"
 git push origin main
 
 # On Pi
-ssh pi@your-pi-ip
-cd pi-wakeword-streamer
-git pull origin main
+ssh pi
+cd hey-orac
+git pull origin master
 docker-compose up --build -d
 ```
 
@@ -176,10 +176,10 @@ docker run --rm pi-wakeword-streamer --help
 ### Pi Testing
 ```bash
 # SSH to Pi and run tests
-ssh pi@your-pi-ip "cd pi-wakeword-streamer && python -m pytest tests/ -v"
+ssh pi "cd hey-orac && python -m pytest tests/ -v"
 
 # Test with real microphone
-ssh pi@your-pi-ip "cd pi-wakeword-streamer && docker-compose up"
+ssh pi "cd hey-orac && docker-compose up"
 # Then speak "ORAC" into the microphone
 ```
 
