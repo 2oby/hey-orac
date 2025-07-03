@@ -1,0 +1,107 @@
+# CRITICAL PATH - Phase 1a: Development Environment Setup
+
+## Step 1: GitHub Repository Setup
+- [ ] Create new GitHub repository: `pi-wakeword-streamer`
+- [ ] Initialize local git repository
+- [ ] Create initial commit with project structure
+- [ ] Push to GitHub
+- [ ] Set up branch protection rules (main branch)
+
+## Step 2: Project Structure Creation
+- [ ] Create directory structure:
+  ```
+  pi-wakeword-streamer/
+  ├── docker/
+  │   ├── Dockerfile
+  │   ├── docker-compose.yml
+  │   └── entrypoint.sh
+  ├── src/
+  │   ├── main.py
+  │   ├── audio_buffer.py
+  │   └── config.yaml
+  ├── tests/
+  │   ├── sample_orac.wav
+  │   └── test_wakeword.py
+  ├── models/
+  │   └── porcupine/
+  │       └── orac.ppn
+  ├── scripts/
+  │   └── deploy_and_test.sh
+  ├── docs/
+  │   ├── CRITICAL_PATH.txt
+  │   ├── DEV_LOG.txt
+  │   └── INSTRUCTIONS.txt
+  └── README.md
+  ```
+
+## Step 3: Development Environment Setup
+- [ ] Install Docker and Docker Compose on development machine
+- [ ] Install Python 3.12 and required packages locally
+- [ ] Set up SSH key authentication with Raspberry Pi
+- [ ] Test SSH connection to Pi
+- [ ] Install Docker and Docker Compose on Raspberry Pi
+
+## Step 4: Core Application Development
+- [ ] Implement audio_buffer.py (ring buffer utility)
+- [ ] Implement main.py (audio capture + Porcupine + streaming)
+- [ ] Create config.yaml with default settings
+- [ ] Generate Porcupine "ORAC" wake-word model
+- [ ] Create sample test audio file
+
+## Step 5: Docker Configuration
+- [ ] Create Dockerfile for the application
+- [ ] Create docker-compose.yml for service orchestration
+- [ ] Create entrypoint.sh script
+- [ ] Test Docker build locally
+- [ ] Test Docker run locally with mock audio
+
+## Step 6: Testing Framework
+- [ ] Implement unit tests for audio_buffer.py
+- [ ] Implement integration tests for wake-word detection
+- [ ] Create test automation scripts
+- [ ] Set up test data (sample_orac.wav)
+- [ ] Verify tests pass locally
+
+## Step 7: Deployment Script
+- [ ] Create deploy_and_test.sh script with:
+  - Git commit and push
+  - SSH to Pi and pull latest code
+  - Docker build and compose up
+  - Run automated tests
+  - Report results
+- [ ] Test deployment script locally
+- [ ] Test deployment script on Pi
+
+## Step 8: Documentation
+- [ ] Complete INSTRUCTIONS.txt with setup procedures
+- [ ] Update DEV_LOG.txt with progress
+- [ ] Create comprehensive README.md
+- [ ] Document any issues encountered and solutions
+
+## Step 9: Validation & Testing
+- [ ] End-to-end test on development machine
+- [ ] End-to-end test on Raspberry Pi
+- [ ] Measure latency and performance
+- [ ] Verify <150ms target for WAV clip delivery
+- [ ] Document any performance issues
+
+## Step 10: Phase 1a Completion Criteria
+- [ ] All tests pass on both dev machine and Pi
+- [ ] Deployment script works reliably
+- [ ] Documentation is complete and accurate
+- [ ] Wake-word detection works with USB microphone
+- [ ] Audio streaming to mock endpoint functions correctly
+- [ ] Latency targets are met (<150ms)
+
+## Blockers & Dependencies
+- Porcupine model generation (requires Picovoice account)
+- USB microphone setup on Pi
+- Docker installation on Pi
+- SSH key setup between dev machine and Pi
+
+## Success Metrics
+- Wake-word detection accuracy > 95%
+- False positive rate < 1%
+- End-to-end latency < 150ms
+- Docker container starts successfully on Pi
+- All automated tests pass 

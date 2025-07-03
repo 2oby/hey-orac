@@ -1,0 +1,246 @@
+# INSTRUCTIONS - pi-wakeword-streamer
+
+## Project Overview
+This is Phase 1a of the ORAC Voice-Control Architecture - a wake-word detection and audio streaming service designed to run on a Raspberry Pi and stream audio clips to a Jetson Orin Nano for processing.
+
+## Repository Structure
+```
+pi-wakeword-streamer/
+├── docker/                 # Docker configuration files
+│   ├── Dockerfile         # Container definition
+│   ├── docker-compose.yml # Service orchestration
+│   └── entrypoint.sh      # Container startup script
+├── src/                   # Application source code
+│   ├── main.py           # Main application logic
+│   ├── audio_buffer.py   # Ring buffer utility
+│   └── config.yaml       # Configuration file
+├── tests/                 # Test files and data
+│   ├── sample_orac.wav   # Test audio file
+│   └── test_wakeword.py  # Test automation
+├── models/                # ML models
+│   └── porcupine/        # Porcupine wake-word models
+│       └── orac.ppn      # ORAC wake-word model
+├── scripts/               # Deployment and utility scripts
+│   └── deploy_and_test.sh # Main deployment script
+├── docs/                  # Documentation
+│   ├── CRITICAL_PATH.txt # Development roadmap
+│   ├── DEV_LOG.txt       # Progress tracking
+│   └── INSTRUCTIONS.txt  # This file
+└── README.md             # Project overview
+```
+
+## Prerequisites
+
+### Development Machine
+- Python 3.12+
+- Docker and Docker Compose
+- Git
+- SSH key pair for Pi access
+- Picovoice account (for Porcupine model generation)
+
+### Raspberry Pi
+- Raspberry Pi 4 (recommended) or Pi 3B+
+- USB microphone
+- Docker and Docker Compose
+- SSH access enabled
+- Internet connection for package installation
+
+## Setup Instructions
+
+### 1. Development Environment Setup
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/pi-wakeword-streamer.git
+cd pi-wakeword-streamer
+
+# Install Python dependencies locally (for development)
+pip install -r requirements.txt
+
+# Test local setup
+python -m pytest tests/
+```
+
+### 2. Raspberry Pi Setup
+```bash
+# SSH into your Pi
+ssh pi@your-pi-ip
+
+# Install Docker (if not already installed)
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+sudo usermod -aG docker pi
+
+# Install Docker Compose
+sudo apt-get update
+sudo apt-get install docker-compose-plugin
+
+# Logout and login again for group changes to take effect
+exit
+ssh pi@your-pi-ip
+```
+
+### 3. SSH Key Setup
+```bash
+# On development machine, generate SSH key if needed
+ssh-keygen -t rsa -b 4096 -C "your-email@example.com"
+
+# Copy public key to Pi
+ssh-copy-id pi@your-pi-ip
+
+# Test SSH connection
+ssh pi@your-pi-ip "echo 'SSH connection successful'"
+```
+
+### 4. Porcupine Model Generation
+1. Create account at https://console.picovoice.ai/
+2. Generate custom wake-word "ORAC"
+3. Download the .ppn file
+4. Place in `models/porcupine/orac.ppn`
+
+## Configuration
+
+### config.yaml
+```yaml
+# Audio settings
+mic_index: 0                    # USB microphone device index
+sample_rate: 16000             # Audio sample rate
+channels: 1                     # Mono audio
+
+# Wake-word settings
+wake_word_path: /models/porcupine/orac.ppn
+sensitivity: 0.6               # Detection sensitivity (0.0-1.0)
+
+# Buffer settings
+preroll_seconds: 1.0           # Audio to capture before wake-word
+postroll_seconds: 2.0          # Audio to capture after wake-word
+
+# Network settings
+jetson_endpoint: http://jetson-orin:8000/speech
+timeout_seconds: 5.0           # HTTP request timeout
+```
+
+### Environment Variables
+```bash
+# Docker environment variables
+JETSON_ENDPOINT=http://jetson-orin:8000/speech
+LOG_LEVEL=INFO
+```
+
+## Deployment Process
+
+### Using deploy_and_test.sh
+```bash
+# Make the script executable
+chmod +x scripts/deploy_and_test.sh
+
+# Run deployment (updates Pi with latest code)
+./scripts/deploy_and_test.sh
+
+# The script will:
+# 1. Commit and push changes to GitHub
+# 2. SSH to Pi and pull latest code
+# 3. Build and start Docker containers
+# 4. Run automated tests
+# 5. Report results
+```
+
+### Manual Deployment
+```bash
+# On development machine
+git add .
+git commit -m "Your commit message"
+git push origin main
+
+# On Pi
+ssh pi@your-pi-ip
+cd pi-wakeword-streamer
+git pull origin main
+docker-compose up --build -d
+```
+
+## Testing
+
+### Local Testing
+```bash
+# Run unit tests
+python -m pytest tests/ -v
+
+# Test wake-word detection with sample audio
+python src/main.py --test-audio tests/sample_orac.wav
+
+# Test Docker build locally
+docker build -t pi-wakeword-streamer .
+docker run --rm pi-wakeword-streamer --help
+```
+
+### Pi Testing
+```bash
+# SSH to Pi and run tests
+ssh pi@your-pi-ip "cd pi-wakeword-streamer && python -m pytest tests/ -v"
+
+# Test with real microphone
+ssh pi@your-pi-ip "cd pi-wakeword-streamer && docker-compose up"
+# Then speak "ORAC" into the microphone
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Microphone not detected**
+   ```bash
+   # On Pi, list audio devices
+   arecord -l
+   # Update mic_index in config.yaml
+   ```
+
+2. **Docker permission denied**
+   ```bash
+   # Add user to docker group
+   sudo usermod -aG docker $USER
+   # Logout and login again
+   ```
+
+3. **Wake-word not detecting**
+   - Check sensitivity setting in config.yaml
+   - Verify microphone is working: `arecord -D hw:1,0 -f S16_LE -r 16000 -c 1 test.wav`
+   - Test with sample audio file
+
+4. **Network connectivity issues**
+   - Verify Pi can reach Jetson endpoint
+   - Check firewall settings
+   - Test with curl: `curl -X POST http://jetson-orin:8000/speech`
+
+### Performance Tuning
+- Adjust `sensitivity` in config.yaml (0.5-0.8 recommended)
+- Modify `preroll_seconds` based on environment
+- Monitor CPU usage: `htop` on Pi
+- Check memory usage: `free -h`
+
+## Development Workflow
+
+1. **Make changes** in development environment
+2. **Test locally** with unit tests and mock audio
+3. **Commit and push** to GitHub
+4. **Deploy to Pi** using deploy_and_test.sh
+5. **Verify functionality** on Pi with real microphone
+6. **Update DEV_LOG.txt** with progress and issues
+
+## Performance Targets
+- Wake-word detection latency: < 10ms
+- Audio streaming latency: < 150ms end-to-end
+- CPU usage: < 30% on Pi 4
+- Memory usage: < 200MB
+- Detection accuracy: > 95%
+- False positive rate: < 1%
+
+## Next Steps (Phase 1b)
+- Implement Jetson STT service
+- Add LLM intent processing
+- Create Home Assistant bridge
+- Implement end-to-end voice control
+
+## Support
+- Check DEV_LOG.txt for known issues and solutions
+- Review CRITICAL_PATH.txt for development roadmap
+- Create GitHub issues for bugs or feature requests 
