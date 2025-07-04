@@ -16,34 +16,33 @@
 - [x] Updated docker-compose.yml with audio device mounting and ALSA configuration
 - [x] Successfully deployed to Raspberry Pi (niederpi at 192.168.8.99)
 - [x] USB microphone plugged in and ready for testing
+- [x] **🎉 USB MICROPHONE RECORDING WORKING!** - Successfully recorded 3-second test file
+- [x] Added `--test-recording` functionality to main.py
+- [x] Cleaned up temporary development files
 
 ### 🔧 CURRENT STATUS
 - **Container**: ✅ Running successfully with sleep fix
-- **Audio Device Access**: ❌ ALSA errors in container (needs audio group permissions)
-- **USB Microphone**: 🔄 Plugged in but not yet detected in container
+- **Audio Device Access**: ✅ Working with ALSA warnings (expected)
+- **USB Microphone**: ✅ Detected and recording working!
 - **Deployment**: ✅ Working via `./scripts/deploy_and_test.sh "commit message"`
 
 ### 🚨 IMMEDIATE NEXT STEPS (for next LLM)
 
-#### 1. Deploy Audio Fixes
+#### 1. Test USB Recording (COMPLETED ✅)
 ```bash
-# Deploy the updated docker-compose.yml with audio group permissions
-./scripts/deploy_and_test.sh "Add audio group permissions and ALSA config mounting for USB microphone access"
+# Test recording from USB microphone
+ssh pi 'cd ~/hey-orac && docker-compose exec -T hey-orac python src/main.py --test-recording'
 ```
 
-#### 2. Test Audio Device Detection
-```bash
-# Check audio devices on Pi host system
-ssh pi 'arecord -l'
+#### 2. Next Phase: Wake-Word Detection
+- Implement Porcupine wake-word detection
+- Test with "Hey Orac" wake word
+- Integrate with audio recording pipeline
 
-# Test device listing in container (after deployment)
-ssh pi 'cd ~/hey-orac && docker-compose exec -T hey-orac python src/main.py --list-devices'
-```
-
-#### 3. Implement Basic Recording Test
-- Add `--test-recording` argument to main.py
-- Test recording from detected USB microphone
-- Save test recording to verify audio capture works
+#### 3. Audio Streaming to Jetson
+- Implement HTTP streaming to Jetson Orin
+- Test end-to-end audio pipeline
+- Add error handling and retry logic
 
 ### 📋 TECHNICAL CONTEXT FOR NEXT LLM
 
@@ -86,23 +85,28 @@ ssh pi 'cd ~/hey-orac && docker-compose restart hey-orac'
 - **Next**: Test device listing in container after deployment
 
 #### File Structure
-- `src/main.py` - Main application with device listing
+- `src/main.py` - Main application with device listing and recording test
 - `src/audio_utils.py` - Audio device management utilities
-- `src/dev_audio_test.py` - TEMPORARY development file (delete when working)
 - `docker-compose.yml` - Container configuration with audio mounts
 - `requirements.txt` - Production dependencies only
 - `requirements-dev.txt` - Development dependencies (black, flake8)
 
 ### 🎯 SUCCESS CRITERIA FOR NEXT PHASE
-1. **USB microphone detected** in container device listing
-2. **Basic recording test** working (3-second test recording)
-3. **No ALSA errors** in container logs
-4. **Audio file saved** and playable
+1. **USB microphone detected** in container device listing ✅
+2. **Basic recording test** working (3-second test recording) ✅
+3. **No ALSA errors** in container logs ✅ (warnings are expected)
+4. **Audio file saved** and playable ✅
+
+### 🎯 NEXT PHASE SUCCESS CRITERIA
+1. **Wake-word detection** working with "Hey Orac"
+2. **Audio streaming** to Jetson Orin endpoint
+3. **End-to-end pipeline** from microphone to speech processing
+4. **Error handling** and retry logic implemented
 
 ### 🚫 KNOWN ISSUES
-- ALSA configuration errors in container (being fixed)
-- Container needs audio group permissions (added to docker-compose.yml)
-- USB microphone not yet detected (waiting for deployment)
+- ALSA configuration warnings in container (expected, doesn't affect functionality)
+- ~~Container needs audio group permissions~~ ✅ FIXED
+- ~~USB microphone not yet detected~~ ✅ FIXED
 
 ## TODO: Add entries as work progresses
 - [ ] GitHub repository created
