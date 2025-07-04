@@ -6,6 +6,7 @@ RUN apt-get update && apt-get install -y \
     libasound2-dev \
     pkg-config \
     build-essential \
+    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
@@ -17,15 +18,21 @@ WORKDIR /app
 # Change ownership of /app to appuser
 RUN chown -R appuser:appuser /app
 
-# Switch to non-root user
-USER appuser
+# Create virtual environment as root (to avoid permission issues)
+RUN python3 -m venv /app/venv
 
 # Copy requirements first for better caching
 COPY --chown=appuser:appuser requirements.txt .
 
-# Install Python dependencies as non-root user
-RUN pip install --upgrade pip setuptools wheel --user
-RUN pip install --no-cache-dir -r requirements.txt --user
+# Install Python dependencies in virtual environment
+RUN /app/venv/bin/pip install --upgrade pip setuptools wheel
+RUN /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# Change ownership of virtual environment to appuser
+RUN chown -R appuser:appuser /app/venv
+
+# Switch to non-root user after setup
+USER appuser
 
 # Copy application code
 COPY --chown=appuser:appuser src/ ./src/
@@ -38,12 +45,13 @@ COPY --chown=appuser:appuser src/config.yaml ./config.yaml
 EXPOSE 8080
 
 # Set environment variables
-ENV PYTHONPATH=/app:/home/appuser/.local/lib/python3.12/site-packages
+ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
+ENV PATH=/app/venv/bin:$PATH
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import sys; sys.exit(0)" || exit 1
+    CMD /app/venv/bin/python -c "import sys; sys.exit(0)" || exit 1
 
 # Default command
-CMD ["python", "src/main.py"] 
+CMD ["/app/venv/bin/python", "src/main.py"] 
