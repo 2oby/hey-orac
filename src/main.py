@@ -12,7 +12,7 @@ import time
 import numpy as np
 from pathlib import Path
 from audio_utils import AudioManager
-from wake_word_detector import WakeWordDetector
+from wake_word_interface import WakeWordDetector
 
 # Configure logging
 logging.basicConfig(
@@ -132,11 +132,12 @@ def main():
         logger.info("Testing wake-word detection with live audio...")
         
         # Initialize wake-word detector
-        wake_detector = WakeWordDetector(
-            model_path=config['wake_word']['model_path'],
-            sensitivity=config['wake_word']['sensitivity'],
-            keyword=config['wake_word']['keyword']
-        )
+        engine_name = config['wake_word'].get('engine', 'test')
+        wake_detector = WakeWordDetector(engine_name=engine_name)
+        
+        if not wake_detector.initialize(config['wake_word']):
+            logger.error("❌ Failed to initialize wake-word detector")
+            return
         
         if not wake_detector.is_ready():
             logger.error("❌ Wake-word detector not ready")
