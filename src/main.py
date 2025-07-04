@@ -9,8 +9,10 @@ import logging
 import sys
 import yaml
 import time
+import numpy as np
 from pathlib import Path
 from audio_utils import AudioManager
+from wake_word_detector import WakeWordDetector
 
 # Configure logging
 logging.basicConfig(
@@ -60,6 +62,11 @@ def main():
         "--test-recording",
         action="store_true",
         help="Test recording from USB microphone"
+    )
+    parser.add_argument(
+        "--test-wakeword",
+        action="store_true",
+        help="Test wake-word detection with live audio"
     )
     
     args = parser.parse_args()
@@ -119,6 +126,74 @@ def main():
         else:
             logger.error("❌ Recording failed")
         
+        return
+    
+    if args.test_wakeword:
+        logger.info("Testing wake-word detection with live audio...")
+        
+        # Initialize wake-word detector
+        wake_detector = WakeWordDetector(
+            model_path=config['wake_word']['model_path'],
+            sensitivity=config['wake_word']['sensitivity'],
+            keyword=config['wake_word']['keyword']
+        )
+        
+        if not wake_detector.is_ready():
+            logger.error("❌ Wake-word detector not ready")
+            return
+        
+        # Initialize audio manager
+        audio_manager = AudioManager()
+        usb_device = audio_manager.find_usb_microphone()
+        if not usb_device:
+            logger.error("❌ No USB microphone found")
+            return
+        
+        logger.info(f"🎤 Listening for '{wake_detector.keyword}' on {usb_device.name}")
+        logger.info("Press Ctrl+C to stop...")
+        
+        try:
+            # Start live audio stream
+            stream = audio_manager.start_stream(
+                device_index=usb_device.index,
+                sample_rate=wake_detector.get_sample_rate(),
+                channels=1,
+                chunk_size=wake_detector.get_frame_length()
+            )
+            
+            if not stream:
+                logger.error("❌ Failed to start audio stream")
+                return
+            
+            # Process audio in real-time
+            while True:
+                try:
+                    # Read audio chunk
+                    audio_data = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
+                    
+                    # Convert to numpy array
+                    audio_chunk = np.frombuffer(audio_data, dtype=np.int16)
+                    
+                    # Process with wake-word detector
+                    if wake_detector.process_audio(audio_chunk):
+                        logger.info("🎯 WAKE WORD DETECTED!")
+                        # Could add audio capture here for post-processing
+                        
+                except KeyboardInterrupt:
+                    logger.info("Stopping wake-word detection...")
+                    break
+                except Exception as e:
+                    logger.error(f"Error processing audio: {e}")
+                    break
+            
+            # Cleanup
+            stream.stop_stream()
+            stream.close()
+            
+        except KeyboardInterrupt:
+            logger.info("Wake-word detection stopped by user")
+        except Exception as e:
+            logger.error(f"Error in wake-word detection: {e}")
         return
     
     # Main service loop
