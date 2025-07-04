@@ -150,7 +150,7 @@ def main():
             logger.error("❌ No USB microphone found")
             return
         
-        logger.info(f"🎤 Listening for '{wake_detector.keyword}' on {usb_device.name}")
+        logger.info(f"🎤 Listening for '{wake_detector.get_wake_word_name()}' on {usb_device.name}")
         logger.info("Press Ctrl+C to stop...")
         
         try:

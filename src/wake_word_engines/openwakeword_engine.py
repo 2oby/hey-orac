@@ -36,9 +36,15 @@ class OpenWakeWordEngine(WakeWordEngine):
             keyword = config.get('keyword', 'hey_orac')
             self.threshold = config.get('threshold', 0.5)
             
-            # Initialize OpenWakeWord model with minimal parameters
-            # The API has changed - try with no parameters first
-            self.model = openwakeword.Model()
+            # Initialize OpenWakeWord model with correct API
+            # The Model class takes: wakeword_model_paths, class_mapping_dicts, enable_speex_noise_suppression, vad_threshold
+            # If no paths provided, it loads all pre-trained models
+            self.model = openwakeword.Model(
+                wakeword_model_paths=[],  # Empty list loads all pre-trained models
+                class_mapping_dicts=[],   # Empty list uses default mappings
+                enable_speex_noise_suppression=False,  # Disable for now
+                vad_threshold=0.0  # Disable VAD for now
+            )
             
             self.wake_word_name = keyword.upper().replace('_', ' ')
             self.is_initialized = True
@@ -69,6 +75,15 @@ class OpenWakeWordEngine(WakeWordEngine):
             # Convert bytes to numpy array (16-bit PCM)
             audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
             
+            # OpenWakeWord expects 1280 samples of 16khz, 16-bit audio data
+            # We need to ensure we have the right amount of data
+            if len(audio_data) < 1280:
+                # Pad with zeros if we don't have enough data
+                audio_data = np.pad(audio_data, (0, 1280 - len(audio_data)), 'constant')
+            elif len(audio_data) > 1280:
+                # Truncate if we have too much data
+                audio_data = audio_data[:1280]
+            
             # Convert to float32 and normalize
             audio_float = audio_data.astype(np.float32) / 32768.0
             
@@ -92,7 +107,7 @@ class OpenWakeWordEngine(WakeWordEngine):
     
     def get_frame_length(self) -> int:
         """Get the required frame length for OpenWakeWord."""
-        return 1024  # OpenWakeWord typically uses 1024 samples
+        return 1280  # OpenWakeWord expects 1280 samples (80ms at 16kHz)
     
     def get_wake_word_name(self) -> str:
         """Get the wake word name."""
