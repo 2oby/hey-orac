@@ -36,9 +36,9 @@ class OpenWakeWordEngine(WakeWordEngine):
             keyword = config.get('keyword', 'hey_orac')
             self.threshold = config.get('threshold', 0.5)
             
-            # Initialize OpenWakeWord model
+            # Initialize OpenWakeWord model with correct API
+            # The API has changed - we need to use the correct initialization
             self.model = openwakeword.Model(
-                wakeword_models=[keyword],
                 inference_framework="onnx"
             )
             
