@@ -134,7 +134,8 @@ LOG_LEVEL=INFO
 chmod +x scripts/deploy_and_test.sh
 
 # Run deployment (updates Pi with latest code)
-./scripts/deploy_and_test.sh
+# IMPORTANT: Always include a descriptive commit message
+./scripts/deploy_and_test.sh "Your descriptive commit message here"
 
 # The script will:
 # 1. Commit and push changes to GitHub

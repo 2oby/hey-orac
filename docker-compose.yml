@@ -10,6 +10,9 @@ services:
     volumes:
       # Mount audio devices
       - /dev/snd:/dev/snd
+      # Mount ALSA configuration
+      - /etc/asound.conf:/etc/asound.conf:ro
+      - /usr/share/alsa:/usr/share/alsa:ro
       # Mount configuration for easy updates
       - ./src/config.yaml:/app/config.yaml:ro
       # Mount models directory
@@ -19,6 +22,8 @@ services:
     devices:
       # Access to audio devices
       - /dev/snd:/dev/snd
+    group_add:
+      - audio
     environment:
       - PYTHONUNBUFFERED=1
       - LOG_LEVEL=INFO

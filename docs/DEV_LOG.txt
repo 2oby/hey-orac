@@ -6,6 +6,104 @@
 - [ ] Development environment setup planned
 - [ ] GitHub repository structure designed
 
+## 2025-07-04 - Audio Device Integration Progress
+
+### ✅ COMPLETED TODAY
+- [x] Fixed CPU runaway loop in main.py (added sleep to prevent 100% CPU usage)
+- [x] Created audio_utils.py module with AudioManager class for device management
+- [x] Implemented audio device listing functionality in main.py
+- [x] Separated production and development requirements (removed black/flake8 from container)
+- [x] Updated docker-compose.yml with audio device mounting and ALSA configuration
+- [x] Successfully deployed to Raspberry Pi (niederpi at 192.168.8.99)
+- [x] USB microphone plugged in and ready for testing
+
+### 🔧 CURRENT STATUS
+- **Container**: ✅ Running successfully with sleep fix
+- **Audio Device Access**: ❌ ALSA errors in container (needs audio group permissions)
+- **USB Microphone**: 🔄 Plugged in but not yet detected in container
+- **Deployment**: ✅ Working via `./scripts/deploy_and_test.sh "commit message"`
+
+### 🚨 IMMEDIATE NEXT STEPS (for next LLM)
+
+#### 1. Deploy Audio Fixes
+```bash
+# Deploy the updated docker-compose.yml with audio group permissions
+./scripts/deploy_and_test.sh "Add audio group permissions and ALSA config mounting for USB microphone access"
+```
+
+#### 2. Test Audio Device Detection
+```bash
+# Check audio devices on Pi host system
+ssh pi 'arecord -l'
+
+# Test device listing in container (after deployment)
+ssh pi 'cd ~/hey-orac && docker-compose exec -T hey-orac python src/main.py --list-devices'
+```
+
+#### 3. Implement Basic Recording Test
+- Add `--test-recording` argument to main.py
+- Test recording from detected USB microphone
+- Save test recording to verify audio capture works
+
+### 📋 TECHNICAL CONTEXT FOR NEXT LLM
+
+#### SSH Access
+- **Pi Hostname**: niederpi
+- **IP Address**: 192.168.8.99
+- **User**: 2oby
+- **SSH Alias**: `ssh pi` (configured in ~/.ssh/config)
+- **Project Path**: `/home/2oby/hey-orac/`
+
+#### Deployment Process
+```bash
+# Always use descriptive commit message
+./scripts/deploy_and_test.sh "Your descriptive commit message here"
+
+# The script will:
+# 1. Commit and push changes to GitHub
+# 2. SSH to Pi and pull latest code
+# 3. Build and start Docker containers
+# 4. Run automated tests
+# 5. Report results
+```
+
+#### Docker Container Access
+```bash
+# Execute commands in running container
+ssh pi 'cd ~/hey-orac && docker-compose exec -T hey-orac python src/main.py --list-devices'
+
+# View container logs
+ssh pi 'cd ~/hey-orac && docker-compose logs -f hey-orac'
+
+# Stop/restart container
+ssh pi 'cd ~/hey-orac && docker-compose restart hey-orac'
+```
+
+#### Audio Device Issues
+- **Problem**: Container can't access host audio devices
+- **Solution**: Added audio group permissions and ALSA config mounting
+- **Test**: Use `arecord -l` on host to verify USB microphone is detected
+- **Next**: Test device listing in container after deployment
+
+#### File Structure
+- `src/main.py` - Main application with device listing
+- `src/audio_utils.py` - Audio device management utilities
+- `src/dev_audio_test.py` - TEMPORARY development file (delete when working)
+- `docker-compose.yml` - Container configuration with audio mounts
+- `requirements.txt` - Production dependencies only
+- `requirements-dev.txt` - Development dependencies (black, flake8)
+
+### 🎯 SUCCESS CRITERIA FOR NEXT PHASE
+1. **USB microphone detected** in container device listing
+2. **Basic recording test** working (3-second test recording)
+3. **No ALSA errors** in container logs
+4. **Audio file saved** and playable
+
+### 🚫 KNOWN ISSUES
+- ALSA configuration errors in container (being fixed)
+- Container needs audio group permissions (added to docker-compose.yml)
+- USB microphone not yet detected (waiting for deployment)
+
 ## TODO: Add entries as work progresses
 - [ ] GitHub repository created
 - [ ] Initial project structure implemented
