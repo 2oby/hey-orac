@@ -1,107 +1,144 @@
-# CRITICAL PATH - Phase 1a: Development Environment Setup
+# CRITICAL PATH - Hey Orac Voice Control System
 
-## Step 1: GitHub Repository Setup
-- [ ] Create new GitHub repository: `pi-wakeword-streamer`
-- [ ] Initialize local git repository
-- [ ] Create initial commit with project structure
-- [ ] Push to GitHub
-- [ ] Set up branch protection rules (main branch)
+## 🚨 IMMEDIATE NEXT STEPS (Phase 1a - Basic Project Running)
 
-## Step 2: Project Structure Creation
-- [ ] Create directory structure:
-  ```
-  pi-wakeword-streamer/
-  ├── docker/
-  │   ├── Dockerfile
-  │   ├── docker-compose.yml
-  │   └── entrypoint.sh
-  ├── src/
-  │   ├── main.py
-  │   ├── audio_buffer.py
-  │   └── config.yaml
-  ├── tests/
-  │   ├── sample_orac.wav
-  │   └── test_wakeword.py
-  ├── models/
-  │   └── porcupine/
-  │       └── orac.ppn
-  ├── scripts/
-  │   └── deploy_and_test.sh
-  ├── docs/
-  │   ├── CRITICAL_PATH.txt
-  │   ├── DEV_LOG.txt
-  │   └── INSTRUCTIONS.txt
-  └── README.md
-  ```
+### 1. Fix PATH Warnings in Docker Container
+- [ ] Update Dockerfile to add `/home/appuser/.local/bin` to PATH
+- [ ] Test that pytest, black, flake8 commands work without warnings
+- [ ] Verify all development tools are accessible
 
-## Step 3: Development Environment Setup
-- [ ] Install Docker and Docker Compose on development machine
-- [ ] Install Python 3.12 and required packages locally
-- [ ] Set up SSH key authentication with Raspberry Pi
-- [ ] Test SSH connection to Pi
-- [ ] Install Docker and Docker Compose on Raspberry Pi
+### 2. Implement Basic Main Service Loop
+- [ ] Replace placeholder "Main service loop not yet implemented" in main.py
+- [ ] Add basic audio device enumeration and selection
+- [ ] Implement simple audio capture loop (without wake-word detection yet)
+- [ ] Add graceful shutdown handling (Ctrl+C)
 
-## Step 4: Core Application Development
-- [ ] Implement audio_buffer.py (ring buffer utility)
-- [ ] Implement main.py (audio capture + Porcupine + streaming)
-- [ ] Create config.yaml with default settings
-- [ ] Generate Porcupine "ORAC" wake-word model
-- [ ] Create sample test audio file
+### 3. Test Audio Hardware Access
+- [ ] Verify USB microphone is detected on Pi
+- [ ] Test basic audio capture functionality
+- [ ] Ensure audio permissions work in Docker container
+- [ ] Add audio device listing functionality
 
-## Step 5: Docker Configuration
-- [ ] Create Dockerfile for the application
-- [ ] Create docker-compose.yml for service orchestration
-- [ ] Create entrypoint.sh script
-- [ ] Test Docker build locally
-- [ ] Test Docker run locally with mock audio
+### 4. Basic Wake-Word Detection
+- [ ] Implement Porcupine initialization
+- [ ] Add basic wake-word detection loop
+- [ ] Test with sample audio or microphone input
+- [ ] Add logging for detection events
 
-## Step 6: Testing Framework
-- [ ] Implement unit tests for audio_buffer.py
-- [ ] Implement integration tests for wake-word detection
-- [ ] Create test automation scripts
-- [ ] Set up test data (sample_orac.wav)
-- [ ] Verify tests pass locally
+### 5. End-to-End Testing
+- [ ] Test complete pipeline: mic → wake-word → audio capture
+- [ ] Verify audio quality and format
+- [ ] Test deployment script with working application
+- [ ] Measure basic latency
 
-## Step 7: Deployment Script
-- [ ] Create deploy_and_test.sh script with:
-  - Git commit and push
-  - SSH to Pi and pull latest code
-  - Docker build and compose up
-  - Run automated tests
-  - Report results
-- [ ] Test deployment script locally
-- [ ] Test deployment script on Pi
+## ✅ COMPLETED MILESTONES
 
-## Step 8: Documentation
-- [ ] Complete INSTRUCTIONS.txt with setup procedures
-- [ ] Update DEV_LOG.txt with progress
-- [ ] Create comprehensive README.md
-- [ ] Document any issues encountered and solutions
+### Infrastructure Setup
+- [x] GitHub repository created (hey-orac)
+- [x] Project structure established
+- [x] Docker and Docker Compose configured
+- [x] SSH connection to Pi working
+- [x] Deployment script created and tested
+- [x] Non-root user security implemented
+- [x] Python 3.12 compatibility fixed (numpy 1.26.4)
+- [x] All dependencies installed successfully
+- [x] Container builds and runs successfully
+- [x] Configuration loading works
+- [x] Basic test framework in place
 
-## Step 9: Validation & Testing
-- [ ] End-to-end test on development machine
-- [ ] End-to-end test on Raspberry Pi
-- [ ] Measure latency and performance
-- [ ] Verify <150ms target for WAV clip delivery
-- [ ] Document any performance issues
+### Current Status
+- **Container**: ✅ Running successfully
+- **Dependencies**: ✅ All installed (PyAudio, Porcupine, etc.)
+- **Configuration**: ✅ Loading correctly
+- **Deployment**: ✅ Script working
+- **Security**: ✅ Non-root user implemented
 
-## Step 10: Phase 1a Completion Criteria
-- [ ] All tests pass on both dev machine and Pi
-- [ ] Deployment script works reliably
-- [ ] Documentation is complete and accurate
-- [ ] Wake-word detection works with USB microphone
-- [ ] Audio streaming to mock endpoint functions correctly
-- [ ] Latency targets are met (<150ms)
+## 🔧 TECHNICAL DEBT TO ADDRESS
 
-## Blockers & Dependencies
-- Porcupine model generation (requires Picovoice account)
-- USB microphone setup on Pi
-- Docker installation on Pi
-- SSH key setup between dev machine and Pi
+### PATH Warnings (Low Priority)
+The following warnings appear during pip install but don't affect functionality:
+```
+WARNING: The script pytest is installed in '/home/appuser/.local/bin' which is not on PATH.
+WARNING: The script black is installed in '/home/appuser/.local/bin' which is not on PATH.
+WARNING: The script flake8 is installed in '/home/appuser/.local/bin' which is not on PATH.
+```
 
-## Success Metrics
-- Wake-word detection accuracy > 95%
-- False positive rate < 1%
-- End-to-end latency < 150ms
-- Docker container starts successfully on Pi
-- All automated tests pass 
+**Solution**: Add to Dockerfile:
+```dockerfile
+ENV PATH="/home/appuser/.local/bin:$PATH"
+```
+
+### Test Execution (Medium Priority)
+- [ ] Fix pytest command format in deployment script
+- [ ] Ensure tests run properly in container
+- [ ] Add more comprehensive test coverage
+
+## 📋 PHASE 1a COMPLETION CRITERIA
+
+### Core Functionality
+- [ ] Wake-word detection working with USB microphone
+- [ ] Audio capture and buffering implemented
+- [ ] Basic streaming to mock endpoint
+- [ ] Latency < 150ms target
+- [ ] Graceful error handling
+
+### Quality Assurance
+- [ ] All tests passing
+- [ ] No critical warnings in logs
+- [ ] Deployment script reliable
+- [ ] Documentation updated
+
+### Performance Targets
+- [ ] Wake-word detection accuracy > 95%
+- [ ] False positive rate < 1%
+- [ ] End-to-end latency < 150ms
+- [ ] Memory usage < 200MB
+- [ ] CPU usage reasonable on Pi
+
+## 🎯 SUCCESS METRICS
+
+### Phase 1a Success Criteria
+1. **Functional**: Say "Hey Orac" → Audio captured and ready for streaming
+2. **Performance**: < 150ms from wake-word to audio clip ready
+3. **Reliability**: 99% uptime, graceful error recovery
+4. **Deployment**: One-command deployment works reliably
+5. **Testing**: All automated tests pass
+
+### Phase 1b Goals (Next Phase)
+- Jetson Orin integration
+- Real-time streaming to Jetson
+- Advanced audio processing
+- Multi-room support
+
+## 🚫 BLOCKERS & DEPENDENCIES
+
+### Current Blockers
+- None - all infrastructure is working
+
+### Dependencies
+- USB microphone on Pi (hardware)
+- Porcupine model file (orac.ppn) - needs to be generated
+- Jetson Orin Nano (for Phase 1b)
+
+### Risk Mitigation
+- Test with mock audio if microphone unavailable
+- Use sample Porcupine model for initial testing
+- Implement fallback audio sources
+
+## 📊 PROGRESS TRACKING
+
+### Phase 1a Progress: 70% Complete
+- ✅ Infrastructure: 100%
+- ✅ Docker Setup: 100%
+- ✅ Dependencies: 100%
+- 🔄 Core Application: 30%
+- 🔄 Testing: 50%
+- 🔄 Documentation: 80%
+
+### Next Sprint Goals (1-2 weeks)
+1. Fix PATH warnings
+2. Implement basic audio capture
+3. Add wake-word detection
+4. Test end-to-end functionality
+5. Optimize performance
+6. Complete documentation 

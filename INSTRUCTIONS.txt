@@ -54,7 +54,7 @@ git clone https://github.com/yourusername/pi-wakeword-streamer.git
 cd pi-wakeword-streamer
 
 # Install Python dependencies locally (for development)
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
 
 # Test local setup
 python -m pytest tests/

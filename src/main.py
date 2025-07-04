@@ -8,7 +8,9 @@ import argparse
 import logging
 import sys
 import yaml
+import time
 from pathlib import Path
+from audio_utils import AudioManager
 
 # Configure logging
 logging.basicConfig(
@@ -62,8 +64,25 @@ def main():
     
     if args.list_devices:
         logger.info("Listing audio devices...")
-        # TODO: Implement device listing
-        logger.info("Device listing not yet implemented")
+        audio_manager = AudioManager()
+        devices = audio_manager.list_input_devices()
+        
+        print("\n=== Available Audio Input Devices ===")
+        for device in devices:
+            print(f"Device {device.index}: {device.name}")
+            print(f"  - Max Input Channels: {device.max_input_channels}")
+            print(f"  - Default Sample Rate: {device.default_sample_rate}")
+            print(f"  - Host API: {device.host_api}")
+            print(f"  - USB Device: {'Yes' if device.is_usb else 'No'}")
+            print()
+        
+        # Find USB microphone
+        usb_device = audio_manager.find_usb_microphone()
+        if usb_device:
+            print(f"✅ Found USB microphone: {usb_device.name} (index {usb_device.index})")
+        else:
+            print("⚠️  No USB microphone found")
+        
         return
     
     if args.test_audio:
@@ -78,9 +97,10 @@ def main():
     logger.info("Main service loop not yet implemented")
     
     try:
-        # Placeholder for main loop
+        # Placeholder for main loop - with sleep to prevent CPU runaway
+        logger.info("Main service loop not yet implemented - sleeping to prevent CPU runaway")
         while True:
-            pass
+            time.sleep(1)  # Sleep 1 second to prevent 100% CPU usage
     except KeyboardInterrupt:
         logger.info("Service stopped by user")
     except Exception as e:

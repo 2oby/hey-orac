@@ -1,0 +1,6 @@
+# Include all production dependencies
+-r requirements.txt
+
+# Development tools (for local development only)
+black==23.7.0
+flake8==6.0.0 

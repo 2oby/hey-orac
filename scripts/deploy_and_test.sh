@@ -104,11 +104,11 @@ ssh "$REMOTE_ALIAS" "\
     
     echo '${BLUE}🧪 Running tests...${NC}'; \
     echo 'Running configuration tests...'; \
-    docker-compose exec -T hey-orac python -m pytest tests/test_wakeword.py::TestConfiguration::test_load_config -v || echo 'Tests completed with some failures'; \
+    docker-compose exec -T hey-orac python -m pytest tests/test_wakeword.py -v || echo 'Tests completed with some failures'; \
     
     echo '${BLUE}📊 Checking resource usage...${NC}'; \
-    echo 'Container stats:'; \
-    docker-compose stats --no-stream; \
+    echo 'Container status:'; \
+    docker-compose ps; \
     \
     echo 'Memory usage:'; \
     free -h; \
