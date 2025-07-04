@@ -8,7 +8,7 @@ import openwakeword
 import numpy as np
 from typing import Dict, Any, Optional
 import logging
-from ..wake_word_interface import WakeWordEngine
+from wake_word_interface import WakeWordEngine
 
 logger = logging.getLogger(__name__)
 

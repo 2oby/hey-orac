@@ -8,7 +8,7 @@ import time
 import random
 from typing import Dict, Any
 import logging
-from ..wake_word_interface import WakeWordEngine
+from wake_word_interface import WakeWordEngine
 
 logger = logging.getLogger(__name__)
 

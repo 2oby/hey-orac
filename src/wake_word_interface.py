@@ -91,19 +91,19 @@ class WakeWordDetector:
         try:
             # Create engine instance based on name
             if self.engine_name == "porcupine":
-                from .wake_word_engines.porcupine_engine import PorcupineEngine
+                from wake_word_engines.porcupine_engine import PorcupineEngine
                 self.engine = PorcupineEngine()
             elif self.engine_name == "openwakeword":
-                from .wake_word_engines.openwakeword_engine import OpenWakeWordEngine
+                from wake_word_engines.openwakeword_engine import OpenWakeWordEngine
                 self.engine = OpenWakeWordEngine()
             elif self.engine_name == "snowboy":
-                from .wake_word_engines.snowboy_engine import SnowboyEngine
+                from wake_word_engines.snowboy_engine import SnowboyEngine
                 self.engine = SnowboyEngine()
             elif self.engine_name == "pocketsphinx":
-                from .wake_word_engines.pocketsphinx_engine import PocketSphinxEngine
+                from wake_word_engines.pocketsphinx_engine import PocketSphinxEngine
                 self.engine = PocketSphinxEngine()
             elif self.engine_name == "test":
-                from .wake_word_engines.test_engine import TestEngine
+                from wake_word_engines.test_engine import TestEngine
                 self.engine = TestEngine()
             else:
                 logger.error(f"Unknown wake-word engine: {self.engine_name}")
