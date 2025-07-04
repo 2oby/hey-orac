@@ -56,6 +56,11 @@ def main():
         action="store_true",
         help="List available audio devices"
     )
+    parser.add_argument(
+        "--test-recording",
+        action="store_true",
+        help="Test recording from USB microphone"
+    )
     
     args = parser.parse_args()
     
@@ -87,6 +92,33 @@ def main():
     
     if args.test_audio:
         test_audio_file(args.test_audio, config)
+        return
+    
+    if args.test_recording:
+        logger.info("Testing USB microphone recording...")
+        audio_manager = AudioManager()
+        
+        # Find USB microphone
+        usb_device = audio_manager.find_usb_microphone()
+        if not usb_device:
+            logger.error("No USB microphone found for recording test")
+            return
+        
+        # Test recording for 3 seconds
+        output_file = "test_usb_recording.wav"
+        logger.info(f"Recording 3 seconds from {usb_device.name}...")
+        
+        if audio_manager.record_to_file(
+            usb_device.index, 
+            duration=3.0, 
+            output_file=output_file,
+            sample_rate=16000,
+            channels=1
+        ):
+            logger.info(f"✅ Recording successful! Saved to {output_file}")
+        else:
+            logger.error("❌ Recording failed")
+        
         return
     
     # Main service loop
