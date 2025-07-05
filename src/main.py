@@ -105,10 +105,15 @@ def main():
         logger.info("Testing USB microphone recording...")
         audio_manager = AudioManager()
         
+        # Debug: Check AudioManager type and attributes
+        logger.info(f"AudioManager type: {type(audio_manager)}")
+        logger.info(f"AudioManager module: {audio_manager.__class__.__module__}")
+        logger.info(f"AudioManager attributes: {[attr for attr in dir(audio_manager) if not attr.startswith('_')]}")
+        
         # Find USB microphone
         usb_device = audio_manager.find_usb_microphone()
         if not usb_device:
-            logger.error("No USB microphone found for recording test")
+            logger.error("❌ No USB microphone found for recording test")
             return
         
         # Test recording for 3 seconds
@@ -145,6 +150,12 @@ def main():
         
         # Initialize audio manager
         audio_manager = AudioManager()
+        
+        # Debug: Check AudioManager type and attributes
+        logger.info(f"AudioManager type: {type(audio_manager)}")
+        logger.info(f"AudioManager module: {audio_manager.__class__.__module__}")
+        logger.info(f"AudioManager attributes: {[attr for attr in dir(audio_manager) if not attr.startswith('_')]}")
+        
         usb_device = audio_manager.find_usb_microphone()
         if not usb_device:
             logger.error("❌ No USB microphone found")

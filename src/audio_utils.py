@@ -106,6 +106,26 @@ class AudioManager:
             logger.error(f"Error starting recording from device {device_index}: {e}")
             return False
     
+    def start_stream(self, device_index: int, sample_rate: int = 16000, 
+                    channels: int = 1, chunk_size: int = 512):
+        """Start audio stream and return the stream object for real-time processing."""
+        try:
+            stream = self.pyaudio.open(
+                format=pyaudio.paInt16,
+                channels=channels,
+                rate=sample_rate,
+                input=True,
+                input_device_index=device_index,
+                frames_per_buffer=chunk_size
+            )
+            
+            logger.info(f"Started audio stream from device {device_index}")
+            return stream
+            
+        except Exception as e:
+            logger.error(f"Error starting audio stream from device {device_index}: {e}")
+            return None
+    
     def read_audio_chunk(self) -> Optional[bytes]:
         """Read one chunk of audio data."""
         if not self.current_stream:
