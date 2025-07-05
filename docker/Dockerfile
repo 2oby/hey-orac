@@ -2,11 +2,15 @@ FROM python:3.12-slim
 
 # Install system dependencies for audio processing
 RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    python3-venv \
+    build-essential \
     portaudio19-dev \
     libasound2-dev \
+    libjack-jackd2-dev \
+    libsndfile1 \
     pkg-config \
-    build-essential \
-    python3-venv \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user for security
