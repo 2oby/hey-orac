@@ -41,13 +41,18 @@ class AudioManager:
             device_info = self.pyaudio.get_device_info_by_index(i)
             
             if device_info['maxInputChannels'] > 0:  # Input device
+                device_name = device_info['name'].lower()
+                is_usb = ('usb' in device_name or 
+                         'hw:' in device_info['name'] or  # Hardware device
+                         'card' in device_name)  # ALSA card device
+                
                 device = AudioDevice(
                     index=i,
                     name=device_info['name'],
                     max_input_channels=device_info['maxInputChannels'],
                     default_sample_rate=device_info['defaultSampleRate'],
                     host_api=device_info['hostApi'],
-                    is_usb='usb' in device_info['name'].lower()
+                    is_usb=is_usb
                 )
                 devices.append(device)
         
@@ -71,13 +76,18 @@ class AudioManager:
             default_index = self.pyaudio.get_default_input_device_info()['index']
             device_info = self.pyaudio.get_device_info_by_index(default_index)
             
+            device_name = device_info['name'].lower()
+            is_usb = ('usb' in device_name or 
+                     'hw:' in device_info['name'] or  # Hardware device
+                     'card' in device_name)  # ALSA card device
+            
             return AudioDevice(
                 index=default_index,
                 name=device_info['name'],
                 max_input_channels=device_info['maxInputChannels'],
                 default_sample_rate=device_info['defaultSampleRate'],
                 host_api=device_info['hostApi'],
-                is_usb='usb' in device_info['name'].lower()
+                is_usb=is_usb
             )
         except Exception as e:
             logger.error(f"Error getting default input device: {e}")
