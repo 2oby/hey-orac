@@ -14,7 +14,7 @@ wake_word:
   access_key: ""                 # Picovoice access key (get from console.picovoice.ai)
   
   # OpenWakeWord settings (only used when engine="openwakeword")
-  threshold: 0.5                 # Detection threshold (0.0-1.0)
+  threshold: 0.1                 # Detection threshold (0.0-1.0) - lowered for testing
   custom_model_path: "/app/third_party/openwakeword/custom_models/Hey_computer.onnx"  # Custom model path
   
   # Test engine settings (only used when engine="test")

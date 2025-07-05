@@ -103,35 +103,37 @@ class OpenWakeWordEngine(WakeWordEngine):
             predictions = self.model.predict(audio_float)
             
             # Debug: Log prediction type and content
-            logger.debug(f"Predictions type: {type(predictions)}, content: {predictions}")
+            logger.debug(f"Prediction type: {type(predictions)}")
+            logger.debug(f"Prediction content: {predictions}")
             
             # Handle different prediction formats
-            if isinstance(predictions, (list, tuple)):
-                # If predictions is a list/tuple, check each element
-                for prediction in predictions:
-                    if isinstance(prediction, (int, float)):
-                        if prediction > self.threshold:
-                            logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {prediction:.3f}")
-                            return True
-                    elif isinstance(prediction, dict):
-                        # If prediction is a dict, check values
-                        for value in prediction.values():
-                            if isinstance(value, (int, float)) and value > self.threshold:
-                                logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {value:.3f}")
-                                return True
-            elif isinstance(predictions, dict):
-                # If predictions is a dict, check values
-                for value in predictions.values():
-                    if isinstance(value, (int, float)) and value > self.threshold:
-                        logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {value:.3f}")
-                        return True
+            if isinstance(predictions, dict):
+                # Dictionary format: {'hey_computer': 0.123, ...}
+                confidence = predictions.get(self.wake_word_name, 0.0)
+            elif isinstance(predictions, (list, tuple)):
+                # List/tuple format: [0.123, 0.456, ...]
+                confidence = float(predictions[0]) if predictions else 0.0
             elif isinstance(predictions, (int, float)):
-                # If predictions is a single number
-                if predictions > self.threshold:
-                    logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {predictions:.3f}")
-                    return True
+                # Direct numeric value
+                confidence = float(predictions)
+            else:
+                # Try to convert to float
+                try:
+                    confidence = float(predictions)
+                except (ValueError, TypeError):
+                    logger.error(f"Unexpected prediction format: {type(predictions)} - {predictions}")
+                    return False
             
-            return False
+            # Log the confidence score for debugging
+            logger.info(f"Wake word confidence: {confidence:.4f} (threshold: {self.threshold})")
+            
+            # Check if confidence exceeds threshold
+            detected = confidence >= self.threshold
+            
+            if detected:
+                logger.info(f"🎯 Wake word detected! Confidence: {confidence:.4f}")
+            
+            return detected
             
         except Exception as e:
             logger.error(f"Error processing audio with OpenWakeWord: {e}")
