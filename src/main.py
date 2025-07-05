@@ -184,32 +184,55 @@ def main():
                     # Load the recorded audio
                     audio_data, sample_rate = sf.read("/tmp/test_audio.wav")
                     
-                    # Convert to mono if stereo
-                    if len(audio_data.shape) > 1:
-                        audio_data = audio_data[:, 0]
+                    # Debug: Check audio quality
+                    rms_level = np.sqrt(np.mean(audio_data**2))
+                    max_level = np.max(np.abs(audio_data))
+                    min_level = np.min(audio_data)
+                    mean_level = np.mean(audio_data)
                     
-                    # Convert to int16 if needed
-                    if audio_data.dtype != np.int16:
-                        audio_data = (audio_data * 32767).astype(np.int16)
+                    logger.info(f"🎵 Audio Quality Check:")
+                    logger.info(f"   RMS Level: {rms_level:.6f}")
+                    logger.info(f"   Max Level: {max_level:.6f}")
+                    logger.info(f"   Min Level: {min_level:.6f}")
+                    logger.info(f"   Mean Level: {mean_level:.6f}")
+                    logger.info(f"   Sample Rate: {sample_rate}")
+                    logger.info(f"   Duration: {len(audio_data)/sample_rate:.2f}s")
+                    logger.info(f"   Samples: {len(audio_data)}")
+                    
+                    # Check if audio is too quiet
+                    if rms_level < 0.001:
+                        logger.warning("⚠️ Audio is very quiet - check microphone volume!")
+                    elif rms_level < 0.01:
+                        logger.warning("⚠️ Audio is quiet - consider speaking louder")
+                    else:
+                        logger.info("✅ Audio levels look good")
+                    
+                    # Save a copy for manual inspection
+                    sf.write("/tmp/debug_audio.wav", audio_data, sample_rate)
+                    logger.info("💾 Saved debug audio to /tmp/debug_audio.wav")
                     
                     # Process audio in 1280-sample chunks
-                    frame_length = wake_detector.get_frame_length()
+                    chunk_size = wake_detector.get_frame_length()
                     detected = False
                     
-                    for start in range(0, len(audio_data) - frame_length, frame_length // 2):  # 50% overlap
-                        chunk = audio_data[start:start + frame_length]
-                        if len(chunk) == frame_length:  # Only process complete frames
-                            if wake_detector.process_audio(chunk):
-                                logger.info("🎉 Wake word detected!")
-                                detected = True
-                                break
+                    for i in range(0, len(audio_data) - chunk_size + 1, chunk_size):
+                        chunk = audio_data[i:i + chunk_size]
+                        
+                        # Convert to int16 format for OpenWakeWord
+                        chunk_int16 = (chunk * 32767).astype(np.int16)
+                        
+                        if wake_detector.process_audio(chunk_int16):
+                            detected = True
+                            logger.info(f"🎯 Wake word detected in chunk {i//chunk_size + 1}!")
+                            break
                     
                     if not detected:
                         logger.info("👂 No wake word detected in this sample")
                         
                 except Exception as e:
                     logger.error(f"❌ Error processing audio: {e}")
-                    
+                    continue
+                
                 time.sleep(1)  # Wait between samples
                 
         except KeyboardInterrupt:
