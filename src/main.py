@@ -136,16 +136,10 @@ def main():
     if args.test_wakeword:
         logger.info("Testing wake-word detection with live audio...")
         
-        # Initialize wake-word detector
-        engine_name = config['wake_word'].get('engine', 'test')
-        wake_detector = WakeWordDetector(engine_name=engine_name)
-        
+        # Initialize wake word detector
+        wake_detector = WakeWordDetector()
         if not wake_detector.initialize(config['wake_word']):
-            logger.error("❌ Failed to initialize wake-word detector")
-            return
-        
-        if not wake_detector.is_ready():
-            logger.error("❌ Wake-word detector not ready")
+            logger.error("❌ Failed to initialize wake word detector")
             return
         
         # Initialize audio manager
@@ -164,48 +158,57 @@ def main():
         logger.info(f"🎤 Listening for '{wake_detector.get_wake_word_name()}' on {usb_device.name}")
         logger.info("Press Ctrl+C to stop...")
         
+        # Simple test mode: record short samples instead of continuous streaming
         try:
-            # Start live audio stream
-            stream = audio_manager.start_stream(
-                device_index=usb_device.index,
-                sample_rate=wake_detector.get_sample_rate(),
-                channels=1,
-                chunk_size=wake_detector.get_frame_length()
-            )
+            logger.info("🔧 Using simple test mode to prevent system crashes...")
             
-            if not stream:
-                logger.error("❌ Failed to start audio stream")
-                return
-            
-            # Process audio in real-time
             while True:
                 try:
-                    # Read audio chunk
-                    audio_data = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
-                    
-                    # Convert to numpy array
-                    audio_chunk = np.frombuffer(audio_data, dtype=np.int16)
-                    
-                    # Process with wake-word detector
-                    if wake_detector.process_audio(audio_chunk):
-                        logger.info("🎯 WAKE WORD DETECTED!")
-                        # Could add audio capture here for post-processing
+                    # Record a short audio sample (2 seconds)
+                    logger.info("🎙️ Recording 2-second sample...")
+                    if audio_manager.record_to_file(
+                        device_index=usb_device.index,
+                        duration=2.0,
+                        output_file="/tmp/test_audio.wav",
+                        sample_rate=wake_detector.get_sample_rate(),
+                        channels=1
+                    ):
+                        # Read the recorded file
+                        import soundfile as sf
+                        audio_data, sample_rate = sf.read("/tmp/test_audio.wav")
                         
+                        # Convert to int16 if needed
+                        if audio_data.dtype != np.int16:
+                            audio_data = (audio_data * 32767).astype(np.int16)
+                        
+                        # Process with wake word detector
+                        if wake_detector.process_audio(audio_data):
+                            logger.info("🎯 Wake word detected!")
+                        else:
+                            logger.info("👂 No wake word detected in this sample")
+                    
+                    # Brief pause between recordings
+                    time.sleep(1)
+                    
                 except KeyboardInterrupt:
-                    logger.info("Stopping wake-word detection...")
+                    logger.info("🛑 Stopping wake word detection...")
                     break
                 except Exception as e:
-                    logger.error(f"Error processing audio: {e}")
-                    break
-            
-            # Cleanup
-            stream.stop_stream()
-            stream.close()
-            
-        except KeyboardInterrupt:
-            logger.info("Wake-word detection stopped by user")
+                    logger.error(f"Error in test mode: {e}")
+                    time.sleep(2)  # Longer pause on error
+                    continue
+                    
         except Exception as e:
-            logger.error(f"Error in wake-word detection: {e}")
+            logger.error(f"❌ Fatal error in test mode: {e}")
+        finally:
+            # Clean up
+            try:
+                import os
+                if os.path.exists("/tmp/test_audio.wav"):
+                    os.remove("/tmp/test_audio.wav")
+                logger.info("✅ Test mode cleanup completed")
+            except Exception as e:
+                logger.error(f"Error during cleanup: {e}")
         return
     
     # Main service loop
