@@ -102,10 +102,33 @@ class OpenWakeWordEngine(WakeWordEngine):
             # Get predictions
             predictions = self.model.predict(audio_float)
             
-            # Check if any prediction exceeds threshold
-            for prediction in predictions:
-                if prediction > self.threshold:
-                    logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {prediction:.3f}")
+            # Debug: Log prediction type and content
+            logger.debug(f"Predictions type: {type(predictions)}, content: {predictions}")
+            
+            # Handle different prediction formats
+            if isinstance(predictions, (list, tuple)):
+                # If predictions is a list/tuple, check each element
+                for prediction in predictions:
+                    if isinstance(prediction, (int, float)):
+                        if prediction > self.threshold:
+                            logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {prediction:.3f}")
+                            return True
+                    elif isinstance(prediction, dict):
+                        # If prediction is a dict, check values
+                        for value in prediction.values():
+                            if isinstance(value, (int, float)) and value > self.threshold:
+                                logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {value:.3f}")
+                                return True
+            elif isinstance(predictions, dict):
+                # If predictions is a dict, check values
+                for value in predictions.values():
+                    if isinstance(value, (int, float)) and value > self.threshold:
+                        logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {value:.3f}")
+                        return True
+            elif isinstance(predictions, (int, float)):
+                # If predictions is a single number
+                if predictions > self.threshold:
+                    logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {predictions:.3f}")
                     return True
             
             return False
