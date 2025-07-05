@@ -124,7 +124,7 @@ class OpenWakeWordEngine(WakeWordEngine):
     
     def get_frame_length(self) -> int:
         """Get the required frame length for this engine."""
-        return 512  # OpenWakeWord uses 512 samples (32ms at 16kHz)
+        return 1280  # OpenWakeWord requires 1280 samples (80ms at 16kHz)
     
     def is_ready(self) -> bool:
         """Check if the engine is ready to process audio."""
