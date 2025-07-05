@@ -158,48 +158,58 @@ def main():
         logger.info(f"🎤 Listening for '{wake_detector.get_wake_word_name()}' on {usb_device.name}")
         logger.info("Press Ctrl+C to stop...")
         
-        # Simple test mode: record short samples instead of continuous streaming
+        # Simple test mode to prevent system crashes
+        logger.info("🔧 Using simple test mode to prevent system crashes...")
+        
         try:
-            logger.info("🔧 Using simple test mode to prevent system crashes...")
-            
-            while True:
-                try:
-                    # Record a short audio sample (2 seconds)
-                    logger.info("🎙️ Recording 2-second sample...")
-                    if audio_manager.record_to_file(
-                        device_index=usb_device.index,
-                        duration=2.0,
-                        output_file="/tmp/test_audio.wav",
-                        sample_rate=wake_detector.get_sample_rate(),
-                        channels=1
-                    ):
-                        # Read the recorded file
-                        import soundfile as sf
-                        audio_data, sample_rate = sf.read("/tmp/test_audio.wav")
-                        
-                        # Convert to int16 if needed
-                        if audio_data.dtype != np.int16:
-                            audio_data = (audio_data * 32767).astype(np.int16)
-                        
-                        # Process with wake word detector
-                        if wake_detector.process_audio(audio_data):
-                            logger.info("🎯 Wake word detected!")
-                        else:
-                            logger.info("👂 No wake word detected in this sample")
-                    
-                    # Brief pause between recordings
-                    time.sleep(1)
-                    
-                except KeyboardInterrupt:
-                    logger.info("🛑 Stopping wake word detection...")
-                    break
-                except Exception as e:
-                    logger.error(f"Error in test mode: {e}")
-                    time.sleep(2)  # Longer pause on error
+            for i in range(5):  # Test 5 samples
+                logger.info(f"🎙️ Recording 2-second sample...")
+                
+                # Record audio sample
+                if not audio_manager.record_to_file("/tmp/test_audio.wav", duration=2.0):
+                    logger.error("❌ Failed to record audio sample")
                     continue
+                
+                # Load and process audio in chunks
+                import soundfile as sf
+                import numpy as np
+                
+                try:
+                    # Load the recorded audio
+                    audio_data, sample_rate = sf.read("/tmp/test_audio.wav")
                     
+                    # Convert to mono if stereo
+                    if len(audio_data.shape) > 1:
+                        audio_data = audio_data[:, 0]
+                    
+                    # Convert to int16 if needed
+                    if audio_data.dtype != np.int16:
+                        audio_data = (audio_data * 32767).astype(np.int16)
+                    
+                    # Process audio in 1280-sample chunks
+                    frame_length = wake_detector.get_frame_length()
+                    detected = False
+                    
+                    for start in range(0, len(audio_data) - frame_length, frame_length // 2):  # 50% overlap
+                        chunk = audio_data[start:start + frame_length]
+                        if len(chunk) == frame_length:  # Only process complete frames
+                            if wake_detector.process_audio(chunk):
+                                logger.info("🎉 Wake word detected!")
+                                detected = True
+                                break
+                    
+                    if not detected:
+                        logger.info("👂 No wake word detected in this sample")
+                        
+                except Exception as e:
+                    logger.error(f"❌ Error processing audio: {e}")
+                    
+                time.sleep(1)  # Wait between samples
+                
+        except KeyboardInterrupt:
+            logger.info("🛑 Test stopped by user")
         except Exception as e:
-            logger.error(f"❌ Fatal error in test mode: {e}")
+            logger.error(f"❌ Error in test mode: {e}")
         finally:
             # Clean up
             try:
