@@ -166,7 +166,13 @@ def main():
                 logger.info(f"🎙️ Recording 2-second sample...")
                 
                 # Record audio sample
-                if not audio_manager.record_to_file("/tmp/test_audio.wav", duration=2.0):
+                if not audio_manager.record_to_file(
+                    usb_device.index,
+                    2.0,
+                    "/tmp/test_audio.wav",
+                    sample_rate=wake_detector.get_sample_rate(),
+                    channels=1
+                ):
                     logger.error("❌ Failed to record audio sample")
                     continue
                 
