@@ -67,14 +67,12 @@ class WakeWordEngine(ABC):
 class WakeWordDetector:
     """Main wake-word detector that uses pluggable engines."""
     
-    def __init__(self, engine_name: str = "porcupine"):
+    def __init__(self):
         """
-        Initialize the wake-word detector with specified engine.
-        
-        Args:
-            engine_name: Name of the engine to use ("porcupine", "snowboy", etc.)
+        Initialize the wake-word detector.
+        The engine will be created during initialize() based on config.
         """
-        self.engine_name = engine_name
+        self.engine_name = None
         self.engine: Optional[WakeWordEngine] = None
         self.is_initialized = False
         
@@ -83,12 +81,16 @@ class WakeWordDetector:
         Initialize the wake-word detection engine.
         
         Args:
-            config: Configuration dictionary
+            config: Configuration dictionary containing 'engine' key
             
         Returns:
             True if initialization successful, False otherwise
         """
         try:
+            # Get engine name from config
+            self.engine_name = config.get('engine', 'openwakeword')
+            logger.info(f"Initializing wake-word engine: {self.engine_name}")
+            
             # Create engine instance based on name
             if self.engine_name == "porcupine":
                 from wake_word_engines.porcupine_engine import PorcupineEngine
