@@ -9,6 +9,7 @@ import numpy as np
 from typing import Dict, Any, Optional
 import logging
 from wake_word_interface import WakeWordEngine
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -27,101 +28,109 @@ class OpenWakeWordEngine(WakeWordEngine):
         Initialize the OpenWakeWord engine.
         
         Args:
-            config: Configuration dictionary with OpenWakeWord settings
-            
+            config: Configuration dictionary containing:
+                - keyword: Wake word to detect
+                - threshold: Detection threshold (0.0-1.0)
+                - custom_model_path: Path to custom model (optional)
+        
         Returns:
-            True if initialization successful, False otherwise
+            bool: True if initialization successful, False otherwise
         """
         try:
-            keyword = config.get('keyword', 'hey_orac')
+            keyword = config.get('keyword', 'hey_jarvis')
             self.threshold = config.get('threshold', 0.5)
+            self.wake_word_name = keyword
             
-            # Initialize OpenWakeWord model with correct API
-            # The Model class takes: wakeword_model_paths, class_mapping_dicts, enable_speex_noise_suppression, vad_threshold
-            # If no paths provided, it loads all pre-trained models
-            self.model = openwakeword.Model(
-                wakeword_model_paths=[],  # Empty list loads all pre-trained models
-                class_mapping_dicts=[],   # Empty list uses default mappings
-                enable_speex_noise_suppression=False,  # Disable for now
-                vad_threshold=0.0  # Disable VAD for now
-            )
+            # Check if custom model is specified
+            custom_model_path = config.get('custom_model_path')
             
-            self.wake_word_name = keyword.upper().replace('_', ' ')
+            if custom_model_path and os.path.exists(custom_model_path):
+                logger.info(f"Loading custom OpenWakeWord model: {custom_model_path}")
+                # Load custom model
+                self.model = openwakeword.Model(
+                    wakeword_model_paths=[custom_model_path],
+                    class_mapping_dicts=[{0: keyword}],
+                    enable_speex_noise_suppression=False,
+                    vad_threshold=0.5
+                )
+            else:
+                # Use pre-trained models
+                logger.info(f"Loading pre-trained OpenWakeWord model for: {keyword}")
+                
+                # Check if keyword is available in pre-trained models
+                available_models = openwakeword.models
+                if keyword not in available_models:
+                    logger.warning(f"Keyword '{keyword}' not found in pre-trained models. Available: {list(available_models.keys())}")
+                    logger.info("Falling back to 'hey_jarvis' model")
+                    keyword = 'hey_jarvis'
+                
+                self.wake_word_name = keyword
+                model_path = available_models[keyword]['model_path']
+                
+                self.model = openwakeword.Model(
+                    wakeword_model_paths=[model_path],
+                    class_mapping_dicts=[{0: keyword}],
+                    enable_speex_noise_suppression=False,
+                    vad_threshold=0.5
+                )
+            
             self.is_initialized = True
-            
-            logger.info(f"OpenWakeWord engine initialized successfully")
-            logger.info(f"Wake word: {self.wake_word_name}")
-            logger.info(f"Threshold: {self.threshold}")
+            logger.info(f"✅ OpenWakeWord engine initialized successfully for '{self.wake_word_name}'")
             return True
             
         except Exception as e:
             logger.error(f"Failed to initialize OpenWakeWord engine: {e}")
             return False
     
-    def process_audio(self, audio_chunk: bytes) -> bool:
+    def process_audio(self, audio_chunk: np.ndarray) -> bool:
         """
-        Process an audio chunk and detect wake-word.
+        Process audio chunk and detect wake word.
         
         Args:
-            audio_chunk: Raw audio data as bytes
-            
+            audio_chunk: Audio data as numpy array (int16)
+        
         Returns:
-            True if wake-word detected, False otherwise
+            bool: True if wake word detected, False otherwise
         """
-        if not self.is_ready():
+        if not self.is_initialized or self.model is None:
             return False
         
         try:
-            # Convert bytes to numpy array (16-bit PCM)
-            audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+            # Convert audio to float32 and normalize
+            audio_float = audio_chunk.astype(np.float32) / 32768.0
             
-            # OpenWakeWord expects 1280 samples of 16khz, 16-bit audio data
-            # We need to ensure we have the right amount of data
-            if len(audio_data) < 1280:
-                # Pad with zeros if we don't have enough data
-                audio_data = np.pad(audio_data, (0, 1280 - len(audio_data)), 'constant')
-            elif len(audio_data) > 1280:
-                # Truncate if we have too much data
-                audio_data = audio_data[:1280]
+            # Get predictions
+            predictions = self.model.predict(audio_float)
             
-            # Convert to float32 and normalize
-            audio_float = audio_data.astype(np.float32) / 32768.0
-            
-            # Predict with OpenWakeWord
-            prediction = self.model.predict(audio_float)
-            
-            # Check if any wake word was detected above threshold
-            for wake_word, confidence in prediction.items():
-                if confidence > self.threshold:
-                    logger.info(f"🎯 OpenWakeWord detected: {wake_word} (confidence: {confidence:.3f})")
+            # Check if any prediction exceeds threshold
+            for prediction in predictions:
+                if prediction > self.threshold:
+                    logger.info(f"Wake word '{self.wake_word_name}' detected with confidence: {prediction:.3f}")
                     return True
-                
+            
+            return False
+            
         except Exception as e:
             logger.error(f"Error processing audio with OpenWakeWord: {e}")
-            
-        return False
+            return False
+    
+    def get_wake_word_name(self) -> str:
+        """Get the name of the wake word being detected."""
+        return self.wake_word_name
     
     def get_sample_rate(self) -> int:
-        """Get the required sample rate for OpenWakeWord."""
+        """Get the required sample rate for this engine."""
         return self.sample_rate
     
     def get_frame_length(self) -> int:
-        """Get the required frame length for OpenWakeWord."""
-        return 1280  # OpenWakeWord expects 1280 samples (80ms at 16kHz)
-    
-    def get_wake_word_name(self) -> str:
-        """Get the wake word name."""
-        return self.wake_word_name
+        """Get the required frame length for this engine."""
+        return 512  # OpenWakeWord uses 512 samples (32ms at 16kHz)
     
     def is_ready(self) -> bool:
-        """Check if the engine is ready."""
+        """Check if the engine is ready to process audio."""
         return self.is_initialized and self.model is not None
     
     def cleanup(self) -> None:
-        """Clean up OpenWakeWord resources."""
-        if self.model:
-            try:
-                # OpenWakeWord doesn't have explicit cleanup, but we can clear the reference
-                self.model = None
-            except Exception as e:
-                logger.warning(f"Error cleaning up OpenWakeWord: {e}") 
+        """Clean up resources."""
+        self.model = None
+        self.is_initialized = False 

@@ -37,6 +37,7 @@ USER appuser
 # Copy application code
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser models/ ./models/
+COPY --chown=appuser:appuser third_party/ ./third_party/
 
 # Copy configuration
 COPY --chown=appuser:appuser src/config.yaml ./config.yaml

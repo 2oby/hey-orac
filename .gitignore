@@ -187,11 +187,15 @@ Thumbs.db
 *.aac
 !tests/sample_orac.wav
 
-# Model files (except test models)
+# Model files (except test models and custom models)
 *.ppn
 *.onnx
 *.pb
+*.tflite
 !models/porcupine/orac.ppn
+!third_party/openwakeword/custom_models/*.onnx
+!third_party/openwakeword/custom_models/*.tflite
+!third_party/porcupine/custom_models/*.ppn
 
 # Logs
 *.log
