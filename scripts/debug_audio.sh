@@ -106,7 +106,7 @@ run_command "docker-compose exec -T hey-orac bash -c 'whoami && groups'" \
     "Checking user and group membership"
 
 # Test ALSA recording
-run_command "docker-compose exec -T hey-orac bash -c 'timeout 3 arecord -D hw:0,0 -f S16_LE -r 16000 -c 1 /tmp/test.wav || echo \"Recording test completed\""' \
+run_command "docker-compose exec -T hey-orac bash -c 'timeout 3 arecord -D hw:0,0 -f S16_LE -r 16000 -c 1 /tmp/test.wav || echo \"Recording test completed\"'" \
     "Testing ALSA recording (3 second timeout)"
 
 echo ""

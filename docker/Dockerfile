@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
     portaudio19-dev \
     libasound2-dev \
     libasound2-plugins \
+    libasound2-plugins-extra \
     libjack-jackd2-dev \
     libsndfile1 \
     pkg-config \
@@ -44,9 +45,10 @@ RUN /app/venv/bin/pip install --upgrade pip setuptools wheel \
     && find /app/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /app/venv -name "*.pyc" -delete 2>/dev/null || true
 
-# Force reinstall PyAudio with ALSA support
+# Force reinstall PyAudio with ALSA support and specific compilation flags
 RUN /app/venv/bin/pip uninstall -y pyaudio || true \
-    && /app/venv/bin/pip install --force-reinstall --no-cache-dir --no-binary=:all: pyaudio
+    && CFLAGS="-I/usr/include/alsa" LDFLAGS="-L/usr/lib/aarch64-linux-gnu -lasound" \
+    /app/venv/bin/pip install --force-reinstall --no-cache-dir --no-binary=:all: pyaudio
 
 # Change ownership of virtual environment to appuser
 RUN chown -R appuser:appuser /app/venv
@@ -72,6 +74,9 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV PATH=/app/venv/bin:/home/appuser/.local/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
+# Disable ALSA plugins that cause issues in containers
+ENV ALSA_PCM_CARD=0
+ENV ALSA_PCM_DEVICE=0
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \

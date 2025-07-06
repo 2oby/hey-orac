@@ -1,7 +1,7 @@
-# ALSA configuration for USB microphone in Docker
-# Optimized for SH-04: USB Audio
+# Minimal ALSA configuration for USB microphone in Docker
+# Bypasses problematic plugins and directly uses hardware
 
-# Default PCM device for input/output
+# Default PCM device - direct hardware access
 pcm.!default {
     type hw
     card 0
@@ -24,4 +24,25 @@ pcm.usb_mic {
 ctl.usb_mic {
     type hw
     card 0
+}
+
+# Disable problematic plugins
+pcm.dmix {
+    type null
+}
+
+pcm.dsnoop {
+    type null
+}
+
+pcm.hdmi {
+    type null
+}
+
+pcm.modem {
+    type null
+}
+
+pcm.phoneline {
+    type null
 }
