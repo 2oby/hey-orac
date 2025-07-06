@@ -13,6 +13,7 @@ import numpy as np
 from pathlib import Path
 from audio_utils import AudioManager
 from wake_word_interface import WakeWordDetector
+from audio_buffer import AudioBuffer
 
 # Configure logging
 logging.basicConfig(
@@ -254,19 +255,121 @@ def main():
     logger.info("Starting Hey Orac wake-word detection service...")
     logger.info(f"Configuration: {config}")
     
-    # TODO: Implement main service loop
-    logger.info("Main service loop not yet implemented")
+    # Initialize wake word detector
+    wake_detector = WakeWordDetector()
+    if not wake_detector.initialize(config['wake_word']):
+        logger.error("❌ Failed to initialize wake word detector")
+        sys.exit(1)
+    
+    # Initialize audio manager
+    audio_manager = AudioManager()
+    
+    # Find USB microphone
+    usb_device = audio_manager.find_usb_microphone()
+    if not usb_device:
+        logger.error("❌ No USB microphone found")
+        sys.exit(1)
+    
+    # Initialize audio buffer for pre-roll and post-roll capture
+    audio_buffer = AudioBuffer(
+        sample_rate=wake_detector.get_sample_rate(),
+        channels=1,
+        preroll_seconds=config['buffer']['preroll_seconds'],
+        postroll_seconds=config['buffer']['postroll_seconds']
+    )
+    
+    logger.info(f"🎤 Starting continuous wake-word detection on {usb_device.name}")
+    logger.info(f"🎯 Listening for: '{wake_detector.get_wake_word_name()}'")
+    logger.info(f"⚙️ Sample rate: {wake_detector.get_sample_rate()}")
+    logger.info(f"📏 Frame length: {wake_detector.get_frame_length()}")
+    logger.info(f"📦 Audio buffer: {config['buffer']['preroll_seconds']}s pre-roll, {config['buffer']['postroll_seconds']}s post-roll")
+    logger.info("Press Ctrl+C to stop...")
+    
+    # Start continuous audio stream
+    stream = audio_manager.start_stream(
+        device_index=usb_device.index,
+        sample_rate=wake_detector.get_sample_rate(),
+        channels=1,
+        chunk_size=wake_detector.get_frame_length()
+    )
+    
+    if not stream:
+        logger.error("❌ Failed to start audio stream")
+        sys.exit(1)
     
     try:
-        # Placeholder for main loop - with sleep to prevent CPU runaway
-        logger.info("Main service loop not yet implemented - sleeping to prevent CPU runaway")
+        detection_count = 0
+        chunk_count = 0
+        
         while True:
-            time.sleep(1)  # Sleep 1 second to prevent 100% CPU usage
+            try:
+                # Read audio chunk
+                audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
+                chunk_count += 1
+                
+                # Convert to numpy array
+                audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+                
+                # Add to audio buffer
+                audio_buffer.add_audio(audio_data)
+                
+                # Process audio for wake-word detection
+                if wake_detector.process_audio(audio_data):
+                    detection_count += 1
+                    logger.info(f"🎯 WAKE WORD DETECTED! (Detection #{detection_count})")
+                    
+                    # Start post-roll capture
+                    audio_buffer.start_postroll_capture()
+                    
+                    # Wait for post-roll capture to complete
+                    while audio_buffer.is_capturing_postroll():
+                        # Continue reading audio during post-roll
+                        audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
+                        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+                        audio_buffer.add_audio(audio_data)
+                        chunk_count += 1
+                    
+                    # Get complete audio clip
+                    complete_audio = audio_buffer.get_complete_audio_clip()
+                    if complete_audio is not None:
+                        # Save audio clip for now (replace with streaming to Jetson)
+                        clip_filename = f"/tmp/wake_word_detection_{detection_count}.wav"
+                        if audio_buffer.save_audio_clip(clip_filename):
+                            logger.info(f"💾 Saved complete audio clip: {clip_filename}")
+                            logger.info(f"📦 Audio clip duration: {len(complete_audio)/audio_buffer.sample_rate:.2f}s")
+                            logger.info(f"📦 Audio clip samples: {len(complete_audio)}")
+                        else:
+                            logger.error("❌ Failed to save audio clip")
+                    
+                    # TODO: Stream audio to Jetson Orin
+                    logger.info("📡 Audio capture completed - ready for streaming to Jetson")
+                
+                # Log progress every 1000 chunks (about 80 seconds at 16kHz)
+                if chunk_count % 1000 == 0:
+                    buffer_status = audio_buffer.get_buffer_status()
+                    logger.info(f"👂 Processed {chunk_count} audio chunks...")
+                    logger.info(f"📦 Buffer status: {buffer_status['preroll_samples']} pre-roll samples")
+                
+            except Exception as e:
+                logger.error(f"❌ Error processing audio chunk: {e}")
+                continue
+                
     except KeyboardInterrupt:
-        logger.info("Service stopped by user")
+        logger.info("🛑 Service stopped by user")
     except Exception as e:
-        logger.error(f"Service error: {e}")
+        logger.error(f"❌ Service error: {e}")
         sys.exit(1)
+    finally:
+        # Cleanup
+        try:
+            if stream:
+                stream.stop_stream()
+                stream.close()
+            audio_manager.stop_recording()
+            wake_detector.cleanup()
+            logger.info("✅ Cleanup completed")
+        except Exception as e:
+            logger.error(f"Error during cleanup: {e}")
 
 
 if __name__ == "__main__":

@@ -25,7 +25,16 @@
 - [ ] Test with sample audio or microphone input
 - [ ] Add logging for detection events
 
-### 5. End-to-End Testing
+### 5. Continuous Streaming Wake-Word Detection
+- [ ] Replace 2-second test windows with continuous audio streaming
+- [ ] Implement real-time audio processing pipeline
+- [ ] Configure OpenWakeWord for continuous detection (80ms frames)
+- [ ] Add immediate wake-word detection without artificial delays
+- [ ] Test continuous listening mode with "hey jarvis" wake word
+- [ ] Ensure low-latency detection (< 100ms from speech to detection)
+- [ ] Add proper audio buffer management for continuous streaming
+
+### 6. End-to-End Testing
 - [ ] Test complete pipeline: mic → wake-word → audio capture
 - [ ] Verify audio quality and format
 - [ ] Test deployment script with working application
@@ -77,6 +86,7 @@ ENV PATH="/home/appuser/.local/bin:$PATH"
 
 ### Core Functionality
 - [ ] Wake-word detection working with USB microphone
+- [ ] Continuous audio streaming and real-time processing
 - [ ] Audio capture and buffering implemented
 - [ ] Basic streaming to mock endpoint
 - [ ] Latency < 150ms target
@@ -127,18 +137,18 @@ ENV PATH="/home/appuser/.local/bin:$PATH"
 
 ## 📊 PROGRESS TRACKING
 
-### Phase 1a Progress: 70% Complete
+### Phase 1a Progress: 65% Complete
 - ✅ Infrastructure: 100%
 - ✅ Docker Setup: 100%
 - ✅ Dependencies: 100%
-- 🔄 Core Application: 30%
+- 🔄 Core Application: 25%
 - 🔄 Testing: 50%
 - 🔄 Documentation: 80%
 
 ### Next Sprint Goals (1-2 weeks)
 1. Fix PATH warnings
-2. Implement basic audio capture
-3. Add wake-word detection
+2. Implement continuous audio streaming (replace 2-second windows)
+3. Add real-time wake-word detection
 4. Test end-to-end functionality
-5. Optimize performance
+5. Optimize performance and latency
 6. Complete documentation 

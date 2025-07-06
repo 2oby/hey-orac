@@ -52,7 +52,7 @@ EXPOSE 8080
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
-ENV PATH=/app/venv/bin:$PATH
+ENV PATH=/app/venv/bin:/home/appuser/.local/bin:$PATH
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
