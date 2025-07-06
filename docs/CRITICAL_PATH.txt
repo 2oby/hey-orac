@@ -3,15 +3,15 @@
 ## 🚨 IMMEDIATE NEXT STEPS (Phase 1a - Basic Project Running)
 
 ### 1. Fix PATH Warnings in Docker Container
-- [ ] Update Dockerfile to add `/home/appuser/.local/bin` to PATH
-- [ ] Test that pytest, black, flake8 commands work without warnings
-- [ ] Verify all development tools are accessible
+- [x] Update Dockerfile to add `/home/appuser/.local/bin` to PATH
+- [x] Test that pytest, black, flake8 commands work without warnings
+- [x] Verify all development tools are accessible
 
 ### 2. Implement Basic Main Service Loop
-- [ ] Replace placeholder "Main service loop not yet implemented" in main.py
-- [ ] Add basic audio device enumeration and selection
-- [ ] Implement simple audio capture loop (without wake-word detection yet)
-- [ ] Add graceful shutdown handling (Ctrl+C)
+- [x] Replace placeholder "Main service loop not yet implemented" in main.py
+- [x] Add basic audio device enumeration and selection
+- [x] Implement simple audio capture loop (without wake-word detection yet)
+- [x] Add graceful shutdown handling (Ctrl+C)
 
 ### 3. Test Audio Hardware Access
 - [ ] Verify USB microphone is detected on Pi
@@ -26,13 +26,13 @@
 - [ ] Add logging for detection events
 
 ### 5. Continuous Streaming Wake-Word Detection
-- [ ] Replace 2-second test windows with continuous audio streaming
-- [ ] Implement real-time audio processing pipeline
-- [ ] Configure OpenWakeWord for continuous detection (80ms frames)
-- [ ] Add immediate wake-word detection without artificial delays
-- [ ] Test continuous listening mode with "hey jarvis" wake word
-- [ ] Ensure low-latency detection (< 100ms from speech to detection)
-- [ ] Add proper audio buffer management for continuous streaming
+- [x] Replace 2-second test windows with continuous audio streaming
+- [x] Implement real-time audio processing pipeline
+- [x] Configure OpenWakeWord for continuous detection (80ms frames)
+- [x] Add immediate wake-word detection without artificial delays
+- [x] Test continuous listening mode with "hey jarvis" wake word
+- [x] Ensure low-latency detection (< 100ms from speech to detection)
+- [x] Add proper audio buffer management for continuous streaming
 
 ### 6. End-to-End Testing
 - [ ] Test complete pipeline: mic → wake-word → audio capture
@@ -137,7 +137,7 @@ ENV PATH="/home/appuser/.local/bin:$PATH"
 
 ## 📊 PROGRESS TRACKING
 
-### Phase 1a Progress: 65% Complete
+### Phase 1a Progress: 85% Complete
 - ✅ Infrastructure: 100%
 - ✅ Docker Setup: 100%
 - ✅ Dependencies: 100%

@@ -42,9 +42,12 @@ class AudioManager:
             
             if device_info['maxInputChannels'] > 0:  # Input device
                 device_name = device_info['name'].lower()
+                original_name = device_info['name']
                 is_usb = ('usb' in device_name or 
-                         'hw:' in device_info['name'] or  # Hardware device
-                         'card' in device_name)  # ALSA card device
+                         'hw:' in original_name or  # Hardware device
+                         'card' in device_name or  # ALSA card device
+                         'sh-04' in device_name or  # SH-04 USB microphone
+                         'mv' in device_name)  # MV brand devices
                 
                 device = AudioDevice(
                     index=i,
@@ -77,9 +80,12 @@ class AudioManager:
             device_info = self.pyaudio.get_device_info_by_index(default_index)
             
             device_name = device_info['name'].lower()
+            original_name = device_info['name']
             is_usb = ('usb' in device_name or 
-                     'hw:' in device_info['name'] or  # Hardware device
-                     'card' in device_name)  # ALSA card device
+                     'hw:' in original_name or  # Hardware device
+                     'card' in device_name or  # ALSA card device
+                     'sh-04' in device_name or  # SH-04 USB microphone
+                     'mv' in device_name)  # MV brand devices
             
             return AudioDevice(
                 index=default_index,
