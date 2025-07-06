@@ -109,11 +109,20 @@ ssh "$REMOTE_ALIAS" "\
     echo 'Running configuration tests...'; \
     docker-compose exec -T hey-orac python -m pytest tests/test_wakeword.py -v || echo 'Tests completed with some failures'; \
     \
-    echo '${BLUE}🔧 Running audio diagnostics...${NC}'; \
+    echo '${BLUE}🔧 Running comprehensive audio diagnostics...${NC}'; \
     docker-compose exec -T hey-orac python src/main.py --audio-diagnostics || echo 'Audio diagnostics completed'; \
     \
     echo '${BLUE}🧪 Testing PyAudio ALSA support...${NC}'; \
     docker-compose exec -T hey-orac python src/main.py --test-pyaudio || echo 'PyAudio test completed'; \
+    \
+    echo '${BLUE}🎤 Testing SH-04 USB microphone specifically...${NC}'; \
+    docker-compose exec -T hey-orac python src/test_pyaudio_minimal.py || echo 'SH-04 test completed'; \
+    \
+    echo '${BLUE}🔍 Testing arecord with SH-04...${NC}'; \
+    docker-compose exec -T hey-orac arecord -D default -f S16_LE -r 16000 -c 1 -d 2 test_sh04.wav || echo 'arecord test completed'; \
+    \
+    echo '${BLUE}📊 Checking device access...${NC}'; \
+    docker-compose exec -T hey-orac lsof /dev/snd/* 2>/dev/null || echo 'No processes using audio devices'; \
     
     echo '${BLUE}📊 Checking resource usage...${NC}'; \
     echo 'Container status:'; \
@@ -139,4 +148,8 @@ echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python
 echo -e "${BLUE}🔧 To run comprehensive audio diagnostics:${NC}"
 echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --audio-diagnostics'${NC}"
 echo -e "${BLUE}🧪 To test PyAudio ALSA support:${NC}"
-echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --test-pyaudio'${NC}" 
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --test-pyaudio'${NC}"
+echo -e "${BLUE}🎤 To test SH-04 USB microphone specifically:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/test_pyaudio_minimal.py'${NC}"
+echo -e "${BLUE}🔍 To test arecord with SH-04:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac arecord -D default -f S16_LE -r 16000 -c 1 -d 2 test.wav'${NC}" 

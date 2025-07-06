@@ -16,6 +16,8 @@ RUN apt-get update && apt-get install -y \
     alsa-utils \
     python3-pyaudio \
     usbutils \
+    libasound2 \
+    libportaudio2 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -44,12 +46,11 @@ RUN /app/venv/bin/pip install --upgrade pip setuptools wheel \
     && find /app/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /app/venv -name "*.pyc" -delete 2>/dev/null || true
 
-# Install PyAudio with proper ALSA support
+# Install PyAudio with proper ALSA support and force reinstall
 RUN /app/venv/bin/pip uninstall -y pyaudio || true \
     && CFLAGS="-I/usr/include/alsa" LDFLAGS="-L/usr/lib/aarch64-linux-gnu -lasound" \
-    /app/venv/bin/pip install --no-cache-dir --no-binary=:all: pyaudio
-
-
+    /app/venv/bin/pip install --no-cache-dir --no-binary=:all: pyaudio \
+    && /app/venv/bin/pip install --force-reinstall numpy
 
 # Change ownership of virtual environment to appuser
 RUN chown -R appuser:appuser /app/venv
@@ -75,8 +76,10 @@ ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV PATH=/app/venv/bin:/home/appuser/.local/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
-# Disable ALSA plugins that cause issues in containers
-ENV ALSA_PCM_CARD=0
+# ALSA configuration for SH-04 USB microphone
+ENV ALSA_CARD=SH04
+ENV ALSA_DEVICE=hw:SH04,0
+ENV ALSA_PCM_CARD=SH04
 ENV ALSA_PCM_DEVICE=0
 
 # Health check

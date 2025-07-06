@@ -1,11 +1,63 @@
-# Minimal ALSA configuration for USB microphone in Docker
-# Only configure what we need - don't override system PCMs
+# Comprehensive ALSA configuration for SH-04 USB microphone in Docker
+# Disable problematic plugins and configure proper device access
 
-# Default PCM device - direct hardware access to SH-04
+# Disable problematic ALSA plugins that cause issues in containers
+pcm.dmix {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.dsnoop {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.rear {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.center_lfe {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.side {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.modem {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.phoneline {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.hdmi {
+    type plug
+    slave.pcm "null"
+}
+
+# Configure dmix for SH-04 to allow multiple access
+pcm.dmix_sh04 {
+    type dmix
+    ipc_key 123456
+    slave {
+        pcm "hw:SH04,0"
+        period_size 1024
+        buffer_size 4096
+        rate 16000
+    }
+}
+
+# Default PCM device - use dmix for multi-access support
 pcm.!default {
-    type hw
-    card SH04
-    device 0
+    type plug
+    slave.pcm "dmix_sh04"
 }
 
 # Default control device

@@ -327,12 +327,18 @@ class AudioManager:
             return None
     
     def stop_recording(self):
-        """Stop recording and close stream."""
+        """Stop recording and close stream with proper device release."""
         if self.current_stream:
-            self.current_stream.stop_stream()
-            self.current_stream.close()
-            self.current_stream = None
-            logger.info("Stopped recording")
+            try:
+                self.current_stream.stop_stream()
+                self.current_stream.close()
+                self.current_stream = None
+                logger.info("Device released and stream closed")
+            except Exception as e:
+                logger.error(f"Error closing stream: {e}")
+                self.current_stream = None
+        else:
+            logger.info("No active stream to stop")
     
     def record_to_file(self, device_index: int, duration: float, 
                       output_file: str, sample_rate: int = 16000, 
