@@ -44,11 +44,12 @@ RUN /app/venv/bin/pip install --upgrade pip setuptools wheel \
     && find /app/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /app/venv -name "*.pyc" -delete 2>/dev/null || true
 
-# Remove PyAudio from pip and use system package instead
-RUN /app/venv/bin/pip uninstall -y pyaudio || true
+# Install PyAudio with proper ALSA support
+RUN /app/venv/bin/pip uninstall -y pyaudio || true \
+    && CFLAGS="-I/usr/include/alsa" LDFLAGS="-L/usr/lib/aarch64-linux-gnu -lasound" \
+    /app/venv/bin/pip install --no-cache-dir --no-binary=:all: pyaudio
 
-# Copy system PyAudio to virtual environment
-RUN cp /usr/lib/python3/dist-packages/pyaudio* /app/venv/lib/python3.12/site-packages/ 2>/dev/null || true
+
 
 # Change ownership of virtual environment to appuser
 RUN chown -R appuser:appuser /app/venv

@@ -1,5 +1,5 @@
 # Minimal ALSA configuration for USB microphone in Docker
-# Bypasses problematic plugins and directly uses hardware
+# Direct hardware access only - no plugins
 
 # Default PCM device - direct hardware access
 pcm.!default {
@@ -14,14 +14,4 @@ ctl.!default {
     card 0
 }
 
-# USB microphone specific configuration
-pcm.usb_mic {
-    type hw
-    card 0
-    device 0
-}
 
-ctl.usb_mic {
-    type hw
-    card 0
-}
