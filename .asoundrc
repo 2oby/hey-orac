@@ -1,29 +1,17 @@
-# Use card 0 (which is your SH-04)
+# Minimal working ALSA configuration for SH-04 USB microphone
+# Direct hardware access without plugin conflicts
+
+# Default PCM device - direct hardware access to SH-04
 pcm.!default {
-    type asym
-    playback.pcm {
-        type plug
-        slave.pcm "hw:0,0"
-    }
-    capture.pcm {
-        type plug
-        slave.pcm "hw:0,0"
-    }
+    type hw
+    card 0
+    device 0
 }
 
+# Default control device
 ctl.!default {
     type hw
     card 0
 }
-
-# Disable all the problematic plugins
-pcm.dmix { type plug; slave.pcm "null"; }
-pcm.dsnoop { type plug; slave.pcm "null"; }
-pcm.rear { type plug; slave.pcm "null"; }
-pcm.center_lfe { type plug; slave.pcm "null"; }
-pcm.side { type plug; slave.pcm "null"; }
-pcm.hdmi { type plug; slave.pcm "null"; }
-pcm.modem { type plug; slave.pcm "null"; }
-pcm.phoneline { type plug; slave.pcm "null"; }
 
 
