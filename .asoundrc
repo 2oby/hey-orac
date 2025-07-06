@@ -25,24 +25,3 @@ ctl.usb_mic {
     type hw
     card 0
 }
-
-# Disable problematic plugins
-pcm.dmix {
-    type null
-}
-
-pcm.dsnoop {
-    type null
-}
-
-pcm.hdmi {
-    type null
-}
-
-pcm.modem {
-    type null
-}
-
-pcm.phoneline {
-    type null
-}
