@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     pkg-config \
     alsa-utils \
+    python3-pyaudio \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -38,9 +39,9 @@ RUN /app/venv/bin/pip install --upgrade pip setuptools wheel \
     && find /app/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /app/venv -name "*.pyc" -delete 2>/dev/null || true
 
-# Reinstall PyAudio with ALSA support
-RUN /app/venv/bin/pip uninstall -y pyaudio \
-    && /app/venv/bin/pip install --no-cache-dir --global-option='build_ext' --global-option='-I/usr/include/alsa' pyaudio
+# Ensure PyAudio is compiled with ALSA support
+RUN /app/venv/bin/pip uninstall -y pyaudio || true \
+    && /app/venv/bin/pip install --no-cache-dir --no-binary=:all: pyaudio
 
 # Change ownership of virtual environment to appuser
 RUN chown -R appuser:appuser /app/venv

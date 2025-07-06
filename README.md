@@ -8,7 +8,7 @@
 
 ## 🎯 Overview
 
-`pi-wakeword-streamer` is a lightweight, containerized service that continuously monitors audio input for the wake-word "ORAC" and streams detected audio clips to a remote processing endpoint. Built for ultra-low latency (<150ms) and designed to run efficiently on Raspberry Pi hardware.
+`pi-wakeword-streamer` is a lightweight, containerized service that continuously monitors audio input for the wake-word e.g. "Hey ORAC" or "Hey Computer" and streams detected audio clips to a remote processing endpoint. Built for ultra-low latency (<150ms) and designed to run efficiently on Raspberry Pi hardware.
 
 ### Key Features
 
