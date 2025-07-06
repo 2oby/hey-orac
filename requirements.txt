@@ -10,6 +10,9 @@ openwakeword==0.2.0
 # HTTP requests for streaming
 requests==2.31.0
 
+# USB device control
+pyusb==1.2.1
+
 # Configuration
 pyyaml==6.0.1
 

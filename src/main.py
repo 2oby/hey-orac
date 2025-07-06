@@ -14,6 +14,7 @@ from pathlib import Path
 from audio_utils import AudioManager
 from wake_word_interface import WakeWordDetector
 from audio_buffer import AudioBuffer
+from led_controller import SH04LEDController
 
 # Configure logging
 logging.basicConfig(
@@ -79,6 +80,11 @@ def main():
         action="store_true",
         help="Test PyAudio ALSA support and capabilities"
     )
+    parser.add_argument(
+        "--test-led",
+        action="store_true",
+        help="Test SH-04 LED controller functionality"
+    )
     
     args = parser.parse_args()
     
@@ -119,6 +125,17 @@ def main():
             print("\n🎉 PyAudio appears to be working correctly!")
         else:
             print("\n❌ PyAudio has issues - check the diagnostics above")
+        return
+    
+    if args.test_led:
+        logger.info("🧪 Testing SH-04 LED controller...")
+        from led_controller import test_led_controller
+        
+        success = test_led_controller()
+        if success:
+            print("\n✅ LED controller test completed successfully!")
+        else:
+            print("\n❌ LED controller test failed!")
         return
     
     if args.list_devices:
@@ -369,6 +386,45 @@ def main():
         postroll_seconds=config['buffer']['postroll_seconds']
     )
     
+    # Initialize LED controller for visual feedback
+    led_controller = SH04LEDController()
+    if led_controller.connect():
+        logger.info("✅ LED controller connected - visual feedback enabled")
+        
+        # Run LED test for 30 seconds on startup
+        logger.info("🎯 Running LED test for 30 seconds on startup...")
+        logger.info("   LED should flash between green (off) and red (on)")
+        
+        start_time = time.time()
+        flash_count = 0
+        
+        while time.time() - start_time < 30:
+            # LED ON (red/muted)
+            if led_controller.set_led_state(True):
+                flash_count += 1
+                elapsed = time.time() - start_time
+                logger.info(f"   {flash_count:2d}. LED ON  (red) - {elapsed:.1f}s")
+            else:
+                logger.error("   ❌ Error setting LED ON")
+            
+            time.sleep(0.5)
+            
+            # LED OFF (green/active)
+            if led_controller.set_led_state(False):
+                elapsed = time.time() - start_time
+                logger.info(f"   {flash_count:2d}. LED OFF (green) - {elapsed:.1f}s")
+            else:
+                logger.error("   ❌ Error setting LED OFF")
+            
+            time.sleep(0.5)
+        
+        logger.info(f"✅ LED test completed! Total flashes: {flash_count}")
+        logger.info("   LED should be back to green (normal state)")
+        
+    else:
+        logger.warning("⚠️ LED controller not available - no visual feedback")
+        led_controller = None
+    
     logger.info(f"🎤 Microphone found: {usb_device.name}")
     logger.info(f"🎯 Wake word: '{wake_detector.get_wake_word_name()}'")
     logger.info(f"⚙️ Sample rate: {wake_detector.get_sample_rate()}")
@@ -436,6 +492,11 @@ def main():
                     logger.info(f"   Audio RMS level: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
                     logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
                     logger.info(f"   Buffer status: {audio_buffer.get_buffer_status()}")
+                    
+                    # Visual feedback with LED
+                    if led_controller:
+                        logger.info("💡 Providing visual feedback with LED...")
+                        led_controller.wake_word_detected_feedback()
                     
                     # Start post-roll capture
                     logger.info("📦 Starting post-roll capture...")
@@ -519,6 +580,12 @@ def main():
             logger.info("🛑 Cleaning up wake detector...")
             wake_detector.cleanup()
             logger.info("✅ Wake detector cleaned up")
+            
+            # Cleanup LED controller
+            if led_controller:
+                logger.info("🛑 Disconnecting LED controller...")
+                led_controller.disconnect()
+                logger.info("✅ LED controller disconnected")
             
             logger.info("✅ All cleanup completed successfully")
         except Exception as e:
