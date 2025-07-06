@@ -179,7 +179,6 @@ def main():
                 
                 # Load and process audio in chunks
                 import soundfile as sf
-                import numpy as np
                 
                 try:
                     # Load the recorded audio
