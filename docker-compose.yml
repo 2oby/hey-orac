@@ -39,9 +39,9 @@ services:
       - PYTHONUNBUFFERED=1
       - DISPLAY=:0
       # ALSA configuration for SH-04 USB microphone
-      - ALSA_CARD=SH04
-      - ALSA_DEVICE=hw:SH04,0
-      - ALSA_PCM_CARD=SH04
+      - ALSA_CARD=0
+      - ALSA_DEVICE=hw:0,0
+      - ALSA_PCM_CARD=0
       - ALSA_PCM_DEVICE=0
       - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu
     deploy:

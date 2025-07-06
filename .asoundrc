@@ -47,7 +47,7 @@ pcm.dmix_sh04 {
     type dmix
     ipc_key 123456
     slave {
-        pcm "hw:SH04,0"
+        pcm "hw:0,0"
         period_size 1024
         buffer_size 4096
         rate 16000
@@ -63,7 +63,7 @@ pcm.!default {
 # Default control device
 ctl.!default {
     type hw
-    card SH04
+    card 0
 }
 
 

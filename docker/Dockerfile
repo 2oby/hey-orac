@@ -77,9 +77,9 @@ ENV PYTHONUNBUFFERED=1
 ENV PATH=/app/venv/bin:/home/appuser/.local/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
 # ALSA configuration for SH-04 USB microphone
-ENV ALSA_CARD=SH04
-ENV ALSA_DEVICE=hw:SH04,0
-ENV ALSA_PCM_CARD=SH04
+ENV ALSA_CARD=0
+ENV ALSA_DEVICE=hw:0,0
+ENV ALSA_PCM_CARD=0
 ENV ALSA_PCM_DEVICE=0
 
 # Health check
