@@ -376,6 +376,15 @@ def main():
     logger.info("🛑 Main audio processing loop TEMPORARILY DISABLED for microphone testing")
     logger.info("📋 Use --audio-diagnostics, --test-pyaudio, or --list-devices to test microphone")
     logger.info("🔄 To re-enable main processing, uncomment the audio processing loop in main.py")
+    logger.info("⏳ Keeping application running for testing...")
+    
+    # Keep the application running for testing purposes
+    try:
+        while True:
+            time.sleep(10)  # Sleep for 10 seconds
+            logger.info("💤 Application still running (testing mode)")
+    except KeyboardInterrupt:
+        logger.info("🛑 Application stopped by user")
     
     # TEMPORARILY DISABLED: Main audio processing loop
     # This prevents device contention during microphone testing
