@@ -342,7 +342,7 @@ def main():
                 logger.error(f"Error during cleanup: {e}")
         return
     
-    # Main service loop
+    # Main service loop - TEMPORARILY DISABLED FOR MICROPHONE TESTING
     logger.info("Starting Hey Orac wake-word detection service...")
     logger.info(f"Configuration: {config}")
     
@@ -369,13 +369,19 @@ def main():
         postroll_seconds=config['buffer']['postroll_seconds']
     )
     
-    logger.info(f"🎤 Starting continuous wake-word detection on {usb_device.name}")
-    logger.info(f"🎯 Listening for: '{wake_detector.get_wake_word_name()}'")
+    logger.info(f"🎤 Microphone found: {usb_device.name}")
+    logger.info(f"🎯 Wake word: '{wake_detector.get_wake_word_name()}'")
     logger.info(f"⚙️ Sample rate: {wake_detector.get_sample_rate()}")
     logger.info(f"📏 Frame length: {wake_detector.get_frame_length()}")
-    logger.info(f"📦 Audio buffer: {config['buffer']['preroll_seconds']}s pre-roll, {config['buffer']['postroll_seconds']}s post-roll")
-    logger.info("Press Ctrl+C to stop...")
+    logger.info("🛑 Main audio processing loop TEMPORARILY DISABLED for microphone testing")
+    logger.info("📋 Use --audio-diagnostics, --test-pyaudio, or --list-devices to test microphone")
+    logger.info("🔄 To re-enable main processing, uncomment the audio processing loop in main.py")
     
+    # TEMPORARILY DISABLED: Main audio processing loop
+    # This prevents device contention during microphone testing
+    # Uncomment the section below to re-enable wake-word detection
+    
+    """
     # Start continuous audio stream
     stream = audio_manager.start_stream(
         device_index=usb_device.index,
@@ -461,6 +467,7 @@ def main():
             logger.info("✅ Cleanup completed")
         except Exception as e:
             logger.error(f"Error during cleanup: {e}")
+    """
 
 
 if __name__ == "__main__":
