@@ -10,7 +10,6 @@ RUN apt-get update && apt-get install -y \
     portaudio19-dev \
     libasound2-dev \
     libasound2-plugins \
-    libasound2-plugins-extra \
     libjack-jackd2-dev \
     libsndfile1 \
     pkg-config \
