@@ -13,7 +13,7 @@ services:
       # Mount audio devices
       - /dev/snd:/dev/snd:rw
       # Mount ALSA configuration
-      - /etc/asound.conf:/etc/asound.conf:ro
+      - ./asound.conf:/etc/asound.conf:ro
       - /usr/share/alsa:/usr/share/alsa:ro
       - /etc/alsa:/etc/alsa:ro
       # Mount configuration for easy updates
@@ -46,13 +46,15 @@ services:
     ulimits:
       memlock: -1
       stack: 67108864
+    privileged: true
     security_opt:
-      - no-new-privileges:true
+      - no-new-privileges:false
     cap_drop:
       - ALL
     cap_add:
       - SYS_RAWIO
       - SYS_ADMIN
+      - SYS_DEVICE
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
