@@ -78,18 +78,36 @@ def test_arecord():
     """Test ALSA recording with arecord."""
     logger.info("🎤 Testing ALSA recording with arecord...")
     
+    # Test with explicit device first
+    logger.info("  Testing with explicit device hw:0,0...")
     try:
-        # Test recording for 2 seconds
         result = subprocess.run([
-            'arecord', '-D', 'default', '-f', 'S16_LE', '-r', '16000', 
-            '-c', '1', '-d', '2', 'test_arecord.wav'
+            'arecord', '-D', 'hw:0,0', '-f', 'S16_LE', '-r', '16000', 
+            '-c', '1', '-d', '2', 'test_arecord_explicit.wav'
         ], capture_output=True, text=True, timeout=10)
         
         if result.returncode == 0:
-            logger.info("✅ arecord test successful")
-            # Check if file was created and has content
-            if os.path.exists('test_arecord.wav'):
-                size = os.path.getsize('test_arecord.wav')
+            logger.info("✅ arecord with explicit device successful")
+            if os.path.exists('test_arecord_explicit.wav'):
+                size = os.path.getsize('test_arecord_explicit.wav')
+                logger.info(f"  Recorded file size: {size} bytes")
+        else:
+            logger.error(f"❌ arecord with explicit device failed: {result.stderr}")
+    except Exception as e:
+        logger.error(f"❌ Error running arecord with explicit device: {e}")
+    
+    # Test with default device
+    logger.info("  Testing with default device...")
+    try:
+        result = subprocess.run([
+            'arecord', '-D', 'default', '-f', 'S16_LE', '-r', '16000', 
+            '-c', '1', '-d', '2', 'test_arecord_default.wav'
+        ], capture_output=True, text=True, timeout=10)
+        
+        if result.returncode == 0:
+            logger.info("✅ arecord with default device successful")
+            if os.path.exists('test_arecord_default.wav'):
+                size = os.path.getsize('test_arecord_default.wav')
                 logger.info(f"  Recorded file size: {size} bytes")
                 if size > 0:
                     logger.info("✅ Audio file contains data")
@@ -98,10 +116,10 @@ def test_arecord():
             else:
                 logger.error("❌ Audio file was not created")
         else:
-            logger.error(f"❌ arecord test failed: {result.stderr}")
+            logger.error(f"❌ arecord with default device failed: {result.stderr}")
             
     except Exception as e:
-        logger.error(f"❌ Error running arecord test: {e}")
+        logger.error(f"❌ Error running arecord with default device: {e}")
 
 def test_pyaudio_devices():
     """Test PyAudio device detection."""
@@ -199,6 +217,22 @@ def test_pyaudio_recording():
                 
             except Exception as e:
                 logger.error(f"❌ Error testing device {device_index}: {e}")
+        
+        # Test explicit device 0 (SH-04) as suggested in debug file
+        logger.info("🎤 Attempting to open device hw:0,0 directly...")
+        try:
+            stream = p.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=16000,
+                input=True,
+                input_device_index=0,  # Force device 0
+                frames_per_buffer=1024
+            )
+            logger.info("✅ Stream opened successfully with explicit device 0!")
+            stream.close()
+        except Exception as e:
+            logger.error(f"❌ Failed to open stream with explicit device 0: {e}")
         
         p.terminate()
         return True

@@ -119,7 +119,8 @@ ssh "$REMOTE_ALIAS" "\
     docker-compose exec -T hey-orac python src/test_pyaudio_minimal.py || echo 'SH-04 test completed'; \
     \
     echo '${BLUE}🔍 Testing arecord with SH-04...${NC}'; \
-    docker-compose exec -T hey-orac arecord -D default -f S16_LE -r 16000 -c 1 -d 2 test_sh04.wav || echo 'arecord test completed'; \
+    docker-compose exec -T hey-orac arecord -D hw:0,0 -f S16_LE -r 16000 -c 1 -d 2 test_sh04_explicit.wav || echo 'arecord explicit test completed'; \
+    docker-compose exec -T hey-orac arecord -D default -f S16_LE -r 16000 -c 1 -d 2 test_sh04_default.wav || echo 'arecord default test completed'; \
     \
     echo '${BLUE}📊 Checking device access...${NC}'; \
     docker-compose exec -T hey-orac lsof /dev/snd/* 2>/dev/null || echo 'No processes using audio devices'; \
