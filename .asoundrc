@@ -1,7 +1,7 @@
 # ALSA configuration for USB microphone in Docker
 # Optimized for SH-04: USB Audio
 
-# Default PCM device for input/output (try card index first)
+# Default PCM device for input/output
 pcm.!default {
     type hw
     card 0
@@ -24,28 +24,4 @@ pcm.usb_mic {
 ctl.usb_mic {
     type hw
     card 0
-}
-
-# Alternative configuration using card name
-pcm.!default {
-    type hw
-    card SH04
-    device 0
-}
-
-ctl.!default {
-    type hw
-    card SH04
-}
-
-# USB microphone specific configuration
-pcm.usb_mic {
-    type hw
-    card SH04
-    device 0
-}
-
-ctl.usb_mic {
-    type hw
-    card SH04
 }
