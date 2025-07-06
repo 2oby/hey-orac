@@ -1,17 +1,92 @@
-# Minimal ALSA configuration for USB microphone in Docker
-# Direct hardware access only - no plugins
+# Enhanced ALSA configuration for USB microphone in Docker
+# Explicitly disables problematic plugins and uses direct hardware access
 
-# Default PCM device - direct hardware access
+# Disable problematic plugins
+pcm.dmix {
+    type plug
+    slave.pcm "null"
+}
+pcm.dsnoop {
+    type plug
+    slave.pcm "null"
+}
+pcm.rear {
+    type plug
+    slave.pcm "null"
+}
+pcm.center_lfe {
+    type plug
+    slave.pcm "null"
+}
+pcm.side {
+    type plug
+    slave.pcm "null"
+}
+pcm.modem {
+    type plug
+    slave.pcm "null"
+}
+pcm.phoneline {
+    type plug
+    slave.pcm "null"
+}
+pcm.hdmi {
+    type plug
+    slave.pcm "null"
+}
+
+# Default PCM for SH-04
 pcm.!default {
+    type hw
+    card SH04
+    device 0
+}
+ctl.!default {
+    type hw
+    card SH04
+}
+
+# USB microphone specific configuration
+pcm.usb_mic {
     type hw
     card 0
     device 0
 }
 
-# Default control device
-ctl.!default {
+ctl.usb_mic {
     type hw
     card 0
+}
+
+# Disable problematic system-wide PCMs
+pcm.cards.pcm.rear {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.cards.pcm.center_lfe {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.cards.pcm.side {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.cards.pcm.modem {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.cards.pcm.phoneline {
+    type plug
+    slave.pcm "null"
+}
+
+pcm.hdmi {
+    type plug
+    slave.pcm "null"
 }
 
 
