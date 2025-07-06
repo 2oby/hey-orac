@@ -111,6 +111,9 @@ ssh "$REMOTE_ALIAS" "\
     \
     echo '${BLUE}🔧 Running audio diagnostics...${NC}'; \
     docker-compose exec -T hey-orac python src/main.py --audio-diagnostics || echo 'Audio diagnostics completed'; \
+    \
+    echo '${BLUE}🧪 Testing PyAudio ALSA support...${NC}'; \
+    docker-compose exec -T hey-orac python src/main.py --test-pyaudio || echo 'PyAudio test completed'; \
     
     echo '${BLUE}📊 Checking resource usage...${NC}'; \
     echo 'Container status:'; \
@@ -134,4 +137,6 @@ echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose logs -f hey-orac'${N
 echo -e "${BLUE}📊 To test wake-word detection:${NC}"
 echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --list-devices'${NC}"
 echo -e "${BLUE}🔧 To run comprehensive audio diagnostics:${NC}"
-echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --audio-diagnostics'${NC}" 
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --audio-diagnostics'${NC}"
+echo -e "${BLUE}🧪 To test PyAudio ALSA support:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --test-pyaudio'${NC}" 

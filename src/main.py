@@ -74,6 +74,11 @@ def main():
         action="store_true",
         help="Run comprehensive audio system diagnostics"
     )
+    parser.add_argument(
+        "--test-pyaudio",
+        action="store_true",
+        help="Test PyAudio ALSA support and capabilities"
+    )
     
     args = parser.parse_args()
     
@@ -101,6 +106,19 @@ def main():
             print(f"   USB device names: {[d.name for d in usb_devices]}")
         
         print("\n" + "="*60)
+        return
+    
+    if args.test_pyaudio:
+        logger.info("🧪 Running PyAudio ALSA support test...")
+        from test_pyaudio import test_pyaudio_alsa, check_alsa_environment
+        
+        check_alsa_environment()
+        success = test_pyaudio_alsa()
+        
+        if success:
+            print("\n🎉 PyAudio appears to be working correctly!")
+        else:
+            print("\n❌ PyAudio has issues - check the diagnostics above")
         return
     
     if args.list_devices:
