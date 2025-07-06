@@ -1,29 +1,29 @@
 # ALSA configuration for USB microphone in Docker
-# Optimized for containerized environment with USB microphone (SH-04: USB Audio, hw:2,0)
+# Optimized for containerized environment with USB microphone (SH-04: USB Audio, hw:0,0)
 
 # Default PCM device for input/output
 pcm.!default {
     type hw
-    card 2
+    card 0
     device 0
 }
 
 # Default control device
 ctl.!default {
     type hw
-    card 2
+    card 0
 }
 
 # USB microphone specific configuration
 pcm.usb_mic {
     type hw
-    card 2
+    card 0
     device 0
 }
 
 ctl.usb_mic {
     type hw
-    card 2
+    card 0
 }
 
 # Disable problematic PCM configurations to avoid errors

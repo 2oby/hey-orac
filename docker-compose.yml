@@ -36,7 +36,7 @@ services:
       - PYTHONUNBUFFERED=1
       - DISPLAY=:0
       # ALSA configuration
-      - ALSA_CARD=2
+      - ALSA_CARD=0
       - ALSA_DEVICE=0
     deploy:
       resources:
