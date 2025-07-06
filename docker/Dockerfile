@@ -39,8 +39,10 @@ RUN /app/venv/bin/pip install --upgrade pip setuptools wheel \
     && find /app/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /app/venv -name "*.pyc" -delete 2>/dev/null || true
 
-# Ensure PyAudio is compiled with ALSA support
+# Ensure PyAudio is compiled with ALSA support - with explicit flags
 RUN /app/venv/bin/pip uninstall -y pyaudio || true \
+    && export CFLAGS="-I/usr/include/alsa" \
+    && export LDFLAGS="-lasound" \
     && /app/venv/bin/pip install --no-cache-dir --no-binary=:all: pyaudio
 
 # Change ownership of virtual environment to appuser
