@@ -54,7 +54,6 @@ services:
     cap_add:
       - SYS_RAWIO
       - SYS_ADMIN
-      - SYS_DEVICE
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
