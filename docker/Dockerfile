@@ -38,6 +38,10 @@ RUN /app/venv/bin/pip install --upgrade pip setuptools wheel \
     && find /app/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
     && find /app/venv -name "*.pyc" -delete 2>/dev/null || true
 
+# Reinstall PyAudio with ALSA support
+RUN /app/venv/bin/pip uninstall -y pyaudio \
+    && /app/venv/bin/pip install --no-cache-dir --global-option='build_ext' --global-option='-I/usr/include/alsa' pyaudio
+
 # Change ownership of virtual environment to appuser
 RUN chown -R appuser:appuser /app/venv
 
@@ -50,6 +54,9 @@ COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser models/ ./models/
 COPY --chown=appuser:appuser third_party/ ./third_party/
 COPY --chown=appuser:appuser src/config.yaml ./config.yaml
+
+# Copy ALSA configuration for USB microphone
+COPY --chown=appuser:appuser .asoundrc /home/appuser/.asoundrc
 
 # Expose port for health checks (optional)
 EXPOSE 8080
