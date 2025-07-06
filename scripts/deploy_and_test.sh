@@ -6,7 +6,7 @@ set -euo pipefail
 # Example: ./scripts/deploy_and_test.sh "Add audio buffer implementation"
 
 # Default parameters
-COMMIT_MSG=${1:-"Update hey-orac"}
+COMMIT_MSG=${1:-"Update hey-orac - Enable OpenWakeWord with enhanced debugging"}
 REMOTE_ALIAS="pi"
 PROJECT_NAME="hey-orac"
 

@@ -373,25 +373,17 @@ def main():
     logger.info(f"🎯 Wake word: '{wake_detector.get_wake_word_name()}'")
     logger.info(f"⚙️ Sample rate: {wake_detector.get_sample_rate()}")
     logger.info(f"📏 Frame length: {wake_detector.get_frame_length()}")
-    logger.info("🛑 Main audio processing loop TEMPORARILY DISABLED for microphone testing")
-    logger.info("📋 Use --audio-diagnostics, --test-pyaudio, or --list-devices to test microphone")
-    logger.info("🔄 To re-enable main processing, uncomment the audio processing loop in main.py")
-    logger.info("⏳ Keeping application running for testing...")
+    logger.info("🎯 Starting continuous wake-word detection with OpenWakeWord")
+    logger.info("📋 Use --audio-diagnostics, --test-pyaudio, or --list-devices for diagnostics")
+    logger.info("🔄 Main audio processing loop ENABLED with comprehensive debugging")
     
-    # Keep the application running for testing purposes
-    try:
-        while True:
-            time.sleep(10)  # Sleep for 10 seconds
-            logger.info("💤 Application still running (testing mode)")
-    except KeyboardInterrupt:
-        logger.info("🛑 Application stopped by user")
+    # ENABLED: Main audio processing loop with comprehensive debugging
+    # This is the main wake-word detection service
     
-    # TEMPORARILY DISABLED: Main audio processing loop
-    # This prevents device contention during microphone testing
-    # Uncomment the section below to re-enable wake-word detection
+    # Start continuous audio stream with enhanced debugging
+    logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
+    logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
     
-    """
-    # Start continuous audio stream
     stream = audio_manager.start_stream(
         device_index=usb_device.index,
         sample_rate=wake_detector.get_sample_rate(),
@@ -403,80 +395,134 @@ def main():
         logger.error("❌ Failed to start audio stream")
         sys.exit(1)
     
+    logger.info("✅ Audio stream started successfully")
+    
     try:
         detection_count = 0
         chunk_count = 0
+        last_audio_level_log = 0
+        
+        logger.info("🎯 Starting continuous wake-word detection loop...")
+        logger.info("📊 Debug info will be logged every 100 chunks")
         
         while True:
             try:
-                # Read audio chunk
+                # Read audio chunk with enhanced error handling
                 audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
                 chunk_count += 1
                 
                 # Convert to numpy array
                 audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
                 
+                # Enhanced audio level monitoring
+                if chunk_count % 100 == 0:  # Log every 100 chunks
+                    rms_level = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
+                    max_level = np.max(np.abs(audio_data))
+                    logger.info(f"📊 Chunk {chunk_count}: RMS={rms_level:.2f}, Max={max_level}, Samples={len(audio_data)}")
+                    last_audio_level_log = chunk_count
+                
                 # Add to audio buffer
                 audio_buffer.add_audio(audio_data)
                 
-                # Process audio for wake-word detection
-                if wake_detector.process_audio(audio_data):
+                # Process audio for wake-word detection with enhanced logging
+                logger.debug(f"🔍 Processing chunk {chunk_count} for wake-word detection...")
+                detection_result = wake_detector.process_audio(audio_data)
+                
+                if detection_result:
                     detection_count += 1
                     logger.info(f"🎯 WAKE WORD DETECTED! (Detection #{detection_count})")
+                    logger.info(f"📊 Detection details:")
+                    logger.info(f"   Chunk number: {chunk_count}")
+                    logger.info(f"   Audio RMS level: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
+                    logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
+                    logger.info(f"   Buffer status: {audio_buffer.get_buffer_status()}")
                     
                     # Start post-roll capture
+                    logger.info("📦 Starting post-roll capture...")
                     audio_buffer.start_postroll_capture()
                     
                     # Wait for post-roll capture to complete
+                    postroll_chunks = 0
                     while audio_buffer.is_capturing_postroll():
                         # Continue reading audio during post-roll
                         audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
                         audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
                         audio_buffer.add_audio(audio_data)
                         chunk_count += 1
+                        postroll_chunks += 1
+                        
+                        if postroll_chunks % 10 == 0:  # Log every 10 post-roll chunks
+                            logger.debug(f"📦 Post-roll capture: {postroll_chunks} chunks captured")
+                    
+                    logger.info(f"📦 Post-roll capture completed: {postroll_chunks} chunks")
                     
                     # Get complete audio clip
+                    logger.info("🎵 Retrieving complete audio clip...")
                     complete_audio = audio_buffer.get_complete_audio_clip()
                     if complete_audio is not None:
                         # Save audio clip for now (replace with streaming to Jetson)
                         clip_filename = f"/tmp/wake_word_detection_{detection_count}.wav"
+                        logger.info(f"💾 Saving audio clip to: {clip_filename}")
+                        
                         if audio_buffer.save_audio_clip(clip_filename):
-                            logger.info(f"💾 Saved complete audio clip: {clip_filename}")
-                            logger.info(f"📦 Audio clip duration: {len(complete_audio)/audio_buffer.sample_rate:.2f}s")
-                            logger.info(f"📦 Audio clip samples: {len(complete_audio)}")
+                            logger.info(f"✅ Audio clip saved successfully")
+                            logger.info(f"📦 Audio clip details:")
+                            logger.info(f"   Duration: {len(complete_audio)/audio_buffer.sample_rate:.2f}s")
+                            logger.info(f"   Samples: {len(complete_audio)}")
+                            logger.info(f"   RMS level: {np.sqrt(np.mean(complete_audio**2)):.4f}")
+                            logger.info(f"   Max level: {np.max(np.abs(complete_audio)):.4f}")
                         else:
                             logger.error("❌ Failed to save audio clip")
+                    else:
+                        logger.warning("⚠️ No complete audio clip available")
                     
                     # TODO: Stream audio to Jetson Orin
                     logger.info("📡 Audio capture completed - ready for streaming to Jetson")
+                    logger.info("🔄 Resuming wake-word detection...")
                 
-                # Log progress every 1000 chunks (about 80 seconds at 16kHz)
+                # Enhanced progress logging
                 if chunk_count % 1000 == 0:
                     buffer_status = audio_buffer.get_buffer_status()
-                    logger.info(f"👂 Processed {chunk_count} audio chunks...")
-                    logger.info(f"📦 Buffer status: {buffer_status['preroll_samples']} pre-roll samples")
+                    logger.info(f"📊 Progress Report:")
+                    logger.info(f"   Processed chunks: {chunk_count}")
+                    logger.info(f"   Detections: {detection_count}")
+                    logger.info(f"   Buffer pre-roll samples: {buffer_status['preroll_samples']}")
+                    logger.info(f"   Buffer post-roll samples: {buffer_status['postroll_samples']}")
+                    logger.info(f"   Runtime: {chunk_count * wake_detector.get_frame_length() / wake_detector.get_sample_rate():.1f}s")
                 
             except Exception as e:
-                logger.error(f"❌ Error processing audio chunk: {e}")
+                logger.error(f"❌ Error processing audio chunk {chunk_count}: {e}")
+                logger.error(f"   Audio data length: {len(audio_data) if 'audio_data' in locals() else 'N/A'}")
+                logger.error(f"   Stream active: {stream.is_active() if stream else False}")
                 continue
                 
     except KeyboardInterrupt:
         logger.info("🛑 Service stopped by user")
     except Exception as e:
         logger.error(f"❌ Service error: {e}")
+        logger.error(f"   Last chunk processed: {chunk_count}")
         sys.exit(1)
     finally:
-        # Cleanup
+        # Enhanced cleanup with detailed logging
+        logger.info("🧹 Starting cleanup...")
         try:
             if stream:
+                logger.info("🛑 Stopping audio stream...")
                 stream.stop_stream()
                 stream.close()
+                logger.info("✅ Audio stream closed")
+            
+            logger.info("🛑 Stopping audio manager...")
             audio_manager.stop_recording()
+            logger.info("✅ Audio manager stopped")
+            
+            logger.info("🛑 Cleaning up wake detector...")
             wake_detector.cleanup()
-            logger.info("✅ Cleanup completed")
+            logger.info("✅ Wake detector cleaned up")
+            
+            logger.info("✅ All cleanup completed successfully")
         except Exception as e:
-            logger.error(f"Error during cleanup: {e}")
-    """
+            logger.error(f"❌ Error during cleanup: {e}")
 
 
 if __name__ == "__main__":
