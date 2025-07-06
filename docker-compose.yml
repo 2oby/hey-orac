@@ -5,6 +5,8 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
+      cache_from:
+        - hey-orac_hey-orac:latest
     container_name: hey-orac
     restart: unless-stopped
     ports:

@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel", "pip>=21.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hey-orac"
+version = "0.1.0"
+description = "Hey Orac Wake-word Detection Service"
+requires-python = ">=3.8"
+dependencies = [
+    "pyaudio>=0.2.13",
+    "soundfile==0.12.1",
+    "numpy==1.26.4",
+    "pvporcupine==3.0.2",
+    "openwakeword==0.2.0",
+    "requests==2.31.0",
+    "pyyaml==6.0.1",
+    "colorlog==6.7.0",
+    "pytest==7.4.0",
+    "pytest-asyncio==0.21.1",
+]
+
+[tool.setuptools]
+packages = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"] 

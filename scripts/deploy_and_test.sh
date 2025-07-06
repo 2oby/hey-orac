@@ -81,14 +81,17 @@ ssh "$REMOTE_ALIAS" "\
     docker-compose down --remove-orphans 2>/dev/null || true; \
     docker container prune -f 2>/dev/null || true; \
     \
-    echo 'Removing unused images...'; \
-    docker image prune -a -f 2>/dev/null || true; \
+    echo 'Removing unused images (keeping last 2)...'; \
+    docker image prune -a -f --filter \"until=24h\" 2>/dev/null || true; \
     \
     echo 'Removing unused volumes...'; \
     docker volume prune -f 2>/dev/null || true; \
     \
     echo 'Removing unused networks...'; \
     docker network prune -f 2>/dev/null || true; \
+    \
+    echo 'Cleaning build cache...'; \
+    docker builder prune -f --filter \"until=24h\" 2>/dev/null || true; \
     \
     echo 'Disk space after cleanup:'; \
     df -h | grep -E '/$|/home'; \

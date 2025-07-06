@@ -1,6 +1,7 @@
 FROM python:3.12-slim
 
 # Install system dependencies for audio processing
+# Do this first to cache system dependencies separately
 RUN apt-get update && apt-get install -y \
     python3 \
     python3-pip \
@@ -11,7 +12,8 @@ RUN apt-get update && apt-get install -y \
     libjack-jackd2-dev \
     libsndfile1 \
     pkg-config \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
 
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser
@@ -19,18 +21,21 @@ RUN useradd --create-home --shell /bin/bash appuser
 # Set working directory
 WORKDIR /app
 
-# Change ownership of /app to appuser
-RUN chown -R appuser:appuser /app
-
 # Create virtual environment as root (to avoid permission issues)
 RUN python3 -m venv /app/venv
 
-# Copy requirements first for better caching
+# Copy requirements and build configuration first for better caching
+# This layer will only rebuild if requirements.txt or pyproject.toml changes
 COPY --chown=appuser:appuser requirements.txt .
+COPY --chown=appuser:appuser pyproject.toml .
 
-# Install Python dependencies in virtual environment
-RUN /app/venv/bin/pip install --upgrade pip setuptools wheel
-RUN /app/venv/bin/pip install --no-cache-dir -r requirements.txt
+# Install Python dependencies in virtual environment with modern build
+# This layer will only rebuild if requirements change
+RUN /app/venv/bin/pip install --upgrade pip setuptools wheel \
+    && /app/venv/bin/pip install --no-cache-dir --use-pep517 -r requirements.txt \
+    && /app/venv/bin/pip cache purge \
+    && find /app/venv -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true \
+    && find /app/venv -name "*.pyc" -delete 2>/dev/null || true
 
 # Change ownership of virtual environment to appuser
 RUN chown -R appuser:appuser /app/venv
@@ -38,12 +43,11 @@ RUN chown -R appuser:appuser /app/venv
 # Switch to non-root user after setup
 USER appuser
 
-# Copy application code
+# Copy application code and configuration
+# This layer will rebuild when source code changes
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser models/ ./models/
 COPY --chown=appuser:appuser third_party/ ./third_party/
-
-# Copy configuration
 COPY --chown=appuser:appuser src/config.yaml ./config.yaml
 
 # Expose port for health checks (optional)
