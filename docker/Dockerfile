@@ -82,9 +82,9 @@ ENV ALSA_DEVICE=hw:0,0
 ENV ALSA_PCM_CARD=0
 ENV ALSA_PCM_DEVICE=0
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD /app/venv/bin/python -c "import sys; sys.exit(0)" || exit 1
+# Health check - temporarily disabled since main loop is commented out
+# HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+#     CMD /app/venv/bin/python -c "import sys; sys.exit(0)" || exit 1
 
 # Default command
 CMD ["/app/venv/bin/python", "src/main.py"] 
