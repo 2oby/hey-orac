@@ -38,7 +38,8 @@ services:
       - PYTHONUNBUFFERED=1
       - DISPLAY=:0
       # ALSA configuration
-      - ALSA_DEVICE=0
+      - ALSA_CARD=0
+      - ALSA_DEVICE=hw:0,0
       - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu
     deploy:
       resources:
