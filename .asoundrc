@@ -24,4 +24,4 @@ pcm.usb_mic {
 ctl.usb_mic {
     type hw
     card SH04
-} 
+}

@@ -108,6 +108,9 @@ ssh "$REMOTE_ALIAS" "\
     echo '${BLUE}🧪 Running tests...${NC}'; \
     echo 'Running configuration tests...'; \
     docker-compose exec -T hey-orac python -m pytest tests/test_wakeword.py -v || echo 'Tests completed with some failures'; \
+    \
+    echo '${BLUE}🔧 Running audio diagnostics...${NC}'; \
+    docker-compose exec -T hey-orac python src/main.py --audio-diagnostics || echo 'Audio diagnostics completed'; \
     
     echo '${BLUE}📊 Checking resource usage...${NC}'; \
     echo 'Container status:'; \
@@ -129,4 +132,6 @@ echo -e "${GREEN}🎉 All deployment and test operations completed successfully!
 echo -e "${BLUE}📊 To monitor the service:${NC}"
 echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose logs -f hey-orac'${NC}"
 echo -e "${BLUE}📊 To test wake-word detection:${NC}"
-echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --list-devices'${NC}" 
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --list-devices'${NC}"
+echo -e "${BLUE}🔧 To run comprehensive audio diagnostics:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/main.py --audio-diagnostics'${NC}" 

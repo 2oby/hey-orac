@@ -69,33 +69,107 @@ def main():
         action="store_true",
         help="Test wake-word detection with live audio"
     )
+    parser.add_argument(
+        "--audio-diagnostics",
+        action="store_true",
+        help="Run comprehensive audio system diagnostics"
+    )
     
     args = parser.parse_args()
     
     # Load configuration
     config = load_config(args.config)
     
+    if args.audio_diagnostics:
+        logger.info("🔧 Running comprehensive audio system diagnostics...")
+        print("\n" + "="*60)
+        print("🔧 COMPREHENSIVE AUDIO SYSTEM DIAGNOSTICS")
+        print("="*60)
+        
+        # This will trigger all the enhanced diagnostics in AudioManager
+        audio_manager = AudioManager()
+        
+        print("\n🎤 Testing device detection...")
+        devices = audio_manager.list_input_devices()
+        
+        print(f"\n📊 SUMMARY:")
+        print(f"   Total devices detected: {len(devices)}")
+        usb_devices = [d for d in devices if d.is_usb]
+        print(f"   USB devices: {len(usb_devices)}")
+        
+        if usb_devices:
+            print(f"   USB device names: {[d.name for d in usb_devices]}")
+        
+        print("\n" + "="*60)
+        return
+    
     if args.list_devices:
-        logger.info("Listing audio devices...")
+        logger.info("🔍 Enhanced audio device detection and listing...")
+        print("\n" + "="*60)
+        print("🔍 ENHANCED AUDIO DEVICE DETECTION")
+        print("="*60)
+        
         audio_manager = AudioManager()
         devices = audio_manager.list_input_devices()
         
-        print("\n=== Available Audio Input Devices ===")
-        for device in devices:
-            print(f"Device {device.index}: {device.name}")
-            print(f"  - Max Input Channels: {device.max_input_channels}")
-            print(f"  - Default Sample Rate: {device.default_sample_rate}")
-            print(f"  - Host API: {device.host_api}")
-            print(f"  - USB Device: {'Yes' if device.is_usb else 'No'}")
-            print()
+        print("\n📋 AVAILABLE AUDIO INPUT DEVICES")
+        print("-" * 40)
         
-        # Find USB microphone
+        if not devices:
+            print("❌ NO INPUT DEVICES FOUND!")
+            print("   This indicates a serious audio system issue.")
+            print("   Check the logs above for detailed diagnostics.")
+            return
+        
+        for device in devices:
+            print(f"\n🎤 Device {device.index}: {device.name}")
+            print(f"   📊 Max Input Channels: {device.max_input_channels}")
+            print(f"   🎵 Default Sample Rate: {device.default_sample_rate}")
+            print(f"   🔌 Host API: {device.host_api}")
+            print(f"   🔌 USB Device: {'✅ Yes' if device.is_usb else '❌ No'}")
+            
+            # Show additional device info if available
+            if device.device_info:
+                print(f"   📋 Additional Info:")
+                print(f"      - Max Output Channels: {device.device_info.get('maxOutputChannels', 'N/A')}")
+                print(f"      - Default Low Input Latency: {device.device_info.get('defaultLowInputLatency', 'N/A')}")
+                print(f"      - Default High Input Latency: {device.device_info.get('defaultHighInputLatency', 'N/A')}")
+        
+        print("\n🔍 USB MICROPHONE DETECTION")
+        print("-" * 30)
+        
+        # Find USB microphone with enhanced logging
         usb_device = audio_manager.find_usb_microphone()
         if usb_device:
-            print(f"✅ Found USB microphone: {usb_device.name} (index {usb_device.index})")
+            print(f"✅ SUCCESS: Found USB microphone!")
+            print(f"   🎤 Device: {usb_device.name}")
+            print(f"   📊 Index: {usb_device.index}")
+            print(f"   🎵 Sample Rate: {usb_device.default_sample_rate}")
+            print(f"   📊 Channels: {usb_device.max_input_channels}")
+            print(f"   🔌 Host API: {usb_device.host_api}")
+            
+            # Test device accessibility
+            print(f"\n🧪 Testing device accessibility...")
+            try:
+                test_stream = audio_manager.start_stream(
+                    device_index=usb_device.index,
+                    sample_rate=16000,
+                    channels=1,
+                    chunk_size=512
+                )
+                if test_stream:
+                    print("   ✅ Device is accessible for recording!")
+                    test_stream.stop_stream()
+                    test_stream.close()
+                else:
+                    print("   ❌ Device is not accessible for recording!")
+            except Exception as e:
+                print(f"   ❌ Error testing device: {e}")
         else:
-            print("⚠️  No USB microphone found")
+            print("❌ FAILED: No USB microphone found!")
+            print("   Check the system diagnostics above for troubleshooting.")
         
+        print("\n" + "="*60)
         return
     
     if args.test_audio:
