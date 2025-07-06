@@ -14,8 +14,9 @@ services:
     volumes:
       # Mount audio devices
       - /dev/snd:/dev/snd:rw
-      # Mount ALSA configuration
+      # Mount ALSA configuration files
       - ./asound.conf:/etc/asound.conf:ro
+      - ./.asoundrc:/home/appuser/.asoundrc:ro
       - /usr/share/alsa:/usr/share/alsa:ro
       - /etc/alsa:/etc/alsa:ro
       # Mount configuration for easy updates
@@ -35,7 +36,7 @@ services:
       - PYTHONUNBUFFERED=1
       - DISPLAY=:0
       # ALSA configuration
-      - ALSA_CARD=0
+      - ALSA_CARD=2
       - ALSA_DEVICE=0
     deploy:
       resources:

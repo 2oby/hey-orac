@@ -12,6 +12,8 @@ RUN apt-get update && apt-get install -y \
     libjack-jackd2-dev \
     libsndfile1 \
     pkg-config \
+    alsa-base \
+    alsa-utils \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
