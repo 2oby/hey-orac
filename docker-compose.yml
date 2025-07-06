@@ -15,6 +15,7 @@ services:
       # Mount ALSA configuration
       - /etc/asound.conf:/etc/asound.conf:ro
       - /usr/share/alsa:/usr/share/alsa:ro
+      - /etc/alsa:/etc/alsa:ro
       # Mount configuration for easy updates
       - ./src/config.yaml:/app/config.yaml:ro
       # Mount models directory
@@ -24,11 +25,16 @@ services:
     devices:
       # Access to audio devices
       - /dev/snd:/dev/snd
+      # Access to USB devices (for USB microphones)
+      - /dev/bus/usb:/dev/bus/usb
     group_add:
       - audio
     environment:
       - PYTHONUNBUFFERED=1
       - DISPLAY=:0
+      # ALSA configuration
+      - ALSA_CARD=0
+      - ALSA_DEVICE=0
     deploy:
       resources:
         limits:
@@ -46,6 +52,7 @@ services:
       - ALL
     cap_add:
       - SYS_RAWIO
+      - SYS_ADMIN
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
