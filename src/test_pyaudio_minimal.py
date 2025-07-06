@@ -263,6 +263,21 @@ def main():
     
     logger.info("✅ All tests completed successfully!")
     logger.info("🎉 SH-04 USB microphone should be working properly")
+    
+    # Additional verification: test device access directly
+    logger.info("🔍 Additional verification: Testing direct device access...")
+    try:
+        result = subprocess.run([
+            'arecord', '-D', 'hw:0,0', '-f', 'S16_LE', '-r', '16000', 
+            '-c', '1', '-d', '1', 'verification_test.wav'
+        ], capture_output=True, text=True, timeout=5)
+        
+        if result.returncode == 0:
+            logger.info("✅ Direct device access verification successful!")
+        else:
+            logger.warning(f"⚠️ Direct device access verification failed: {result.stderr}")
+    except Exception as e:
+        logger.warning(f"⚠️ Direct device access verification error: {e}")
 
 if __name__ == "__main__":
     main() 
