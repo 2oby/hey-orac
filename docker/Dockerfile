@@ -22,6 +22,9 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash appuser
 
+# Add user to audio group for device access
+RUN usermod -a -G audio appuser
+
 # Set working directory
 WORKDIR /app
 

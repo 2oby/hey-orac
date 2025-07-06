@@ -27,9 +27,21 @@ def test_pyaudio_initialization():
         p = pyaudio.PyAudio()
         print("✅ PyAudio initialized successfully!")
         
+        # Test host APIs
+        print(f"\n🎵 Host APIs available: {p.get_host_api_count()}")
+        for i in range(p.get_host_api_count()):
+            try:
+                api_info = p.get_host_api_info_by_index(i)
+                print(f"  API {i}: {api_info['name']} (id: {api_info['type']})")
+                print(f"    Default input device: {api_info.get('defaultInputDevice', 'None')}")
+                print(f"    Default output device: {api_info.get('defaultOutputDevice', 'None')}")
+                print(f"    Device count: {api_info['deviceCount']}")
+            except Exception as e:
+                print(f"  API {i}: Error getting info - {e}")
+        
         # Test device count
         device_count = p.get_device_count()
-        print(f"📊 Device count: {device_count}")
+        print(f"\n📊 Total device count: {device_count}")
         
         if device_count > 0:
             print("\n📋 Available devices:")
@@ -53,6 +65,23 @@ def test_pyaudio_initialization():
                     print(f"  Device {i}: Error getting info - {e}")
         else:
             print("❌ No devices detected!")
+            
+        # Try to force ALSA usage
+        print("\n🔧 Testing ALSA-specific device access...")
+        try:
+            # Try to open a stream with ALSA-specific parameters
+            stream = p.open(
+                format=pyaudio.paInt16,
+                channels=1,
+                rate=16000,
+                input=True,
+                input_device_index=None,  # Use default
+                frames_per_buffer=1024
+            )
+            print("✅ Successfully opened audio stream!")
+            stream.close()
+        except Exception as e:
+            print(f"❌ Failed to open audio stream: {e}")
             
         # Cleanup
         p.terminate()
