@@ -41,12 +41,14 @@ class OpenWakeWordEngine(WakeWordEngine):
             self.threshold = config.get('threshold', 0.5)
             self.wake_word_name = keyword
             
+            # Log available models
+            logger.info(f"Available OpenWakeWord models: {list(openwakeword.models.keys())}")
+            
             # Check if custom model is specified
             custom_model_path = config.get('custom_model_path')
             
             if custom_model_path and os.path.exists(custom_model_path):
                 logger.info(f"Loading custom OpenWakeWord model: {custom_model_path}")
-                # Load custom model
                 self.model = openwakeword.Model(
                     wakeword_model_paths=[custom_model_path],
                     class_mapping_dicts=[{0: keyword}],
@@ -54,32 +56,35 @@ class OpenWakeWordEngine(WakeWordEngine):
                     vad_threshold=0.5
                 )
             else:
-                # Use pre-trained models
                 logger.info(f"Loading pre-trained OpenWakeWord model for: {keyword}")
-                
-                # Check if keyword is available in pre-trained models
                 available_models = openwakeword.models
                 if keyword not in available_models:
                     logger.warning(f"Keyword '{keyword}' not found in pre-trained models. Available: {list(available_models.keys())}")
-                    logger.info("Falling back to 'hey_jarvis' model")
-                    keyword = 'hey_jarvis'
-                
-                self.wake_word_name = keyword
+                    logger.info("Falling back to 'alexa' model")
+                    keyword = 'alexa'  # Use a known model
+                    self.wake_word_name = keyword
+                    
                 model_path = available_models[keyword]['model_path']
-                
+                logger.info(f"Model path: {model_path}")
+                if not os.path.exists(model_path):
+                    logger.error(f"Model file not found at: {model_path}")
+                    return False
+                    
                 self.model = openwakeword.Model(
                     wakeword_model_paths=[model_path],
                     class_mapping_dicts=[{0: keyword}],
                     enable_speex_noise_suppression=False,
                     vad_threshold=0.5
                 )
-            
+                
+            # Verify model initialization
+            logger.info(f"Model object: {self.model}")
             self.is_initialized = True
             logger.info(f"✅ OpenWakeWord engine initialized successfully for '{self.wake_word_name}'")
             return True
             
         except Exception as e:
-            logger.error(f"Failed to initialize OpenWakeWord engine: {e}")
+            logger.error(f"Failed to initialize OpenWakeWord engine: {e}", exc_info=True)
             return False
     
     def process_audio(self, audio_chunk: np.ndarray) -> bool:
@@ -93,41 +98,45 @@ class OpenWakeWordEngine(WakeWordEngine):
             bool: True if wake word detected, False otherwise
         """
         if not self.is_initialized or self.model is None:
+            logger.error("Engine not initialized or model is None")
             return False
         
         try:
+            # Log raw audio stats
+            logger.debug(f"Raw audio chunk: shape={audio_chunk.shape}, dtype={audio_chunk.dtype}, min={np.min(audio_chunk)}, max={np.max(audio_chunk)}")
+            
             # Convert audio to float32 and normalize
             audio_float = audio_chunk.astype(np.float32) / 32768.0
+            
+            # Log preprocessed audio stats
+            logger.debug(f"Preprocessed audio: shape={audio_float.shape}, dtype={audio_float.dtype}, min={np.min(audio_float)}, max={np.max(audio_float)}")
+            
+            # Verify audio is in expected range [-1, 1]
+            if np.any(np.abs(audio_float) > 1.0):
+                logger.warning("Preprocessed audio exceeds expected range [-1, 1]")
             
             # Get predictions
             predictions = self.model.predict(audio_float)
             
-            # Debug: Log prediction type and content
             logger.debug(f"Prediction type: {type(predictions)}")
             logger.debug(f"Prediction content: {predictions}")
             
             # Handle different prediction formats
             if isinstance(predictions, dict):
-                # Dictionary format: {'hey_computer': 0.123, ...}
                 confidence = predictions.get(self.wake_word_name, 0.0)
             elif isinstance(predictions, (list, tuple)):
-                # List/tuple format: [0.123, 0.456, ...]
                 confidence = float(predictions[0]) if predictions else 0.0
             elif isinstance(predictions, (int, float)):
-                # Direct numeric value
                 confidence = float(predictions)
             else:
-                # Try to convert to float
                 try:
                     confidence = float(predictions)
                 except (ValueError, TypeError):
                     logger.error(f"Unexpected prediction format: {type(predictions)} - {predictions}")
                     return False
             
-            # Log the confidence score for debugging
             logger.info(f"Wake word confidence: {confidence:.4f} (threshold: {self.threshold})")
             
-            # Check if confidence exceeds threshold
             detected = confidence >= self.threshold
             
             if detected:
@@ -136,7 +145,7 @@ class OpenWakeWordEngine(WakeWordEngine):
             return detected
             
         except Exception as e:
-            logger.error(f"Error processing audio with OpenWakeWord: {e}")
+            logger.error(f"Error processing audio with OpenWakeWord: {e}", exc_info=True)
             return False
     
     def get_wake_word_name(self) -> str:
