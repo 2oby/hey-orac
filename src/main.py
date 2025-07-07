@@ -216,6 +216,11 @@ def main():
         help="Test SH-04 LED controller functionality"
     )
     parser.add_argument(
+        "--debug-openwakeword",
+        action="store_true",
+        help="Run comprehensive OpenWakeWord debugging tests"
+    )
+    parser.add_argument(
         "--stop-service",
         action="store_true",
         help="Stop the main service if running"
@@ -293,6 +298,17 @@ def main():
             print("\n✅ LED controller test completed successfully!")
         else:
             print("\n❌ LED controller test failed!")
+        return
+    
+    if args.debug_openwakeword:
+        logger.info("🔍 Running comprehensive OpenWakeWord debugging...")
+        from debug_openwakeword import main as debug_main
+        
+        success = debug_main()
+        if success:
+            print("\n✅ OpenWakeWord debugging completed successfully!")
+        else:
+            print("\n❌ OpenWakeWord debugging failed!")
         return
     
     if args.list_devices:
