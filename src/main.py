@@ -215,11 +215,38 @@ def main():
         action="store_true",
         help="Test SH-04 LED controller functionality"
     )
+    parser.add_argument(
+        "--stop-service",
+        action="store_true",
+        help="Stop the main service if running"
+    )
     
     args = parser.parse_args()
     
     # Load configuration
     config = load_config(args.config)
+    
+    # Check if main service is running and stop it for audio tests
+    if any([args.audio_diagnostics, args.test_pyaudio, args.test_recording, args.test_wakeword, args.list_devices]):
+        logger.info("🔧 Audio test mode detected - ensuring main service is stopped...")
+        
+        # Try to stop any running main service
+        try:
+            import subprocess
+            # Kill any running main.py processes
+            result = subprocess.run(['pkill', '-f', 'python.*main.py'], 
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                logger.info("✅ Stopped running main service")
+            else:
+                logger.info("ℹ️ No running main service found")
+            
+            # Wait a moment for device to be released
+            import time
+            time.sleep(2)
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Could not stop main service: {e}")
     
     if args.audio_diagnostics:
         logger.info("🔧 Running comprehensive audio system diagnostics...")
