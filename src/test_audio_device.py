@@ -9,6 +9,7 @@ import subprocess
 import time
 import sys
 import os
+import signal
 from audio_utils import AudioManager
 
 # Configure logging
@@ -23,16 +24,39 @@ def stop_main_service():
     logger.info("🛑 Stopping main service to free audio device...")
     
     try:
-        # Kill any running main.py processes
-        result = subprocess.run(['pkill', '-f', 'python.*main.py'], 
-                              capture_output=True, text=True, timeout=5)
-        if result.returncode == 0:
-            logger.info("✅ Stopped running main service")
-        else:
-            logger.info("ℹ️ No running main service found")
+        # Try multiple approaches to stop the main service
         
-        # Wait for device to be released
-        time.sleep(3)
+        # Approach 1: Try to kill Python processes
+        try:
+            result = subprocess.run(['pkill', '-f', 'python.*main.py'], 
+                                  capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                logger.info("✅ Stopped running main service with pkill")
+                time.sleep(3)
+                return True
+        except FileNotFoundError:
+            logger.info("ℹ️ pkill not available, trying alternative methods")
+        
+        # Approach 2: Try to kill by PID if we can find it
+        try:
+            result = subprocess.run(['ps', 'aux'], capture_output=True, text=True, timeout=5)
+            if result.returncode == 0:
+                lines = result.stdout.split('\n')
+                for line in lines:
+                    if 'python.*main.py' in line or 'main.py' in line:
+                        parts = line.split()
+                        if len(parts) > 1:
+                            pid = parts[1]
+                            logger.info(f"🔄 Found main.py process with PID {pid}, stopping it...")
+                            os.kill(int(pid), signal.SIGTERM)
+                            time.sleep(3)
+                            return True
+        except Exception as e:
+            logger.warning(f"⚠️ Could not find or stop main.py process: {e}")
+        
+        # Approach 3: Just wait and hope the device is free
+        logger.info("ℹ️ Could not stop main service, waiting for device to be free...")
+        time.sleep(5)
         return True
         
     except Exception as e:
