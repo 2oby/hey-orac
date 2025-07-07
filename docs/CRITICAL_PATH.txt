@@ -1,5 +1,23 @@
 # CRITICAL PATH - Hey Orac Voice Control System
 
+## 🚨 CRITICAL ISSUE: OpenWakeWord Always Returns 0.0000 Confidence
+
+**Status**: System running but wake word detection broken
+**Issue**: OpenWakeWord models return 0.0000 confidence for all audio (silence, noise, speech)
+**Root Cause**: Likely audio format mismatch or model compatibility issue
+**Next Action**: Test different models, verify audio preprocessing, create test audio files
+
+**Recent Fixes Applied**:
+- ✅ Fixed prediction key mapping (`alexa_v0.1` vs `alexa`)
+- ✅ Enhanced debugging and audio preprocessing validation
+- ✅ Switched from `alexa` to `hey_jarvis` model
+- ✅ Added integrated OpenWakeWord testing during startup
+
+**Available Models**: `['alexa', 'hey_mycroft', 'hey_jarvis', 'timer', 'weather']`
+**Current Config**: `keyword: "hey_jarvis", threshold: 0.1`
+
+---
+
 ## 🚨 IMMEDIATE NEXT STEPS (Phase 1a - Basic Project Running)
 
 ### 1. Fix PATH Warnings in Docker Container

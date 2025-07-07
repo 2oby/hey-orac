@@ -123,7 +123,25 @@ class OpenWakeWordEngine(WakeWordEngine):
             
             # Handle different prediction formats
             if isinstance(predictions, dict):
-                confidence = predictions.get(self.wake_word_name, 0.0)
+                # Try multiple possible keys for the wake word
+                possible_keys = [
+                    self.wake_word_name,  # e.g., 'alexa'
+                    f"{self.wake_word_name}_v0.1",  # e.g., 'alexa_v0.1'
+                    f"{self.wake_word_name}_v1.0",  # e.g., 'alexa_v1.0'
+                    list(predictions.keys())[0] if predictions else None  # First key if available
+                ]
+                
+                confidence = 0.0
+                for key in possible_keys:
+                    if key and key in predictions:
+                        confidence = predictions[key]
+                        logger.debug(f"Found confidence using key '{key}': {confidence}")
+                        break
+                
+                if confidence == 0.0:
+                    logger.debug(f"Available prediction keys: {list(predictions.keys())}")
+                    logger.debug(f"Looking for wake word: {self.wake_word_name}")
+                    
             elif isinstance(predictions, (list, tuple)):
                 confidence = float(predictions[0]) if predictions else 0.0
             elif isinstance(predictions, (int, float)):
