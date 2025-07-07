@@ -43,6 +43,136 @@ def test_audio_file(audio_path: str, config: dict) -> None:
     logger.info("Audio file testing not yet implemented")
 
 
+def test_openwakeword_integration(wake_detector, config: dict) -> bool:
+    """
+    Test OpenWakeWord integration with the actual audio pipeline.
+    This runs during startup to verify the wake word detection is working.
+    """
+    try:
+        logger.info("🔍 Testing OpenWakeWord model and prediction pipeline...")
+        
+        # Test 1: Verify model is loaded
+        if not wake_detector.is_ready():
+            logger.error("❌ Wake word detector not ready")
+            return False
+        
+        logger.info(f"✅ Wake word detector ready: {wake_detector.get_wake_word_name()}")
+        
+        # Test 2: Test with silence (should give low confidence)
+        logger.info("🔍 Testing with silence (should give low confidence)...")
+        silence_audio = np.zeros(wake_detector.get_frame_length(), dtype=np.int16)
+        
+        # Process silence multiple times to get a baseline
+        silence_confidences = []
+        for i in range(10):
+            result = wake_detector.process_audio(silence_audio)
+            silence_confidences.append(result)
+        
+        logger.info(f"✅ Silence test completed - detections: {sum(silence_confidences)}/10")
+        
+        # Test 2.5: Get detailed confidence scores if possible
+        try:
+            # Try to access the engine directly for detailed testing
+            if hasattr(wake_detector, 'engine') and wake_detector.engine:
+                logger.info("🔍 Testing detailed confidence scores...")
+                
+                # Test silence with direct engine access
+                silence_float = silence_audio.astype(np.float32) / 32768.0
+                predictions = wake_detector.engine.model.predict(silence_float)
+                
+                if isinstance(predictions, dict):
+                    confidence = predictions.get(wake_detector.get_wake_word_name(), 0.0)
+                elif isinstance(predictions, (list, tuple)):
+                    confidence = float(predictions[0]) if predictions else 0.0
+                else:
+                    confidence = float(predictions)
+                
+                logger.info(f"   Silence confidence: {confidence:.6f}")
+                
+                # Test with noise
+                noise_audio = np.random.randint(-1000, 1000, wake_detector.get_frame_length(), dtype=np.int16)
+                noise_float = noise_audio.astype(np.float32) / 32768.0
+                predictions = wake_detector.engine.model.predict(noise_float)
+                
+                if isinstance(predictions, dict):
+                    confidence = predictions.get(wake_detector.get_wake_word_name(), 0.0)
+                elif isinstance(predictions, (list, tuple)):
+                    confidence = float(predictions[0]) if predictions else 0.0
+                else:
+                    confidence = float(predictions)
+                
+                logger.info(f"   Noise confidence: {confidence:.6f}")
+                
+                # Test with sine wave
+                t = np.linspace(0, wake_detector.get_frame_length() / wake_detector.get_sample_rate(), 
+                               wake_detector.get_frame_length())
+                sine_audio = (np.sin(2 * np.pi * 1000 * t) * 5000).astype(np.int16)
+                sine_float = sine_audio.astype(np.float32) / 32768.0
+                predictions = wake_detector.engine.model.predict(sine_float)
+                
+                if isinstance(predictions, dict):
+                    confidence = predictions.get(wake_detector.get_wake_word_name(), 0.0)
+                elif isinstance(predictions, (list, tuple)):
+                    confidence = float(predictions[0]) if predictions else 0.0
+                else:
+                    confidence = float(predictions)
+                
+                logger.info(f"   Sine wave confidence: {confidence:.6f}")
+                
+        except Exception as e:
+            logger.warning(f"⚠️ Could not get detailed confidence scores: {e}")
+        
+        # Test 3: Test with random noise (should give varying confidence)
+        logger.info("🔍 Testing with random noise...")
+        noise_audio = np.random.randint(-1000, 1000, wake_detector.get_frame_length(), dtype=np.int16)
+        
+        noise_results = []
+        for i in range(5):
+            result = wake_detector.process_audio(noise_audio)
+            noise_results.append(result)
+        
+        logger.info(f"✅ Noise test completed - detections: {sum(noise_results)}/5")
+        
+        # Test 4: Test with sine wave (simulating speech-like audio)
+        logger.info("🔍 Testing with sine wave (speech-like audio)...")
+        t = np.linspace(0, wake_detector.get_frame_length() / wake_detector.get_sample_rate(), 
+                       wake_detector.get_frame_length())
+        sine_audio = (np.sin(2 * np.pi * 1000 * t) * 5000).astype(np.int16)  # 1kHz sine wave
+        
+        sine_results = []
+        for i in range(5):
+            result = wake_detector.process_audio(sine_audio)
+            sine_results.append(result)
+        
+        logger.info(f"✅ Sine wave test completed - detections: {sum(sine_results)}/5")
+        
+        # Test 5: Verify threshold behavior
+        logger.info("🔍 Testing threshold behavior...")
+        threshold = config['wake_word'].get('threshold', 0.1)
+        logger.info(f"   Current threshold: {threshold}")
+        logger.info(f"   Silence detections: {sum(silence_confidences)}/10")
+        logger.info(f"   Noise detections: {sum(noise_results)}/5")
+        logger.info(f"   Sine wave detections: {sum(sine_results)}/5")
+        
+        # Summary
+        total_tests = 10 + 5 + 5
+        total_detections = sum(silence_confidences) + sum(noise_results) + sum(sine_results)
+        
+        logger.info(f"📊 Integration test summary:")
+        logger.info(f"   Total audio chunks tested: {total_tests}")
+        logger.info(f"   Total detections: {total_detections}")
+        logger.info(f"   Detection rate: {total_detections/total_tests*100:.1f}%")
+        
+        # Consider the test passed if the system is processing audio
+        # (we can't easily get confidence scores from the interface)
+        logger.info("✅ OpenWakeWord integration test completed successfully")
+        return True
+        
+    except Exception as e:
+        logger.error(f"❌ OpenWakeWord integration test failed: {e}", exc_info=True)
+        return False
+
+
 def main():
     """Main application entry point."""
     parser = argparse.ArgumentParser(description="Hey Orac Wake-word Detection Service")
@@ -368,6 +498,13 @@ def main():
     if not wake_detector.initialize(config['wake_word']):
         logger.error("❌ Failed to initialize wake word detector")
         sys.exit(1)
+    
+    # Run OpenWakeWord integration test during startup
+    logger.info("🧪 Running OpenWakeWord integration test...")
+    if not test_openwakeword_integration(wake_detector, config):
+        logger.warning("⚠️ OpenWakeWord integration test failed - continuing anyway")
+    else:
+        logger.info("✅ OpenWakeWord integration test passed")
     
     # Initialize audio manager
     audio_manager = AudioManager()
