@@ -18,6 +18,9 @@ RUN apt-get update && apt-get install -y \
     usbutils \
     libasound2 \
     libportaudio2 \
+    mpg123 \
+    ffmpeg \
+    pulseaudio-utils \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
@@ -63,6 +66,7 @@ USER appuser
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser models/ ./models/
 COPY --chown=appuser:appuser third_party/ ./third_party/
+COPY --chown=appuser:appuser assets/ ./assets/
 COPY --chown=appuser:appuser src/config.yaml ./config.yaml
 
 # Copy ALSA configuration for USB microphone

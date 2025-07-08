@@ -15,6 +15,7 @@ from audio_utils import AudioManager
 from wake_word_interface import WakeWordDetector
 from audio_buffer import AudioBuffer
 from led_controller import SH04LEDController
+from audio_feedback import create_audio_feedback
 
 # Configure logging
 logging.basicConfig(
@@ -605,6 +606,15 @@ def main():
         logger.warning("⚠️ LED controller not available - no visual feedback")
         led_controller = None
     
+    # Initialize audio feedback for wake word detection
+    audio_feedback = None
+    try:
+        audio_feedback = create_audio_feedback()
+        logger.info("✅ Audio feedback initialized successfully")
+    except Exception as e:
+        logger.warning(f"⚠️ Audio feedback not available: {e}")
+        audio_feedback = None
+    
     logger.info(f"🎤 Microphone found: {usb_device.name}")
     logger.info(f"🎯 Wake word: '{wake_detector.get_wake_word_name()}'")
     logger.info(f"⚙️ Sample rate: {wake_detector.get_sample_rate()}")
@@ -673,10 +683,30 @@ def main():
                     logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
                     logger.info(f"   Buffer status: {audio_buffer.get_buffer_status()}")
                     
-                    # Visual feedback with LED
+                    # Visual feedback with LED (independent of audio)
                     if led_controller:
-                        logger.info("💡 Providing visual feedback with LED...")
-                        led_controller.wake_word_detected_feedback()
+                        try:
+                            logger.info("💡 Providing visual feedback with LED...")
+                            led_controller.wake_word_detected_feedback()
+                            logger.info("✅ LED feedback completed successfully")
+                        except Exception as e:
+                            logger.error(f"❌ LED feedback failed: {e}")
+                    else:
+                        logger.debug("⚠️ LED controller not available - skipping visual feedback")
+                    
+                    # Audio feedback with beep sound (independent of LED)
+                    if audio_feedback:
+                        try:
+                            logger.info("🔊 Providing audio feedback with beep...")
+                            success = audio_feedback.play_wake_word_detected()
+                            if success:
+                                logger.info("✅ Audio feedback completed successfully")
+                            else:
+                                logger.warning("⚠️ Audio feedback failed (but system continues)")
+                        except Exception as e:
+                            logger.error(f"❌ Audio feedback failed: {e}")
+                    else:
+                        logger.debug("⚠️ Audio feedback not available - skipping audio feedback")
                     
                     # Start post-roll capture
                     logger.info("📦 Starting post-roll capture...")
