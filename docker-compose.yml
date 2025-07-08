@@ -21,6 +21,9 @@ services:
       # Mount ALSA libraries
       - /usr/lib/aarch64-linux-gnu/libasound.so.2:/usr/lib/aarch64-linux-gnu/libasound.so.2:ro
       - /usr/lib/aarch64-linux-gnu/libasound.so.2.0.0:/usr/lib/aarch64-linux-gnu/libasound.so.2.0.0:ro
+      # Mount PulseAudio socket for audio output
+      - /run/user/1000/pulse:/run/user/1000/pulse:rw
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # Mount configuration for easy updates
       - ./src/config.yaml:/app/config.yaml:ro
       # Mount models directory
@@ -45,6 +48,9 @@ services:
       - ALSA_PCM_DEVICE=0
       - AUDIODEV=hw:0,0
       - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu
+      # PulseAudio configuration for audio output
+      - PULSE_SERVER=unix:/run/user/1000/pulse/native
+      - PULSE_COOKIE=/home/appuser/.config/pulse/cookie
     deploy:
       resources:
         limits:
