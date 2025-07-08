@@ -67,7 +67,7 @@ COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser models/ ./models/
 COPY --chown=appuser:appuser third_party/ ./third_party/
 # Copy assets directory if it exists (for audio feedback)
-COPY --chown=appuser:appuser assets/ ./assets/ 2>/dev/null || mkdir -p ./assets/audio
+COPY --chown=appuser:appuser assets/ ./assets/
 COPY --chown=appuser:appuser src/config.yaml ./config.yaml
 
 # Copy ALSA configuration for USB microphone
