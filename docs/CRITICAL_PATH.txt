@@ -12,9 +12,22 @@
 - System processes audio but never detects wake word
 - Threshold set to 0.01 but confidence never rises above 0.0000
 
-**Root Cause**: Unknown - requires immediate debugging
+**Root Cause**: **HYPOTHESIS IDENTIFIED** - Prediction key mismatch in OpenWakeWord engine
 **Impact**: System cannot respond to voice commands - core functionality broken
 **Priority**: **URGENT** - This is blocking all voice control functionality
+
+### 🔍 **ROOT CAUSE HYPOTHESIS: Prediction Key Mismatch**
+
+**Hypothesis**: OpenWakeWord models return prediction keys with `_v0.1` suffix (e.g., `hey_jarvis_v0.1`) but our code is looking for base keyword names (e.g., `hey_jarvis`).
+
+**Evidence from Debugging**:
+- All models return keys with `_v0.1` suffix: `{'hey_jarvis_v0.1': 0.0}`, `{'alexa_v0.1': 0.0}`, `{'hey_mycroft_v0.1': 0.0}`
+- Class mapping has no effect on prediction keys - models ignore our `class_mapping_dicts` parameter
+- Our code was looking for `'hey_jarvis'` but model only returns `'hey_jarvis_v0.1'`
+- This explains why confidence was always 0.0000 - we never found the correct prediction key
+
+**Fix Applied**: Updated key lookup order to prioritize `_v0.1` suffix keys
+**Status**: **NEEDS CONFIRMATION** - Deploy and test to verify hypothesis is correct
 
 ### 🔍 **Immediate Debugging Required**
 1. **Test with known wake word audio** - verify if model responds to "hey jarvis"
@@ -82,7 +95,9 @@
 - ✅ Switched from `alexa` to `hey_jarvis` model
 - ✅ Added integrated OpenWakeWord testing during startup
 - ✅ Lowered threshold to 0.01 for testing sensitivity
-- ❌ **STILL BROKEN** - System is working but not detecting wake words
+- ✅ **HYPOTHESIS IDENTIFIED** - Prediction key mismatch with `_v0.1` suffix
+- ✅ **FIX APPLIED** - Updated key lookup to prioritize `_v0.1` suffix keys
+- ⏳ **NEEDS CONFIRMATION** - Deploy and test to verify fix resolves issue
 
 **Available Models**: `['alexa', 'hey_mycroft', 'hey_jarvis', 'timer', 'weather']`
 **Current Config**: `keyword: "hey_jarvis", threshold: 0.01`
@@ -91,14 +106,13 @@
 
 ## 🚨 IMMEDIATE NEXT STEPS (Phase 1a - Basic Project Running)
 
-### 1. 🔥 URGENT: Debug Wake Word Detection
-- [ ] Test with known "hey jarvis" audio file
-- [ ] Verify OpenWakeWord model loading and initialization
-- [ ] Check audio preprocessing pipeline
-- [ ] Test different OpenWakeWord models (alexa, hey_mycroft)
-- [ ] Validate audio format (sample rate, channels, encoding)
-- [ ] Check OpenWakeWord version compatibility
-- [ ] Add detailed debugging for confidence calculation
+### 1. 🔥 URGENT: Confirm and Fix Wake Word Detection
+- [x] **HYPOTHESIS IDENTIFIED** - Prediction key mismatch with `_v0.1` suffix
+- [x] **FIX APPLIED** - Updated key lookup to prioritize `_v0.1` suffix keys
+- [ ] **CONFIRM FIX** - Deploy and test to verify hypothesis is correct
+- [ ] **TEST WITH REAL AUDIO** - Verify wake word detection works with actual speech
+- [ ] **VALIDATE THRESHOLD** - Adjust threshold if needed after fix confirmation
+- [ ] **PERFORMANCE TEST** - Ensure detection latency is acceptable (< 100ms)
 
 ### 2. Fix PATH Warnings in Docker Container
 - [x] Update Dockerfile to add `/home/appuser/.local/bin` to PATH

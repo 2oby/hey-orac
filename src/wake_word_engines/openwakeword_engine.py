@@ -54,43 +54,33 @@ class OpenWakeWordEngine(WakeWordEngine):
             
             if custom_model_path and os.path.exists(custom_model_path):
                 logger.info(f"🔍 DEBUGGING: Loading custom model from {custom_model_path}")
+                # Use the documented approach for custom models
                 self.model = openwakeword.Model(
-                    wakeword_model_paths=[custom_model_path],
-                    class_mapping_dicts=[{0: keyword}],
-                    enable_speex_noise_suppression=False,
-                    vad_threshold=0.5
+                    wakeword_models=[custom_model_path],
+                    vad_threshold=0.5,
+                    enable_speex_noise_suppression=False
                 )
             else:
-                logger.info(f"🔍 DEBUGGING: Loading pre-trained model for '{keyword}'")
-                available_models = openwakeword.models
-                if keyword not in available_models:
-                    logger.warning(f"❌ Keyword '{keyword}' not found in pre-trained models!")
-                    logger.info(f"   Available models: {list(available_models.keys())}")
-                    logger.info("   Falling back to 'alexa' model")
-                    keyword = 'alexa'  # Use a known model
-                    self.wake_word_name = keyword
-                    
-                model_path = available_models[keyword]['model_path']
-                logger.info(f"🔍 DEBUGGING: Model path: {model_path}")
-                logger.info(f"   Model file exists: {os.path.exists(model_path)}")
-                logger.info(f"   Model file size: {os.path.getsize(model_path) if os.path.exists(model_path) else 'N/A'} bytes")
+                logger.info(f"🔍 DEBUGGING: Loading pre-trained models using documented approach")
                 
-                if not os.path.exists(model_path):
-                    logger.error(f"❌ Model file not found at: {model_path}")
-                    return False
-                    
-                # Enhanced model loading with detailed debugging
-                logger.info("🔍 DEBUGGING: Creating OpenWakeWord Model object...")
-                logger.info(f"   wakeword_model_paths: [{model_path}]")
-                logger.info(f"   class_mapping_dicts: [{{0: '{keyword}'}}]")
-                logger.info(f"   enable_speex_noise_suppression: False")
+                # Use the documented approach: load ALL available models
+                # This matches ARCHITECTURE_UPDATE.md implementation
+                logger.info("🔍 DEBUGGING: Creating OpenWakeWord Model with all available models...")
                 logger.info(f"   vad_threshold: 0.5")
+                logger.info(f"   enable_speex_noise_suppression: False")
+                logger.info(f"   wakeword_models: None (load all available)")
                 
+                # Download models if not present (one-time operation)
+                try:
+                    openwakeword.utils.download_models()
+                    logger.info("✅ Models downloaded/verified")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not download models: {e}")
+                
+                # Initialize model with all available models (documented approach)
                 self.model = openwakeword.Model(
-                    wakeword_model_paths=[model_path],
-                    class_mapping_dicts=[{0: keyword}],
-                    enable_speex_noise_suppression=False,
-                    vad_threshold=0.5
+                    vad_threshold=0.5,
+                    enable_speex_noise_suppression=False
                 )
                 
             # Enhanced model verification
@@ -106,6 +96,16 @@ class OpenWakeWordEngine(WakeWordEngine):
                 logger.info(f"   Test prediction type: {type(test_predictions)}")
                 logger.info(f"   Test prediction content: {test_predictions}")
                 logger.info(f"   Test prediction keys (if dict): {list(test_predictions.keys()) if isinstance(test_predictions, dict) else 'N/A'}")
+                
+                # Check prediction_buffer after first prediction
+                if hasattr(self.model, 'prediction_buffer'):
+                    logger.info(f"   ✅ prediction_buffer available after first prediction")
+                    logger.info(f"   prediction_buffer keys: {list(self.model.prediction_buffer.keys())}")
+                    for key, scores in self.model.prediction_buffer.items():
+                        logger.info(f"     Model '{key}': {len(scores)} scores, latest: {scores[-1] if scores else 'N/A'}")
+                else:
+                    logger.warning(f"   ⚠️ prediction_buffer still not available after first prediction")
+                    
             except Exception as e:
                 logger.error(f"❌ Error testing model after loading: {e}")
                 return False
@@ -142,117 +142,193 @@ class OpenWakeWordEngine(WakeWordEngine):
                 logger.info(f"   Raw audio: min={np.min(audio_chunk)}, max={np.max(audio_chunk)}, mean={np.mean(audio_chunk):.2f}")
                 logger.info(f"   Raw audio: RMS={np.sqrt(np.mean(audio_chunk.astype(np.float32)**2)):.2f}")
             
-            # Convert audio to float32 and normalize
-            audio_float = audio_chunk.astype(np.float32) / 32768.0
-            
-            # Enhanced preprocessing debugging
+            # Use documented approach: pass int16 audio directly to predict()
+            # This matches ARCHITECTURE_UPDATE.md: prediction = self.model.predict(audio_np)
             if self.debug_counter % 100 == 0:
-                logger.info(f"🔍 DEBUGGING: Audio preprocessing")
-                logger.info(f"   Float audio: shape={audio_float.shape}, dtype={audio_float.dtype}")
-                logger.info(f"   Float audio: min={np.min(audio_float):.6f}, max={np.max(audio_float):.6f}, mean={np.mean(audio_float):.6f}")
-                logger.info(f"   Float audio: RMS={np.sqrt(np.mean(audio_float**2)):.6f}")
+                logger.info(f"🔍 DEBUGGING: Audio processing (documented approach)")
+                logger.info(f"   Raw audio: shape={audio_chunk.shape}, dtype={audio_chunk.dtype}")
+                logger.info(f"   Raw audio: min={np.min(audio_chunk)}, max={np.max(audio_chunk)}, mean={np.mean(audio_chunk):.2f}")
+                logger.info(f"   Raw audio: RMS={np.sqrt(np.mean(audio_chunk.astype(np.float32)**2)):.2f}")
                 
                 # Check for clipping or unusual values
-                if np.any(np.abs(audio_float) > 1.0):
-                    logger.warning(f"⚠️ Audio clipping detected: max abs value = {np.max(np.abs(audio_float)):.6f}")
-                if np.all(audio_float == 0):
+                if np.any(np.abs(audio_chunk) > 32000):
+                    logger.warning(f"⚠️ Audio clipping detected: max abs value = {np.max(np.abs(audio_chunk))}")
+                if np.all(audio_chunk == 0):
                     logger.warning(f"⚠️ Silent audio detected")
-                elif np.sqrt(np.mean(audio_float**2)) < 0.001:
-                    logger.warning(f"⚠️ Very quiet audio detected: RMS = {np.sqrt(np.mean(audio_float**2)):.6f}")
+                elif np.sqrt(np.mean(audio_chunk.astype(np.float32)**2)) < 100:
+                    logger.warning(f"⚠️ Very quiet audio detected: RMS = {np.sqrt(np.mean(audio_chunk.astype(np.float32)**2)):.2f}")
             
-            # Get predictions with enhanced debugging
+            # Get predictions using the documented prediction_buffer approach
             if self.debug_counter % 100 == 0:
-                logger.info(f"🔍 DEBUGGING: Calling model.predict()...")
+                logger.info(f"🔍 DEBUGGING: Calling model.predict() with int16 audio (documented approach)...")
             
-            predictions = self.model.predict(audio_float)
+            # Call predict with int16 audio (documented approach)
+            raw_predictions = self.model.predict(audio_chunk)
             
-            # Enhanced prediction debugging
+            # Enhanced debugging of raw predictions
             if self.debug_counter % 100 == 0:
-                logger.info(f"🔍 DEBUGGING: Model prediction results")
-                logger.info(f"   Prediction type: {type(predictions)}")
-                logger.info(f"   Prediction content: {predictions}")
+                logger.info(f"🔍 DEBUGGING: Raw model.predict() results")
+                logger.info(f"   Raw prediction type: {type(raw_predictions)}")
+                logger.info(f"   Raw prediction content: {raw_predictions}")
                 
-                if isinstance(predictions, dict):
-                    logger.info(f"   Prediction keys: {list(predictions.keys())}")
-                    logger.info(f"   Prediction values: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
-                elif isinstance(predictions, (list, tuple)):
-                    logger.info(f"   Prediction list length: {len(predictions)}")
-                    logger.info(f"   Prediction list values: {[f'{v:.6f}' for v in predictions]}")
-                else:
-                    logger.info(f"   Prediction scalar value: {predictions}")
+                if isinstance(raw_predictions, dict):
+                    logger.info(f"   Raw prediction keys: {list(raw_predictions.keys())}")
+                    logger.info(f"   Raw prediction values: {[f'{k}: {v:.6f}' for k, v in raw_predictions.items()]}")
             
-            # Enhanced confidence extraction with detailed debugging
+            # Extract predictions from prediction_buffer (documented approach)
+            predictions = {}
             confidence = 0.0
             confidence_source = "unknown"
             
-            if isinstance(predictions, dict):
-                # Try multiple possible keys for the wake word
-                possible_keys = [
-                    self.wake_word_name,  # e.g., 'alexa'
-                    f"{self.wake_word_name}_v0.1",  # e.g., 'alexa_v0.1'
-                    f"{self.wake_word_name}_v1.0",  # e.g., 'alexa_v1.0'
-                    list(predictions.keys())[0] if predictions else None  # First key if available
-                ]
-                
+            if hasattr(self.model, 'prediction_buffer'):
                 if self.debug_counter % 100 == 0:
-                    logger.info(f"🔍 DEBUGGING: Extracting confidence from dict")
-                    logger.info(f"   Looking for keys: {possible_keys}")
-                    logger.info(f"   Available keys: {list(predictions.keys())}")
+                    logger.info(f"🔍 DEBUGGING: prediction_buffer analysis")
+                    logger.info(f"   prediction_buffer type: {type(self.model.prediction_buffer)}")
+                    logger.info(f"   prediction_buffer keys: {list(self.model.prediction_buffer.keys())}")
+                    logger.info(f"   Raw prediction_buffer content: {self.model.prediction_buffer}")
                 
-                for key in possible_keys:
-                    if key and key in predictions:
-                        confidence = predictions[key]
-                        confidence_source = f"dict key '{key}'"
-                        if self.debug_counter % 100 == 0:
-                            logger.info(f"   Found confidence using key '{key}': {confidence:.6f}")
-                        break
-                
-                if confidence == 0.0 and self.debug_counter % 100 == 0:
-                    logger.warning(f"⚠️ No matching key found for wake word '{self.wake_word_name}'")
-                    logger.info(f"   Available keys: {list(predictions.keys())}")
-                    # Try using the first available key as fallback
-                    if predictions:
-                        first_key = list(predictions.keys())[0]
-                        confidence = predictions[first_key]
-                        confidence_source = f"fallback key '{first_key}'"
-                        logger.info(f"   Using fallback key '{first_key}': {confidence:.6f}")
-                    
-            elif isinstance(predictions, (list, tuple)):
-                confidence = float(predictions[0]) if predictions else 0.0
-                confidence_source = "list[0]"
-                if self.debug_counter % 100 == 0:
-                    logger.info(f"   Extracted confidence from list: {confidence:.6f}")
-            elif isinstance(predictions, (int, float)):
-                confidence = float(predictions)
-                confidence_source = "scalar"
-                if self.debug_counter % 100 == 0:
-                    logger.info(f"   Extracted confidence from scalar: {confidence:.6f}")
-            else:
-                try:
-                    confidence = float(predictions)
-                    confidence_source = "converted scalar"
+                # Extract predictions from each model's buffer
+                for model_name, scores in self.model.prediction_buffer.items():
                     if self.debug_counter % 100 == 0:
-                        logger.info(f"   Converted confidence from {type(predictions)}: {confidence:.6f}")
-                except (ValueError, TypeError):
-                    logger.error(f"❌ Unexpected prediction format: {type(predictions)} - {predictions}")
-                    return False
+                        logger.info(f"   Model '{model_name}' buffer: {len(scores)} scores")
+                        logger.info(f"     Raw scores array: {scores}")
+                        if len(scores) > 0:
+                            logger.info(f"     Latest scores (last 5): {scores[-5:] if len(scores) >= 5 else scores}")
+                            logger.info(f"     Most recent score: {scores[-1]}")
+                    
+                    if len(scores) > 0:
+                        # Get the most recent score (latest prediction for this audio chunk)
+                        # This is the key insight from ARCHITECTURE_UPDATE.md: scores[-1]
+                        latest_score = scores[-1]
+                        predictions[model_name] = latest_score
+                        
+                        if self.debug_counter % 100 == 0:
+                            logger.info(f"     Using latest score for '{model_name}': {latest_score:.6f}")
+                        
+                    else:
+                        if self.debug_counter % 100 == 0:
+                            logger.warning(f"   ⚠️ Model '{model_name}' has no scores in buffer")
+                
+                if self.debug_counter % 100 == 0:
+                    logger.info(f"🔍 DEBUGGING: Extracted predictions from buffer")
+                    logger.info(f"   Final extracted predictions: {predictions}")
+                    logger.info(f"   Available model names: {list(predictions.keys())}")
+                    logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
+                
+                # Use documented approach: check ALL models for detections above threshold
+                # This matches ARCHITECTURE_UPDATE.md: detected_models = [name for name, score in predictions.items() if score > self.threshold]
+                detected_models = [name for name, score in predictions.items() if score > self.threshold]
+                
+                if detected_models:
+                    # Use the highest confidence score from detected models
+                    best_model = max(detected_models, key=lambda k: predictions[k])
+                    confidence = predictions[best_model]
+                    confidence_source = f"detected model '{best_model}'"
+                    if self.debug_counter % 100 == 0:
+                        logger.info(f"   ✅ Detected wake words: {detected_models}")
+                        logger.info(f"   Best model: '{best_model}' with confidence: {confidence:.6f}")
+                else:
+                    # No detections above threshold - use highest score for monitoring
+                    if predictions:
+                        best_model = max(predictions.keys(), key=lambda k: predictions[k])
+                        confidence = predictions[best_model]
+                        confidence_source = f"best available model '{best_model}'"
+                        if self.debug_counter % 100 == 0:
+                            logger.info(f"   No detections above threshold. Best score: {confidence:.6f} from '{best_model}'")
+                    else:
+                        confidence = 0.0
+                        confidence_source = "no predictions available"
+                        if self.debug_counter % 100 == 0:
+                            logger.warning(f"   ⚠️ No predictions available from any model")
             
-            # Enhanced confidence logging
+            else:
+                # Fallback to direct prediction if prediction_buffer doesn't exist
+                if self.debug_counter % 100 == 0:
+                    logger.warning(f"⚠️ prediction_buffer not available, using direct predictions")
+                
+                if isinstance(raw_predictions, dict):
+                    # Try multiple possible keys for the wake word
+                    possible_keys = [
+                        f"{self.wake_word_name}_v0.1",  # e.g., 'alexa_v0.1' - PRIMARY
+                        self.wake_word_name,  # e.g., 'alexa' - FALLBACK
+                        f"{self.wake_word_name}_v1.0",  # e.g., 'alexa_v1.0' - FALLBACK
+                        list(raw_predictions.keys())[0] if raw_predictions else None  # First key if available
+                    ]
+                    
+                    if self.debug_counter % 100 == 0:
+                        logger.info(f"🔍 DEBUGGING: Fallback - extracting confidence from direct predictions")
+                        logger.info(f"   Looking for keys: {possible_keys}")
+                        logger.info(f"   Available keys: {list(raw_predictions.keys())}")
+                    
+                    for key in possible_keys:
+                        if key and key in raw_predictions:
+                            confidence = raw_predictions[key]
+                            confidence_source = f"fallback direct key '{key}'"
+                            if self.debug_counter % 100 == 0:
+                                logger.info(f"   Found confidence using fallback key '{key}': {confidence:.6f}")
+                            break
+                    
+                    if confidence == 0.0 and self.debug_counter % 100 == 0:
+                        logger.warning(f"⚠️ No matching key found in fallback mode")
+                        if raw_predictions:
+                            first_key = list(raw_predictions.keys())[0]
+                            confidence = raw_predictions[first_key]
+                            confidence_source = f"fallback first key '{first_key}'"
+                            logger.info(f"   Using fallback first key '{first_key}': {confidence:.6f}")
+                            
+                elif isinstance(raw_predictions, (list, tuple)):
+                    confidence = float(raw_predictions[0]) if raw_predictions else 0.0
+                    confidence_source = "fallback list[0]"
+                    if self.debug_counter % 100 == 0:
+                        logger.info(f"   Extracted confidence from fallback list: {confidence:.6f}")
+                elif isinstance(raw_predictions, (int, float)):
+                    confidence = float(raw_predictions)
+                    confidence_source = "fallback scalar"
+                    if self.debug_counter % 100 == 0:
+                        logger.info(f"   Extracted confidence from fallback scalar: {confidence:.6f}")
+                else:
+                    try:
+                        confidence = float(raw_predictions)
+                        confidence_source = "fallback converted scalar"
+                        if self.debug_counter % 100 == 0:
+                            logger.info(f"   Converted confidence from fallback {type(raw_predictions)}: {confidence:.6f}")
+                    except (ValueError, TypeError):
+                        logger.error(f"❌ Unexpected prediction format: {type(raw_predictions)} - {raw_predictions}")
+                        return False
+            
+            # Enhanced confidence logging with prediction_buffer state
             if self.debug_counter % 100 == 0:
                 logger.info(f"🔍 DEBUGGING: Final confidence analysis")
                 logger.info(f"   Confidence: {confidence:.6f}")
                 logger.info(f"   Confidence source: {confidence_source}")
                 logger.info(f"   Threshold: {self.threshold:.6f}")
                 logger.info(f"   Detection: {confidence >= self.threshold}")
+                logger.info(f"   All extracted predictions: {predictions}")
+                
+                # Show current prediction_buffer state if available
+                if hasattr(self.model, 'prediction_buffer'):
+                    logger.info(f"   Current prediction_buffer state:")
+                    for key, scores in self.model.prediction_buffer.items():
+                        if len(scores) > 0:
+                            logger.info(f"     '{key}': {scores[-1]:.6f} (latest of {len(scores)} scores)")
+                            if len(scores) > 1:
+                                logger.info(f"       Recent history: {scores[-3:]}")
+                        else:
+                            logger.info(f"     '{key}': no scores yet")
+                else:
+                    logger.info(f"   No prediction_buffer available")
             
             # Always log confidence for non-zero values or detections
             if confidence > 0.0 or confidence >= self.threshold:
                 logger.info(f"🎯 Wake word confidence: {confidence:.6f} (threshold: {self.threshold:.6f}) - Source: {confidence_source}")
+                if hasattr(self.model, 'prediction_buffer'):
+                    logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
             
             detected = confidence >= self.threshold
             
             if detected:
                 logger.info(f"🎯 Wake word detected! Confidence: {confidence:.6f} (source: {confidence_source})")
+                logger.info(f"   All model scores at detection: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
             
             return detected
             
