@@ -599,7 +599,7 @@ def main():
     logger.info("✅ Wake word detector initialized successfully")
     
     # Initialize audio feedback
-    audio_feedback = create_audio_feedback(config)
+    audio_feedback = create_audio_feedback()
     if audio_feedback:
         logger.info("✅ Audio feedback system initialized")
     else:
