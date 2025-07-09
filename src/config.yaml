@@ -10,12 +10,12 @@ wake_word:
   engine: "openwakeword"         # Engine to use: "porcupine", "openwakeword", "snowboy", "pocketsphinx", "test"
   model_path: /app/models/porcupine/orac.ppn
   sensitivity: 0.6               # Detection sensitivity (0.0-1.0) - for Porcupine
-  keyword: "hey_computer"        # Wake-word to detect (using custom OpenWakeWord model)
+  keyword: "hey_jarvis"          # Wake-word to detect (using pre-trained OpenWakeWord models)
   access_key: ""                 # Picovoice access key (get from console.picovoice.ai)
   
   # OpenWakeWord settings (only used when engine="openwakeword")
-  threshold: 0.5                 # Detection threshold (0.0-1.0) - restored to reasonable level
-  custom_model_path: "/app/third_party/openwakeword/custom_models/Hey_computer.onnx"  # Custom Hey Computer model
+  threshold: 0.3                 # Detection threshold (0.0-1.0) - lowered for better sensitivity
+  custom_model_path: ""           # Use all pre-trained models (multi-model detection)
   
   # Test engine settings (only used when engine="test")
   detection_probability: 0.01    # Probability of detection per audio chunk
