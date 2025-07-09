@@ -60,21 +60,14 @@ class OpenWakeWordEngine(WakeWordEngine):
                     logger.error(f"❌ Custom model must be .onnx or .tflite format: {custom_model_path}")
                     return False
                 
-                # For custom models, we need to create a custom model configuration
+                # For custom models, use the correct OpenWakeWord API
                 try:
-                    # Create a custom model configuration
-                    custom_model_config = {
-                        keyword: {
-                            'model_path': custom_model_path,
-                            'model_type': 'onnx' if custom_model_path.endswith('.onnx') else 'tflite'
-                        }
-                    }
+                    logger.info(f"🔍 DEBUGGING: Using correct OpenWakeWord API for custom models")
                     
-                    logger.info(f"🔍 DEBUGGING: Custom model config: {custom_model_config}")
-                    
-                    # Initialize with custom model
+                    # Use the correct API: wakeword_model_paths and class_mapping_dicts
                     self.model = openwakeword.Model(
-                        wakeword_models=custom_model_config,
+                        wakeword_model_paths=[custom_model_path],
+                        class_mapping_dicts=[{0: keyword}],
                         vad_threshold=0.5,
                         enable_speex_noise_suppression=False
                     )

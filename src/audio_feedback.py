@@ -117,7 +117,7 @@ class AudioFeedback:
                 ["ffplay", "-nodisp", "-autoexit", "-loglevel", "error", str(audio_file)]  # ffplay
             ]
             
-            for i, player_cmd in players:
+            for i, player_cmd in enumerate(players):
                 try:
                     logger.info(f"🔊 Trying player {i+1}/{len(players)}: {player_cmd[0]}")
                     result = subprocess.run(

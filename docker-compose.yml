@@ -36,6 +36,13 @@ services:
       - /dev/snd:/dev/snd
       # Access to USB devices (for USB microphones)
       - /dev/bus/usb:/dev/bus/usb
+      # Access to HID devices (for LED control)
+      - /dev/hidraw0:/dev/hidraw0
+      - /dev/hidraw1:/dev/hidraw1
+      - /dev/hidraw2:/dev/hidraw2
+      - /dev/hidraw3:/dev/hidraw3
+      - /dev/hidraw4:/dev/hidraw4
+      - /dev/hidraw5:/dev/hidraw5
     group_add:
       - audio
     user: "1000:29"  # Map to pi user and audio group
@@ -71,6 +78,8 @@ services:
     cap_add:
       - SYS_RAWIO
       - SYS_ADMIN
+      - SYS_DEVICE
+      - SYS_MODULE
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s

@@ -91,12 +91,23 @@ class SH04LEDController:
             # Set the active configuration
             self.device.set_configuration()
             
-            # Claim the HID interface
-            usb.util.claim_interface(self.device, self.HID_INTERFACE)
-            
-            self.is_connected = True
-            logger.info(f"✅ Connected to USB device: Vendor={self.VENDOR_ID:04x}, Product={self.PRODUCT_ID:04x}")
-            return True
+            # Try to claim the HID interface with better error handling
+            try:
+                usb.util.claim_interface(self.device, self.HID_INTERFACE)
+                logger.info(f"✅ Connected to USB device: Vendor={self.VENDOR_ID:04x}, Product={self.PRODUCT_ID:04x}")
+                self.is_connected = True
+                return True
+            except usb.core.USBError as e:
+                if e.errno == 13:  # Permission denied
+                    logger.error(f"❌ Permission denied accessing USB device: {e}")
+                    logger.info("💡 Try running container with USB device permissions:")
+                    logger.info("   - Add HID device mounts to docker-compose.yml")
+                    logger.info("   - Add USB device capabilities")
+                    logger.info("   - Run container with --privileged flag")
+                    return False
+                else:
+                    logger.error(f"❌ USB error: {e}")
+                    return False
             
         except Exception as e:
             logger.error(f"❌ Failed to connect to USB device: {e}")
