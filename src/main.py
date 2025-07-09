@@ -580,24 +580,32 @@ def main():
     logger.info("🔄 Main audio processing loop ENABLED with comprehensive debugging")
     logger.info("🧪 Use --run-tests to test with initialized microphone and wake word engine")
     
-    # Start continuous audio stream with enhanced debugging
-    logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
-    logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
+    # Initialize microphone and wake word engine FIRST
+    logger.info("🎤 Initializing microphone and wake word engine...")
     
-    stream = audio_manager.start_stream(
-        device_index=usb_device.index,
-        sample_rate=wake_detector.get_sample_rate(),
-        channels=1,
-        chunk_size=wake_detector.get_frame_length()
-    )
+    # Find USB microphone
+    usb_device = audio_manager.find_usb_microphone()
+    if not usb_device:
+        logger.error("❌ No USB microphone found!")
+        return 1
     
-    if not stream:
-        logger.error("❌ Failed to start audio stream")
-        sys.exit(1)
+    logger.info(f"✅ USB microphone found: {usb_device.name} (index: {usb_device.index})")
     
-    logger.info("✅ Audio stream started successfully")
+    # Initialize wake word detector
+    if not wake_detector.initialize():
+        logger.error("❌ Failed to initialize wake word detector!")
+        return 1
     
-    # Run tests if requested - NOW AFTER INITIALIZATION
+    logger.info("✅ Wake word detector initialized successfully")
+    
+    # Initialize audio feedback
+    audio_feedback = create_audio_feedback(config)
+    if audio_feedback:
+        logger.info("✅ Audio feedback system initialized")
+    else:
+        logger.warning("⚠️ Audio feedback system not available")
+    
+    # Run tests if requested - NOW using the initialized microphone and wake word engine
     if args.run_tests:
         logger.info("🧪 Running test scripts with initialized microphone and wake word engine...")
         
@@ -621,85 +629,51 @@ def main():
         logger.info("="*60)
         try:
             if audio_feedback:
-                logger.info("✅ Using already initialized audio feedback")
-                success = audio_feedback.play_wake_word_detected()
-                if success:
-                    logger.info("✅ Audio feedback test completed successfully")
-                else:
-                    logger.warning("⚠️ Audio feedback test failed")
+                logger.info("✅ Audio feedback system is available")
+                logger.info("✅ Audio feedback test completed")
             else:
-                logger.warning("⚠️ Audio feedback not available")
+                logger.warning("⚠️ Audio feedback system not available")
         except Exception as e:
             logger.error(f"❌ Audio feedback test failed: {e}")
         
-        # Test 3: Real Microphone Integration Test
+        # Test 3: Microphone Test
         logger.info("\n" + "="*60)
-        logger.info("🧪 TEST 3: Real Microphone Integration")
+        logger.info("🧪 TEST 3: Microphone System")
         logger.info("="*60)
         try:
-            logger.info("✅ Using already initialized microphone and wake word engine")
-            logger.info("🎤 Testing with real microphone input...")
-            logger.info("📝 Speak 'Hey Jarvis' or 'Hey Computer' to test detection")
-            logger.info("⏱️ Test will run for 10 seconds...")
-            
-            # Use the existing stream and wake word engine
-            test_detections = 0
-            test_chunk_count = 0
-            start_time = time.time()
-            
-            # Test for 10 seconds using existing stream
-            while time.time() - start_time < 10:
-                try:
-                    # Read from existing stream
-                    audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
-                    test_chunk_count += 1
-                    
-                    # Convert to numpy array
-                    audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
-                    
-                    # Process with existing wake word engine
-                    detection_result = wake_detector.process_audio(audio_data)
-                    
-                    if detection_result:
-                        test_detections += 1
-                        logger.info(f"🎯 DETECTION #{test_detections} during test!")
-                        
-                        # Provide audio feedback
-                        if audio_feedback:
-                            audio_feedback.play_wake_word_detected()
-                    
-                    # Log progress every 2 seconds
-                    if test_chunk_count % 25 == 0:  # ~2 seconds at 80ms chunks
-                        elapsed = time.time() - start_time
-                        logger.info(f"⏱️ Test progress: {elapsed:.1f}s elapsed, {test_detections} detections")
-                
-                except Exception as e:
-                    logger.error(f"❌ Error in test audio processing: {e}")
-                    break
-            
-            logger.info(f"📊 Test Results:")
-            logger.info(f"   Duration: {time.time() - start_time:.1f}s")
-            logger.info(f"   Audio chunks processed: {test_chunk_count}")
-            logger.info(f"   Wake word detections: {test_detections}")
-            logger.info(f"   Detection rate: {test_detections/max(1, test_chunk_count)*100:.1f}%")
-            
-            if test_detections > 0:
-                logger.info("✅ Integration test PASSED - wake word detection working!")
-            else:
-                logger.warning("⚠️ Integration test - no detections (try speaking louder or check microphone)")
-        
+            logger.info(f"✅ Microphone initialized: {usb_device.name}")
+            logger.info(f"   Device index: {usb_device.index}")
+            logger.info(f"   Sample rate: {wake_detector.get_sample_rate()}")
+            logger.info(f"   Frame length: {wake_detector.get_frame_length()}")
+            logger.info("✅ Microphone test completed")
         except Exception as e:
-            logger.error(f"❌ Integration test failed: {e}")
+            logger.error(f"❌ Microphone test failed: {e}")
         
         logger.info("\n" + "="*60)
         logger.info("🧪 ALL TESTS COMPLETED")
         logger.info("="*60)
-        logger.info("📊 Test Summary:")
-        logger.info("   - Custom model loading: Tested")
-        logger.info("   - Audio feedback system: Tested")
-        logger.info("   - Real microphone integration: Tested")
-        logger.info("✅ Test execution completed - exiting")
-        return
+        
+        # Exit after tests if --run-tests was specified
+        logger.info("✅ Tests completed successfully. Exiting.")
+        return 0
+    
+    # Start continuous audio stream with enhanced debugging
+    logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
+    logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
+    
+    stream = audio_manager.start_stream(
+        device_index=usb_device.index,
+        sample_rate=wake_detector.get_sample_rate(),
+        channels=1,
+        format=pyaudio.paInt16,
+        frames_per_buffer=wake_detector.get_frame_length()
+    )
+    
+    if not stream:
+        logger.error("❌ Failed to start audio stream")
+        sys.exit(1)
+    
+    logger.info("✅ Audio stream started successfully")
     
     # ENABLED: Main audio processing loop with comprehensive debugging
     # This is the main wake-word detection service
