@@ -35,7 +35,7 @@ network:
 
 # Logging
 logging:
-  level: INFO                    # Log level (DEBUG, INFO, WARNING, ERROR)
+  level: WARNING                    # Log level (DEBUG, INFO, WARNING, ERROR)
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: /app/logs/hey-orac.log
 
