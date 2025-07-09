@@ -218,6 +218,11 @@ def main():
         help="Run comprehensive OpenWakeWord debugging tests"
     )
     parser.add_argument(
+        "--run-tests",
+        action="store_true",
+        help="Run test scripts using the initialized microphone and wake word engine"
+    )
+    parser.add_argument(
         "--stop-service",
         action="store_true",
         help="Stop the main service if running"
@@ -573,6 +578,114 @@ def main():
     logger.info("🎯 Starting continuous wake-word detection with OpenWakeWord")
     logger.info("📋 Use --audio-diagnostics, --test-pyaudio, or --list-devices for diagnostics")
     logger.info("🔄 Main audio processing loop ENABLED with comprehensive debugging")
+    logger.info("🧪 Use --run-tests to test with initialized microphone and wake word engine")
+    
+    # Run tests if requested
+    if args.run_tests:
+        logger.info("🧪 Running test scripts with initialized microphone and wake word engine...")
+        
+        # Test 1: Custom Model Loading Test
+        logger.info("\n" + "="*60)
+        logger.info("🧪 TEST 1: Custom Model Loading")
+        logger.info("="*60)
+        try:
+            from test_custom_models import main as test_custom_models_main
+            test_custom_models_main()
+            logger.info("✅ Custom model test completed")
+        except Exception as e:
+            logger.error(f"❌ Custom model test failed: {e}")
+        
+        # Test 2: Audio Feedback Test
+        logger.info("\n" + "="*60)
+        logger.info("🧪 TEST 2: Audio Feedback System")
+        logger.info("="*60)
+        try:
+            from audio_feedback import main as test_audio_feedback_main
+            test_audio_feedback_main()
+            logger.info("✅ Audio feedback test completed")
+        except Exception as e:
+            logger.error(f"❌ Audio feedback test failed: {e}")
+        
+        # Test 3: Integration Test with Real Audio
+        logger.info("\n" + "="*60)
+        logger.info("🧪 TEST 3: Integration Test with Real Audio")
+        logger.info("="*60)
+        try:
+            logger.info("🎤 Testing wake word detection with real microphone input...")
+            logger.info("📝 Speak 'Hey Jarvis' or 'Hey Computer' to test detection...")
+            logger.info("⏱️ Test will run for 10 seconds...")
+            
+            # Start audio stream for testing
+            test_stream = audio_manager.start_stream(
+                device_index=usb_device.index,
+                sample_rate=wake_detector.get_sample_rate(),
+                channels=1,
+                chunk_size=wake_detector.get_frame_length()
+            )
+            
+            if not test_stream:
+                logger.error("❌ Failed to start test audio stream")
+            else:
+                logger.info("✅ Test audio stream started")
+                
+                # Test for 10 seconds
+                import time
+                start_time = time.time()
+                test_chunk_count = 0
+                test_detections = 0
+                
+                while time.time() - start_time < 10:
+                    try:
+                        # Read audio chunk
+                        audio_chunk = test_stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
+                        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+                        test_chunk_count += 1
+                        
+                        # Process for wake word detection
+                        if wake_detector.process_audio(audio_data):
+                            test_detections += 1
+                            logger.info(f"🎯 WAKE WORD DETECTED! (Test detection #{test_detections})")
+                            
+                            # Play audio feedback
+                            if audio_feedback:
+                                audio_feedback.play_wake_word_detected()
+                        
+                        # Log progress every 2 seconds
+                        if test_chunk_count % 25 == 0:  # ~2 seconds at 80ms chunks
+                            elapsed = time.time() - start_time
+                            logger.info(f"⏱️ Test progress: {elapsed:.1f}s elapsed, {test_detections} detections")
+                    
+                    except Exception as e:
+                        logger.error(f"❌ Error in test audio processing: {e}")
+                        break
+                
+                # Cleanup test stream
+                test_stream.stop_stream()
+                test_stream.close()
+                
+                logger.info(f"📊 Test Results:")
+                logger.info(f"   Duration: {time.time() - start_time:.1f}s")
+                logger.info(f"   Audio chunks processed: {test_chunk_count}")
+                logger.info(f"   Wake word detections: {test_detections}")
+                logger.info(f"   Detection rate: {test_detections/max(1, test_chunk_count)*100:.1f}%")
+                
+                if test_detections > 0:
+                    logger.info("✅ Integration test PASSED - wake word detection working!")
+                else:
+                    logger.warning("⚠️ Integration test - no detections (try speaking louder or check microphone)")
+            
+        except Exception as e:
+            logger.error(f"❌ Integration test failed: {e}")
+        
+        logger.info("\n" + "="*60)
+        logger.info("🧪 ALL TESTS COMPLETED")
+        logger.info("="*60)
+        logger.info("📊 Test Summary:")
+        logger.info("   - Custom model loading: Tested")
+        logger.info("   - Audio feedback system: Tested")
+        logger.info("   - Real microphone integration: Tested")
+        logger.info("✅ Test execution completed - exiting")
+        return
     
     # ENABLED: Main audio processing loop with comprehensive debugging
     # This is the main wake-word detection service
@@ -627,7 +740,24 @@ def main():
                 
                 if detection_result:
                     detection_count += 1
-                    logger.info(f"🎯 WAKE WORD DETECTED! (Detection #{detection_count})")
+                    
+                    # PROMINENT DETECTION LOG - Easy to spot in logs
+                    logger.info("🎯🎯🎯 WAKE WORD DETECTED! 🎯🎯🎯")
+                    logger.info(f"🎯 DETECTION #{detection_count} - {wake_detector.get_wake_word_name()} detected!")
+                    
+                    # Simple detection log for easy monitoring
+                    import datetime
+                    detection_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    detection_log_line = f"[{detection_time}] WAKE WORD DETECTED: {wake_detector.get_wake_word_name()} (Detection #{detection_count})"
+                    logger.info(detection_log_line)
+                    
+                    # Write to dedicated detection log file
+                    try:
+                        with open("/app/logs/detections.log", "a") as f:
+                            f.write(f"{detection_log_line}\n")
+                    except Exception as e:
+                        logger.warning(f"⚠️ Could not write to detection log: {e}")
+                    
                     logger.info(f"📊 Detection details:")
                     logger.info(f"   Chunk number: {chunk_count}")
                     logger.info(f"   Audio RMS level: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
