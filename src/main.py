@@ -592,7 +592,7 @@ def main():
     logger.info(f"✅ USB microphone found: {usb_device.name} (index: {usb_device.index})")
     
     # Initialize wake word detector
-    if not wake_detector.initialize():
+    if not wake_detector.initialize(config):
         logger.error("❌ Failed to initialize wake word detector!")
         return 1
     
