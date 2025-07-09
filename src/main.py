@@ -16,6 +16,7 @@ from wake_word_interface import WakeWordDetector
 from audio_buffer import AudioBuffer
 # Removed LED controller import since USB LED control is not working
 from audio_feedback import create_audio_feedback
+import pyaudio
 
 # Configure logging
 logging.basicConfig(
