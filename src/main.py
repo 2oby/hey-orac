@@ -580,7 +580,24 @@ def main():
     logger.info("🔄 Main audio processing loop ENABLED with comprehensive debugging")
     logger.info("🧪 Use --run-tests to test with initialized microphone and wake word engine")
     
-    # Run tests if requested
+    # Start continuous audio stream with enhanced debugging
+    logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
+    logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
+    
+    stream = audio_manager.start_stream(
+        device_index=usb_device.index,
+        sample_rate=wake_detector.get_sample_rate(),
+        channels=1,
+        chunk_size=wake_detector.get_frame_length()
+    )
+    
+    if not stream:
+        logger.error("❌ Failed to start audio stream")
+        sys.exit(1)
+    
+    logger.info("✅ Audio stream started successfully")
+    
+    # Run tests if requested - NOW AFTER INITIALIZATION
     if args.run_tests:
         logger.info("🧪 Running test scripts with initialized microphone and wake word engine...")
         
@@ -686,23 +703,6 @@ def main():
     
     # ENABLED: Main audio processing loop with comprehensive debugging
     # This is the main wake-word detection service
-    
-    # Start continuous audio stream with enhanced debugging
-    logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
-    logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
-    
-    stream = audio_manager.start_stream(
-        device_index=usb_device.index,
-        sample_rate=wake_detector.get_sample_rate(),
-        channels=1,
-        chunk_size=wake_detector.get_frame_length()
-    )
-    
-    if not stream:
-        logger.error("❌ Failed to start audio stream")
-        sys.exit(1)
-    
-    logger.info("✅ Audio stream started successfully")
     
     try:
         detection_count = 0
