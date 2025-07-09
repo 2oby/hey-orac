@@ -14,7 +14,7 @@ wake_word:
   access_key: ""                 # Picovoice access key (get from console.picovoice.ai)
   
   # OpenWakeWord settings (only used when engine="openwakeword")
-  threshold: 0.3                 # Detection threshold (0.0-1.0) - lowered for better sensitivity
+  threshold: 0.1                 # Detection threshold (0.0-1.0) - temporarily very low for testing
   custom_model_path: ""           # Use all pre-trained models (multi-model detection)
   
   # Test engine settings (only used when engine="test")
@@ -35,7 +35,7 @@ network:
 
 # Logging
 logging:
-  level: WARNING                    # Log level (DEBUG, INFO, WARNING, ERROR)
+  level: INFO                     # Log level (DEBUG, INFO, WARNING, ERROR) - temporarily INFO to debug
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: /app/logs/hey-orac.log
 
