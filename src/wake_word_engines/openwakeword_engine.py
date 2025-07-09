@@ -54,13 +54,48 @@ class OpenWakeWordEngine(WakeWordEngine):
             
             if custom_model_path and os.path.exists(custom_model_path):
                 logger.info(f"🔍 DEBUGGING: Loading custom model from {custom_model_path}")
-                # Use the documented approach for custom models
-                self.model = openwakeword.Model(
-                    wakeword_models=[custom_model_path],
-                    vad_threshold=0.5,
-                    enable_speex_noise_suppression=False
-                )
+                
+                # Verify the custom model file
+                if not custom_model_path.endswith(('.onnx', '.tflite')):
+                    logger.error(f"❌ Custom model must be .onnx or .tflite format: {custom_model_path}")
+                    return False
+                
+                # For custom models, we need to create a custom model configuration
+                try:
+                    # Create a custom model configuration
+                    custom_model_config = {
+                        keyword: {
+                            'model_path': custom_model_path,
+                            'model_type': 'onnx' if custom_model_path.endswith('.onnx') else 'tflite'
+                        }
+                    }
+                    
+                    logger.info(f"🔍 DEBUGGING: Custom model config: {custom_model_config}")
+                    
+                    # Initialize with custom model
+                    self.model = openwakeword.Model(
+                        wakeword_models=custom_model_config,
+                        vad_threshold=0.5,
+                        enable_speex_noise_suppression=False
+                    )
+                    
+                    logger.info(f"✅ Custom model loaded successfully: {custom_model_path}")
+                    
+                except Exception as e:
+                    logger.error(f"❌ Failed to load custom model: {e}")
+                    logger.info("🔄 Falling back to pre-trained models...")
+                    
+                    # Fallback to pre-trained models
+                    self.model = openwakeword.Model(
+                        vad_threshold=0.5,
+                        enable_speex_noise_suppression=False
+                    )
+                    
             else:
+                if custom_model_path:
+                    logger.warning(f"⚠️ Custom model path specified but file not found: {custom_model_path}")
+                    logger.info("🔄 Falling back to pre-trained models...")
+                
                 logger.info(f"🔍 DEBUGGING: Loading pre-trained models using documented approach")
                 
                 # Use the documented approach: load ALL available models

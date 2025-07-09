@@ -15,9 +15,9 @@ logger = logging.getLogger(__name__)
 class SH04LEDController:
     """Controls the LED on SH-04 USB microphone."""
     
-    # SH-04 USB device identifiers
-    VENDOR_ID = 0x5678
-    PRODUCT_ID = 0x2348
+    # SH-04 USB device identifiers - will be auto-detected
+    VENDOR_ID = None
+    PRODUCT_ID = None
     
     # HID interface (from lsusb output)
     HID_INTERFACE = 2
@@ -26,14 +26,66 @@ class SH04LEDController:
         self.device = None
         self.is_connected = False
         
+    def _detect_device_ids(self) -> bool:
+        """Auto-detect SH-04 USB device IDs."""
+        try:
+            import subprocess
+            import re
+            
+            # Run lsusb to find USB devices
+            result = subprocess.run(['lsusb'], capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error("❌ Failed to run lsusb command")
+                return False
+            
+            # Look for SH-04 or similar microphone devices
+            lines = result.stdout.split('\n')
+            for line in lines:
+                # Common patterns for USB microphones
+                if any(keyword in line.lower() for keyword in ['sh-04', 'microphone', 'audio', 'usb mic']):
+                    logger.info(f"🔍 Found potential microphone device: {line}")
+                    
+                    # Extract vendor and product IDs
+                    match = re.search(r'Bus \d+ Device \d+: ID ([0-9a-f]{4}):([0-9a-f]{4})', line)
+                    if match:
+                        self.VENDOR_ID = int(match.group(1), 16)
+                        self.PRODUCT_ID = int(match.group(2), 16)
+                        logger.info(f"✅ Auto-detected USB device: Vendor={self.VENDOR_ID:04x}, Product={self.PRODUCT_ID:04x}")
+                        return True
+            
+            # If no specific device found, try common USB audio device patterns
+            logger.info("🔍 No specific microphone found, trying common USB audio devices...")
+            for line in lines:
+                if 'audio' in line.lower() or 'sound' in line.lower():
+                    logger.info(f"🔍 Found potential audio device: {line}")
+                    match = re.search(r'Bus \d+ Device \d+: ID ([0-9a-f]{4}):([0-9a-f]{4})', line)
+                    if match:
+                        self.VENDOR_ID = int(match.group(1), 16)
+                        self.PRODUCT_ID = int(match.group(2), 16)
+                        logger.info(f"✅ Auto-detected USB audio device: Vendor={self.VENDOR_ID:04x}, Product={self.PRODUCT_ID:04x}")
+                        return True
+            
+            logger.warning("⚠️ No USB audio devices found")
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Error detecting USB device IDs: {e}")
+            return False
+    
     def connect(self) -> bool:
         """Connect to the SH-04 device."""
         try:
-            # Find the SH-04 device
+            # Auto-detect device IDs if not set
+            if self.VENDOR_ID is None or self.PRODUCT_ID is None:
+                if not self._detect_device_ids():
+                    logger.error("❌ Could not detect USB device IDs")
+                    return False
+            
+            # Find the device
             self.device = usb.core.find(idVendor=self.VENDOR_ID, idProduct=self.PRODUCT_ID)
             
             if self.device is None:
-                logger.error("❌ SH-04 device not found")
+                logger.error(f"❌ USB device not found: Vendor={self.VENDOR_ID:04x}, Product={self.PRODUCT_ID:04x}")
                 return False
             
             # Set the active configuration
@@ -43,11 +95,11 @@ class SH04LEDController:
             usb.util.claim_interface(self.device, self.HID_INTERFACE)
             
             self.is_connected = True
-            logger.info("✅ Connected to SH-04 LED controller")
+            logger.info(f"✅ Connected to USB device: Vendor={self.VENDOR_ID:04x}, Product={self.PRODUCT_ID:04x}")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Failed to connect to SH-04: {e}")
+            logger.error(f"❌ Failed to connect to USB device: {e}")
             return False
     
     def disconnect(self):

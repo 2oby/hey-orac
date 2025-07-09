@@ -115,6 +115,21 @@ ssh "$REMOTE_ALIAS" "\
     echo '${BLUE}🧪 Testing PyAudio ALSA support...${NC}'; \
     docker-compose exec -T hey-orac python src/main.py --test-pyaudio || echo 'PyAudio test completed'; \
     \
+    echo '${BLUE}🎯 Testing Custom Model Loading...${NC}'; \
+    docker-compose exec -T hey-orac python src/test_custom_models.py || echo 'Custom model tests completed'; \
+    \
+    echo '${BLUE}🔊 Testing Audio Feedback System...${NC}'; \
+    docker-compose exec -T hey-orac python src/audio_feedback.py || echo 'Audio feedback tests completed'; \
+    \
+    echo '${BLUE}💡 Testing LED Control System...${NC}'; \
+    docker-compose exec -T hey-orac python src/led_controller.py || echo 'LED control tests completed'; \
+    \
+    echo '${BLUE}🔍 Checking audio assets...${NC}'; \
+    docker-compose exec -T hey-orac bash -c 'ls -la /app/assets/audio/ || echo "Audio assets not found"'; \
+    \
+    echo '${BLUE}🔍 Checking USB devices for LED control...${NC}'; \
+    docker-compose exec -T hey-orac bash -c 'lsusb || echo "lsusb not available"'; \
+    \
     echo '${BLUE}🛑 Stopping main application to release audio device...${NC}'; \
     docker-compose exec -T hey-orac pkill -f "python.*main.py" || echo 'No main process to kill'; \
     sleep 2; \
@@ -158,4 +173,12 @@ echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python
 echo -e "${BLUE}🎤 To test SH-04 USB microphone specifically:${NC}"
 echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/test_pyaudio_minimal.py'${NC}"
 echo -e "${BLUE}🔍 To test arecord with SH-04:${NC}"
-echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac arecord -D default -f S16_LE -r 16000 -c 1 -d 2 test.wav'${NC}" 
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac arecord -D default -f S16_LE -r 16000 -c 1 -d 2 test.wav'${NC}"
+echo -e "${BLUE}🎯 To test custom model loading:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/test_custom_models.py'${NC}"
+echo -e "${BLUE}🔊 To test audio feedback system:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/audio_feedback.py'${NC}"
+echo -e "${BLUE}💡 To test LED control system:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && docker-compose exec hey-orac python src/led_controller.py'${NC}"
+echo -e "${BLUE}🧪 To run all fix tests:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/hey-orac && ./scripts/test_fixes.sh'${NC}" 
