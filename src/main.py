@@ -666,8 +666,7 @@ def main():
         device_index=usb_device.index,
         sample_rate=wake_detector.get_sample_rate(),
         channels=1,
-        format=pyaudio.paInt16,
-        frames_per_buffer=wake_detector.get_frame_length()
+        chunk_size=wake_detector.get_frame_length()
     )
     
     if not stream:
