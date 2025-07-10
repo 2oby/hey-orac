@@ -76,6 +76,71 @@ def get_rms_data():
     rms_data = rms_monitor.get_rms_data()
     return jsonify(rms_data)
 
+@app.route('/api/custom-models', methods=['GET'])
+def get_custom_models():
+    """Get list of available custom models and current selection"""
+    import os
+    import glob
+    
+    # Discover available custom models
+    models_dir = '/app/third_party/openwakeword/custom_models'
+    onnx_files = glob.glob(os.path.join(models_dir, '*.onnx'))
+    
+    available_models = []
+    for file_path in onnx_files:
+        model_name = os.path.splitext(os.path.basename(file_path))[0]
+        available_models.append({
+            'name': model_name,
+            'file': os.path.basename(file_path),
+            'path': file_path
+        })
+    
+    # Get current selection from config
+    config_handler = ConfigHandler()
+    config = config_handler.get_config()
+    current_model_path = config.get('wake_word', {}).get('custom_model_path', '')
+    
+    # Find which model is currently active
+    current_model = None
+    for model in available_models:
+        if model['path'] == current_model_path:
+            current_model = model['name']
+            break
+    
+    return jsonify({
+        'available_models': available_models,
+        'current_model': current_model,
+        'current_path': current_model_path
+    })
+
+@app.route('/api/custom-models/<model_name>', methods=['POST'])
+def set_custom_model(model_name):
+    """Set the active custom model"""
+    import os
+    
+    # Validate the model exists
+    model_path = f'/app/third_party/openwakeword/custom_models/{model_name}.onnx'
+    if not os.path.exists(model_path):
+        return jsonify({'error': f'Model {model_name} not found'}), 404
+    
+    # Update the config
+    config_handler = ConfigHandler()
+    config = config_handler.get_config()
+    
+    if 'wake_word' not in config:
+        config['wake_word'] = {}
+    
+    config['wake_word']['custom_model_path'] = model_path
+    config_handler.config = config
+    config_handler.save()
+    
+    return jsonify({
+        'status': 'success',
+        'message': f'Model {model_name} activated',
+        'current_model': model_name,
+        'current_path': model_path
+    })
+
 if __name__ == '__main__':
     # Run in production mode for service deployment
     app.run(host='0.0.0.0', port=7171, debug=False, threaded=True) 
