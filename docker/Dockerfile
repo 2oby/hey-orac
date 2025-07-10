@@ -75,7 +75,7 @@ COPY --chown=appuser:appuser src/config.yaml ./config.yaml
 COPY --chown=appuser:appuser .asoundrc /home/appuser/.asoundrc
 
 # Expose port for web interface
-EXPOSE 8080
+EXPOSE 7171
 
 # Set environment variables
 ENV PYTHONPATH=/app

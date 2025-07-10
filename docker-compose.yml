@@ -10,7 +10,7 @@ services:
     container_name: hey-orac
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "7171:7171"
     volumes:
       # Mount audio devices
       - /dev/snd:/dev/snd:rw
@@ -27,6 +27,10 @@ services:
       - /tmp/.X11-unix:/tmp/.X11-unix:rw
       # Mount configuration for easy updates
       - ./src/config.yaml:/app/config.yaml:ro
+      - /dev:/dev
+      - /proc:/proc
+      - /sys:/sys
+      - /var/run/docker.sock:/var/run/docker.sock
       # Mount models directory
       - ./models:/app/models:ro
       # Mount logs directory
@@ -34,7 +38,6 @@ services:
     devices:
       # Access to audio devices
       - /dev/snd:/dev/snd
-      # Access to USB devices (for USB microphones)
       - /dev/bus/usb:/dev/bus/usb
     group_add:
       - audio
@@ -66,6 +69,7 @@ services:
     privileged: true
     security_opt:
       - no-new-privileges:false
+      - seccomp:unconfined
     cap_drop:
       - ALL
     cap_add:
