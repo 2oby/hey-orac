@@ -59,11 +59,7 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
     volume_window_size = config['volume_monitoring'].get('window_size', 10)
     volume_history = []
     
-    # Detection debouncing and cooldown
-    last_detection_time = 0
-    detection_cooldown_seconds = 3.0  # Minimum time between detections
-    detection_debounce_samples = int(wake_detector.get_sample_rate() * 0.5)  # 0.5s debounce
-    last_detection_chunk = -detection_debounce_samples  # Initialize to negative so first detection can get through
+    # Audio pipeline doesn't need cooldown/debounce - let wake word engine handle timing
     
     logger.info(f"🔊 Volume monitoring: threshold={silence_threshold}, window={volume_window_size}")
     logger.info(f"🛡️ Detection cooldown: {detection_cooldown_seconds}s, Debounce: {detection_debounce_samples} samples")
@@ -127,33 +123,20 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                 # Add to audio buffer
                 audio_buffer.add_audio(audio_data)
                 
-                # Check if we're in cooldown period
-                current_time = time.time()
-                time_since_last_detection = current_time - last_detection_time
-                
-                # Check if we're too close to the last detection (debouncing)
-                chunks_since_last_detection = chunk_count - last_detection_chunk
-                
                 # Process audio for wake-word detection (ALWAYS process for detector state)
                 detection_result = wake_detector.process_audio(audio_data)
                 
                 if detection_result:
-                    # Check if we should allow this detection
-                    should_allow = (time_since_last_detection >= detection_cooldown_seconds and 
-                                  chunks_since_last_detection >= detection_debounce_samples and
-                                  not audio_buffer.is_capturing_postroll() and
+                    # Always allow detection - let wake word engine handle timing
+                    should_allow = (not audio_buffer.is_capturing_postroll() and
                                   avg_volume >= silence_threshold)
                     
                     if should_allow:
                         detection_count += 1
-                        last_detection_time = current_time
-                        last_detection_chunk = chunk_count
                         
                         # PROMINENT DETECTION LOG
                         logger.info("🎯🎯🎯 WAKE WORD DETECTED! 🎯🎯🎯")
                         logger.info(f"🎯 DETECTION #{detection_count} - {wake_detector.get_wake_word_name()} detected!")
-                        logger.info(f"⏱️ Time since last detection: {time_since_last_detection:.2f}s")
-                        logger.info(f"📦 Chunks since last detection: {chunks_since_last_detection}")
                         logger.info(f"🔊 Audio volume: {avg_volume:.2f} (threshold: {silence_threshold})")
                         
                         # Detection log with timestamp
@@ -228,19 +211,15 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                         # TODO: Stream audio to Jetson Orin
                         logger.info("📡 Audio capture completed - ready for streaming to Jetson")
                         logger.info("🔄 Resuming audio pipeline monitoring...")
-                        logger.info(f"🛡️ Cooldown active for {detection_cooldown_seconds}s...")
                 
                 # Progress logging
                 if chunk_count % 1000 == 0:
                     buffer_status = audio_buffer.get_buffer_status()
-                    time_since_last = time.time() - last_detection_time
                     logger.info(f"📊 Pipeline Progress Report:")
                     logger.info(f"   Processed chunks: {chunk_count}")
                     logger.info(f"   Active chunks: {active_chunks}")
                     logger.info(f"   Silent chunks: {silent_chunks}")
                     logger.info(f"   Detections: {detection_count}")
-                    logger.info(f"   Time since last detection: {time_since_last:.1f}s")
-                    logger.info(f"   Cooldown remaining: {max(0, detection_cooldown_seconds - time_since_last):.1f}s")
                     logger.info(f"   Current volume: {avg_volume:.2f} (threshold: {silence_threshold})")
                     logger.info(f"   Buffer pre-roll samples: {buffer_status['preroll_samples']}")
                     logger.info(f"   Buffer post-roll samples: {buffer_status['postroll_samples']}")

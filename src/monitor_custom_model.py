@@ -65,13 +65,13 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     # Detection debouncing and cooldown
     last_detection_time = 0  # Initialize to 0 so first detection can get through
     detection_cooldown_seconds = 1.5  # Reduced from 3.0s to 1.5s - minimum time between detections
-    detection_debounce_samples = int(wake_detector.get_sample_rate() * 0.2)  # Reduced from 0.5s to 0.2s debounce
-    last_detection_chunk = -detection_debounce_samples  # Initialize to negative so first detection can get through
+    detection_debounce_chunks = int((wake_detector.get_sample_rate() * 0.2) / wake_detector.get_frame_length())  # 0.2s debounce in chunks
+    last_detection_chunk = -detection_debounce_chunks  # Initialize to negative so first detection can get through
     
     # Start continuous audio stream
     logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
     logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
-    logger.info(f"🛡️ Detection cooldown: {detection_cooldown_seconds}s, Debounce: {detection_debounce_samples} samples")
+    logger.info(f"🛡️ Detection cooldown: {detection_cooldown_seconds}s, Debounce: {detection_debounce_chunks} chunks")
     
     stream = audio_manager.start_stream(
         device_index=usb_device.index,
@@ -160,7 +160,7 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                 if detection_result:
                     # Check if we should allow this detection (cooldown and debounce)
                     should_allow = (time_since_last_detection >= detection_cooldown_seconds and 
-                                  chunks_since_last_detection >= detection_debounce_samples and
+                                  chunks_since_last_detection >= detection_debounce_chunks and
                                   not audio_buffer.is_capturing_postroll())
                     
                     if should_allow:
@@ -287,11 +287,11 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                         logger.info(f"🛡️ Cooldown active for {detection_cooldown_seconds}s...")
                     else:
                         # Log that detection was blocked by cooldown/debounce
-                        logger.info(f"🛡️ Detection blocked: time_since={time_since_last_detection:.2f}s, chunks_since={chunks_since_last_detection}, cooldown={detection_cooldown_seconds}s, debounce={detection_debounce_samples}")
+                        logger.info(f"🛡️ Detection blocked: time_since={time_since_last_detection:.2f}s, chunks_since={chunks_since_last_detection}, cooldown={detection_cooldown_seconds}s, debounce={detection_debounce_chunks}")
                         if time_since_last_detection < detection_cooldown_seconds:
                             logger.info(f"   Reason: Cooldown period active (need {detection_cooldown_seconds - time_since_last_detection:.1f}s more)")
-                        elif chunks_since_last_detection < detection_debounce_samples:
-                            logger.info(f"   Reason: Debounce period active (need {detection_debounce_samples - chunks_since_last_detection} more chunks)")
+                        elif chunks_since_last_detection < detection_debounce_chunks:
+                            logger.info(f"   Reason: Debounce period active (need {detection_debounce_chunks - chunks_since_last_detection} more chunks)")
                         elif audio_buffer.is_capturing_postroll():
                             logger.info(f"   Reason: Post-roll capture in progress")
                 
