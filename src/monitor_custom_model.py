@@ -206,13 +206,43 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                         
                         # Notify web interface of detection
                         try:
-                            from web_backend import add_detection
-                            model_name = wake_detector.get_wake_word_name()
-                            confidence = wake_detector.engine.get_latest_confidence() if hasattr(wake_detector, 'engine') else 0.0
-                            add_detection(model_name, confidence)
-                            logger.info(f"🌐 Web interface notified of detection: {model_name}")
+                            import json
+                            import time
+                            import os
+                            
+                            # Record detection to a file for web interface to read
+                            detection_data = {
+                                'model_name': wake_detector.get_wake_word_name(),
+                                'confidence': wake_detector.engine.get_latest_confidence() if hasattr(wake_detector, 'engine') else 0.0,
+                                'timestamp': time.time()
+                            }
+                            
+                            # Write to detection log file
+                            detection_file = '/tmp/recent_detections.json'
+                            detections = []
+                            
+                            # Read existing detections if file exists
+                            if os.path.exists(detection_file):
+                                try:
+                                    with open(detection_file, 'r') as f:
+                                        detections = json.load(f)
+                                except:
+                                    detections = []
+                            
+                            # Add new detection
+                            detections.append(detection_data)
+                            
+                            # Keep only last 50 detections
+                            if len(detections) > 50:
+                                detections = detections[-50:]
+                            
+                            # Write back to file
+                            with open(detection_file, 'w') as f:
+                                json.dump(detections, f)
+                            
+                            logger.info(f"🌐 Detection recorded to file: {wake_detector.get_wake_word_name()}")
                         except Exception as e:
-                            logger.debug(f"⚠️ Could not notify web interface: {e}")
+                            logger.debug(f"⚠️ Could not record detection to file: {e}")
                         
                         # Start post-roll capture
                         logger.info("📦 Starting post-roll capture...")
