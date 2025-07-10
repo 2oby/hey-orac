@@ -1176,15 +1176,20 @@
                         
                         // Check for recent detections (last 2 seconds)
                         const now = Date.now();
+                        let foundRecent = false;
                         detections.forEach(detection => {
                             if (now - detection.timestamp < 2000) {
                                 // Trigger pulse for the detected model
                                 triggerDetectionPulse(detection.model_name);
-                                
                                 // Show notification
                                 showNotification(`Wake word detected: ${detection.model_name}!`, 'success');
+                                foundRecent = true;
                             }
                         });
+                        if (foundRecent) {
+                            document.getElementById('lastDetection').textContent = 
+                                `Last Detection: ${new Date().toLocaleTimeString()}`;
+                        }
                     }
                 } catch (error) {
                     // Silently handle errors - detection polling is optional

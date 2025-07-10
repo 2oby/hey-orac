@@ -241,10 +241,10 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                             import os
                             # Record detection to a file for web interface to read
                             detection_data = {
-                                'model_name': str(wake_detector.get_wake_word_name()),
-                                'confidence': float(wake_detector.engine.get_latest_confidence()) if hasattr(wake_detector, 'engine') else 0.0,
-                                'timestamp': float(time.time())
-                            }
+                                        'model_name': str(wake_detector.get_wake_word_name()),
+                                        'confidence': float(wake_detector.engine.get_latest_confidence()) if hasattr(wake_detector, 'engine') else 0.0,
+                                        'timestamp': int(time.time() * 1000)  # milliseconds since epoch
+                                    }
                             logger.info(f"🌐 DEBUG: Detection data prepared: {detection_data}")
                             # Write to detection log file
                             detection_file = '/tmp/recent_detections.json'
