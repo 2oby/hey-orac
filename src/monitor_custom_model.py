@@ -182,7 +182,7 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                         
                         # Write to dedicated detection log file
                         try:
-                            with open("/app/logs/custom_detections.log", "a") as f:
+                            with open("/tmp/custom_detections.log", "a") as f:
                                 f.write(f"{detection_log_line}\n")
                         except Exception as e:
                             logger.warning(f"⚠️ Could not write to detection log: {e}")

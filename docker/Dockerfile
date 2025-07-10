@@ -74,6 +74,9 @@ COPY --chown=appuser:appuser src/config.yaml ./config.yaml
 # Copy ALSA configuration for USB microphone
 COPY --chown=appuser:appuser .asoundrc /home/appuser/.asoundrc
 
+# Create logs directory with proper ownership
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
+
 # Expose port for web interface
 EXPOSE 7171
 

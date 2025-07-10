@@ -146,7 +146,7 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                         
                         # Write to dedicated detection log file
                         try:
-                            with open("/app/logs/pipeline_detections.log", "a") as f:
+                            with open("/tmp/pipeline_detections.log", "a") as f:
                                 f.write(f"{detection_log_line}\n")
                         except Exception as e:
                             logger.warning(f"⚠️ Could not write to detection log: {e}")
