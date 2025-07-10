@@ -246,6 +246,108 @@ class SpeakerTester:
         except Exception as e:
             logger.error(f"Error testing volume control: {e}")
 
+    def show_lsusb(self):
+        """Show lsusb output for USB device detection"""
+        logger.info("\n===== USB Devices (lsusb) =====")
+        try:
+            result = subprocess.run(['lsusb'], capture_output=True, text=True)
+            if result.returncode == 0:
+                logger.info(result.stdout.strip())
+            else:
+                logger.warning("lsusb command failed")
+        except Exception as e:
+            logger.warning(f"Could not run lsusb: {e}")
+
+    def show_aplay_l(self):
+        """Show aplay -l output for ALSA playback devices"""
+        logger.info("\n===== ALSA Playback Devices (aplay -l) =====")
+        try:
+            result = subprocess.run(['aplay', '-l'], capture_output=True, text=True)
+            if result.returncode == 0:
+                logger.info(result.stdout.strip())
+            else:
+                logger.warning("aplay -l command failed")
+        except Exception as e:
+            logger.warning(f"Could not run aplay -l: {e}")
+
+    def show_arecord_l(self):
+        """Show arecord -l output for ALSA capture devices"""
+        logger.info("\n===== ALSA Capture Devices (arecord -l) =====")
+        try:
+            result = subprocess.run(['arecord', '-l'], capture_output=True, text=True)
+            if result.returncode == 0:
+                logger.info(result.stdout.strip())
+            else:
+                logger.warning("arecord -l command failed")
+        except Exception as e:
+            logger.warning(f"Could not run arecord -l: {e}")
+
+    def find_usb_audio_device(self):
+        """Parse aplay -l output to find a USB audio device (returns card,device or None)"""
+        try:
+            result = subprocess.run(['aplay', '-l'], capture_output=True, text=True)
+            if result.returncode != 0:
+                return None
+            for line in result.stdout.split('\n'):
+                if 'USB' in line or 'usb' in line:
+                    # Example: card 2: Device [USB Audio Device], device 0: USB Audio [USB Audio]
+                    import re
+                    m = re.search(r'card (\d+):.*device (\d+):', line)
+                    if m:
+                        card = m.group(1)
+                        device = m.group(2)
+                        logger.info(f"Found USB audio device: card {card}, device {device}")
+                        return card, device
+            return None
+        except Exception as e:
+            logger.warning(f"Error parsing aplay -l: {e}")
+            return None
+
+    def play_direct_to_usb(self, card, device):
+        """Try to play a test sound directly to the USB audio device"""
+        logger.info(f"\n===== Direct Playback to USB Audio Device (card {card}, device {device}) =====")
+        test_file = '/usr/share/sounds/alsa/Front_Left.wav'
+        if not os.path.exists(test_file):
+            logger.warning(f"Test file not found: {test_file}")
+            return False
+        try:
+            cmd = ['aplay', '-D', f'plughw:{card},{device}', test_file]
+            logger.info(f"Running: {' '.join(cmd)}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                logger.info("✅ Successfully played test sound to USB audio device!")
+                return True
+            else:
+                logger.error(f"❌ Playback failed: {result.stderr}")
+                return False
+        except Exception as e:
+            logger.error(f"❌ Error during direct playback: {e}")
+            return False
+
+    def enhanced_hardware_test(self):
+        """Enhanced hardware/OS-level troubleshooting for USB audio"""
+        logger.info("\n==============================")
+        logger.info("🔍 Hardware/OS Audio Troubleshooting")
+        logger.info("==============================\n")
+        self.show_lsusb()
+        self.show_aplay_l()
+        self.show_arecord_l()
+        usb_dev = self.find_usb_audio_device()
+        if usb_dev:
+            card, device = usb_dev
+            played = self.play_direct_to_usb(card, device)
+            if played:
+                logger.info("\n🎉 If you heard the test sound, your USB speaker is working at the OS level!")
+            else:
+                logger.error("\n❌ Could not play sound directly to USB device. Check connections and try a different port.")
+        else:
+            logger.error("\n❌ No USB audio device detected by ALSA.\n")
+            logger.info("- Try unplugging/replugging the USB speaker.")
+            logger.info("- Try a different USB port.")
+            logger.info("- Reboot the Pi if needed.")
+            logger.info("- Make sure the speaker is powered (if required).\n")
+        logger.info("==============================\n")
+
 def main():
     """Main function"""
     logger.info("🔊 USB Speaker Test Script")
@@ -254,6 +356,9 @@ def main():
     logger.info("")
     
     tester = SpeakerTester()
+    
+    # Enhanced hardware/OS-level troubleshooting
+    tester.enhanced_hardware_test()
     
     # Run comprehensive test
     success = tester.test_speaker_output()
