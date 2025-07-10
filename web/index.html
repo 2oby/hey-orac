@@ -1080,6 +1080,26 @@
         }
 
         // Real detection events are handled by the backend
+        
+        // Function to trigger detection pulse on model card
+        function triggerDetectionPulse(modelName) {
+            const modelCard = document.querySelector(`[data-model-name="${modelName}"]`);
+            if (modelCard) {
+                // Remove any existing detection class
+                modelCard.classList.remove('detected');
+                
+                // Trigger reflow to ensure animation plays
+                modelCard.offsetHeight;
+                
+                // Add detection class to trigger animation
+                modelCard.classList.add('detected');
+                
+                // Remove the class after animation completes
+                setTimeout(() => {
+                    modelCard.classList.remove('detected');
+                }, 500);
+            }
+        }
 
         // Modal functions
         function openSettingsModal(modelName) {
@@ -1143,7 +1163,35 @@
         document.addEventListener('DOMContentLoaded', () => {
             initializeInterface();
             setupModalListeners();
+            startDetectionPolling();
         });
+        
+        // Poll for wake word detections
+        function startDetectionPolling() {
+            setInterval(async () => {
+                try {
+                    const response = await fetch(`${API_BASE}/detections`);
+                    if (response.ok) {
+                        const detections = await response.json();
+                        
+                        // Check for recent detections (last 2 seconds)
+                        const now = Date.now();
+                        detections.forEach(detection => {
+                            if (now - detection.timestamp < 2000) {
+                                // Trigger pulse for the detected model
+                                triggerDetectionPulse(detection.model_name);
+                                
+                                // Show notification
+                                showNotification(`Wake word detected: ${detection.model_name}!`, 'success');
+                            }
+                        });
+                    }
+                } catch (error) {
+                    // Silently handle errors - detection polling is optional
+                    console.debug('Detection polling error:', error);
+                }
+            }, 1000); // Poll every second
+        }
 
         // Volume meter functions
         function setupVolumeMeter() {

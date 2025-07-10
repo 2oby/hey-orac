@@ -144,6 +144,42 @@ def set_custom_model(model_name):
         'current_path': model_path
     })
 
+@app.route('/api/detections', methods=['GET'])
+def get_detections():
+    """Get recent wake word detections"""
+    # This is a simple in-memory store for recent detections
+    # In a production system, you might want to use a database
+    if not hasattr(app, 'recent_detections'):
+        app.recent_detections = []
+    
+    # Return detections from the last 10 seconds
+    import time
+    current_time = time.time()
+    recent_detections = [
+        detection for detection in app.recent_detections 
+        if current_time - detection['timestamp'] < 10
+    ]
+    
+    return jsonify(recent_detections)
+
+def add_detection(model_name, confidence):
+    """Add a detection to the recent detections list"""
+    import time
+    if not hasattr(app, 'recent_detections'):
+        app.recent_detections = []
+    
+    detection = {
+        'model_name': model_name,
+        'confidence': confidence,
+        'timestamp': time.time()
+    }
+    
+    app.recent_detections.append(detection)
+    
+    # Keep only the last 50 detections
+    if len(app.recent_detections) > 50:
+        app.recent_detections = app.recent_detections[-50:]
+
 if __name__ == '__main__':
     # Run in production mode for service deployment
     app.run(host='0.0.0.0', port=7171, debug=False, threaded=True) 
