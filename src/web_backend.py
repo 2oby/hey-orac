@@ -10,11 +10,11 @@ CORS(app)
 # Serve static files from web directory
 @app.route('/')
 def index():
-    return send_from_directory('web', 'index.html')
+    return send_from_directory('/app/web', 'index.html')
 
 @app.route('/<path:filename>')
 def static_files(filename):
-    return send_from_directory('web', filename)
+    return send_from_directory('/app/web', filename)
 
 # API endpoints
 @app.route('/api/config', methods=['GET'])
