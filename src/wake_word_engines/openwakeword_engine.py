@@ -63,6 +63,8 @@ class OpenWakeWordEngine(WakeWordEngine):
                 # For custom models, use the correct OpenWakeWord API
                 try:
                     logger.info(f"🔍 DEBUGGING: Using correct OpenWakeWord API for custom models")
+                    logger.info(f"   Custom model path: {custom_model_path}")
+                    logger.info(f"   Keyword: {keyword}")
                     
                     # Use the correct API: wakeword_model_paths and class_mapping_dicts
                     self.model = openwakeword.Model(
@@ -74,8 +76,16 @@ class OpenWakeWordEngine(WakeWordEngine):
                     
                     logger.info(f"✅ Custom model loaded successfully: {custom_model_path}")
                     
+                    # Test the custom model immediately
+                    test_audio = np.zeros(1280, dtype=np.float32)
+                    test_predictions = self.model.predict(test_audio)
+                    logger.info(f"🔍 Custom model test prediction: {test_predictions}")
+                    
                 except Exception as e:
                     logger.error(f"❌ Failed to load custom model: {e}")
+                    logger.error(f"❌ Custom model path: {custom_model_path}")
+                    logger.error(f"❌ Custom model exists: {os.path.exists(custom_model_path)}")
+                    logger.error(f"❌ Custom model size: {os.path.getsize(custom_model_path) if os.path.exists(custom_model_path) else 'N/A'}")
                     logger.info("🔄 Falling back to pre-trained models...")
                     
                     # Fallback to pre-trained models
@@ -98,14 +108,9 @@ class OpenWakeWordEngine(WakeWordEngine):
                 logger.info(f"   enable_speex_noise_suppression: False")
                 logger.info(f"   wakeword_models: None (load all available)")
                 
-                # Download models if not present (one-time operation)
-                try:
-                    openwakeword.utils.download_models()
-                    logger.info("✅ Models downloaded/verified")
-                except Exception as e:
-                    logger.warning(f"⚠️ Could not download models: {e}")
-                
                 # Initialize model with all available models (documented approach)
+                # Note: We don't call download_models() as it's not available in this version
+                logger.info("🔍 DEBUGGING: Creating OpenWakeWord Model with available models...")
                 self.model = openwakeword.Model(
                     vad_threshold=0.5,
                     enable_speex_noise_suppression=False
