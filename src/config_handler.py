@@ -3,8 +3,8 @@ import glob
 import yaml
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.yaml')
-OPENWAKEWORD_MODELS_DIR = os.path.join('third_party', 'openwakeword', 'custom_models')
-PORCUPINE_MODELS_DIR = os.path.join('third_party', 'porcupine', 'custom_models')
+OPENWAKEWORD_MODELS_DIR = os.path.join('/app', 'third_party', 'openwakeword', 'custom_models')
+PORCUPINE_MODELS_DIR = os.path.join('/app', 'third_party', 'porcupine', 'custom_models')
 
 DEFAULT_GLOBAL = {
     'rms_filter': 50,
@@ -18,12 +18,10 @@ DEFAULT_MODEL = {
 
 def discover_models():
     models = set()
-    # OpenWakeWord: .onnx files
+    # OpenWakeWord: .onnx files only
     oww_models = glob.glob(os.path.join(OPENWAKEWORD_MODELS_DIR, '*.onnx'))
     models.update([os.path.splitext(os.path.basename(f))[0] for f in oww_models])
-    # Porcupine: .ppn files
-    porcupine_models = glob.glob(os.path.join(PORCUPINE_MODELS_DIR, '*.ppn'))
-    models.update([os.path.splitext(os.path.basename(f))[0] for f in porcupine_models])
+    # Porcupine models excluded for now
     return sorted(models)
 
 class ConfigHandler:
