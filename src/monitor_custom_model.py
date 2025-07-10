@@ -183,9 +183,13 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                 
                 if detection_result:
                     # Check if we should allow this detection (cooldown and debounce)
-                    should_allow = (time_since_last_detection >= detection_cooldown_seconds and 
-                                  chunks_since_last_detection >= detection_debounce_chunks and
-                                  not audio_buffer.is_capturing_postroll())
+                    # Cooldown logic: -1 means no previous detection (always allow) or cooldown expired
+                    # Debounce logic: need at least detection_debounce_chunks between detections
+                    cooldown_ok = (time_since_last_detection == -1) or (time_since_last_detection >= detection_cooldown_seconds)
+                    debounce_ok = chunks_since_last_detection >= detection_debounce_chunks
+                    not_postrolling = not audio_buffer.is_capturing_postroll()
+                    
+                    should_allow = cooldown_ok and debounce_ok and not_postrolling
                     
                     if should_allow:
                         
@@ -231,6 +235,7 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                                 logger.error(f"❌ Audio feedback failed: {e}")
                         
                         # Notify web interface of detection
+                        logger.info("🌐 DEBUG: About to write detection to file...")
                         try:
                             import json
                             import os
@@ -240,22 +245,32 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                                 'confidence': float(wake_detector.engine.get_latest_confidence()) if hasattr(wake_detector, 'engine') else 0.0,
                                 'timestamp': float(time.time())
                             }
+                            logger.info(f"🌐 DEBUG: Detection data prepared: {detection_data}")
                             # Write to detection log file
                             detection_file = '/tmp/recent_detections.json'
+                            logger.info(f"🌐 DEBUG: Writing to file: {detection_file}")
                             detections = []
                             # Read existing detections if file exists
                             if os.path.exists(detection_file):
+                                logger.info(f"🌐 DEBUG: Existing file found, reading...")
                                 try:
                                     with open(detection_file, 'r') as f:
                                         detections = json.load(f)
-                                except:
+                                    logger.info(f"🌐 DEBUG: Read {len(detections)} existing detections")
+                                except Exception as e:
+                                    logger.warning(f"🌐 DEBUG: Failed to read existing file: {e}")
                                     detections = []
+                            else:
+                                logger.info(f"🌐 DEBUG: No existing file, starting fresh")
                             # Add new detection
                             detections.append(detection_data)
+                            logger.info(f"🌐 DEBUG: Added detection, total now: {len(detections)}")
                             # Keep only last 50 detections
                             if len(detections) > 50:
                                 detections = detections[-50:]
+                                logger.info(f"🌐 DEBUG: Trimmed to last 50 detections")
                             # Write back to file
+                            logger.info(f"🌐 DEBUG: Writing {len(detections)} detections to file...")
                             with open(detection_file, 'w') as f:
                                 json.dump(detections, f)
                             logger.info(f"🌐 Detection recorded to file: {wake_detector.get_wake_word_name()}")
@@ -305,11 +320,12 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                     else:
                         # Log that detection was blocked by cooldown/debounce
                         logger.info(f"🛡️ Detection blocked: time_since={time_since_last_detection:.2f}s, chunks_since={chunks_since_last_detection}, cooldown={detection_cooldown_seconds}s, debounce={detection_debounce_chunks}")
-                        if time_since_last_detection < detection_cooldown_seconds:
+                        logger.info(f"🔍 Debug: cooldown_ok={cooldown_ok}, debounce_ok={debounce_ok}, not_postrolling={not_postrolling}")
+                        if not cooldown_ok:
                             logger.info(f"   Reason: Cooldown period active (need {detection_cooldown_seconds - time_since_last_detection:.1f}s more)")
-                        elif chunks_since_last_detection < detection_debounce_chunks:
+                        elif not debounce_ok:
                             logger.info(f"   Reason: Debounce period active (need {detection_debounce_chunks - chunks_since_last_detection} more chunks)")
-                        elif audio_buffer.is_capturing_postroll():
+                        elif not not_postrolling:
                             logger.info(f"   Reason: Post-roll capture in progress")
                 
                 # Progress logging
