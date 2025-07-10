@@ -12,6 +12,7 @@ from audio_utils import AudioManager
 from wake_word_interface import WakeWordDetector
 from audio_buffer import AudioBuffer
 from audio_feedback import create_audio_feedback
+from rms_monitor import rms_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,9 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                 # Calculate RMS volume level
                 rms_level = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
                 volume_history.append(rms_level)
+                
+                # Update RMS monitor for web interface
+                rms_monitor.update_rms(rms_level)
                 
                 # Keep only recent volume history
                 if len(volume_history) > volume_window_size:

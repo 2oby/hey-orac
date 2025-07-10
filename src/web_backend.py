@@ -3,6 +3,7 @@ from flask_cors import CORS
 import os
 import json
 from config_handler import ConfigHandler
+from rms_monitor import rms_monitor
 
 app = Flask(__name__)
 CORS(app)
@@ -68,6 +69,12 @@ def discover_models():
         "models": config_handler.get_all_models(),
         "count": len(config_handler.get_all_models())
     })
+
+@app.route('/api/audio/rms', methods=['GET'])
+def get_rms_data():
+    """Get current RMS audio levels for volume meter"""
+    rms_data = rms_monitor.get_rms_data()
+    return jsonify(rms_data)
 
 if __name__ == '__main__':
     # Run in production mode for service deployment
