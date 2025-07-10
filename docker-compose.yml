@@ -11,6 +11,8 @@ services:
     restart: unless-stopped
     ports:
       - "8080:8080"
+    # Override default command to run our custom model testing script
+    command: ["/app/venv/bin/python", "src/test_custom_models_individually.py"]
     volumes:
       # Mount audio devices
       - /dev/snd:/dev/snd:rw
