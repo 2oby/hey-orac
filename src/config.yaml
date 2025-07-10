@@ -14,8 +14,8 @@ wake_word:
   access_key: ""                 # Picovoice access key (get from console.picovoice.ai)
   
   # OpenWakeWord settings (only used when engine="openwakeword")
-  threshold: 0.05                # Detection threshold (0.0-1.0) - very low for testing
-  custom_model_path: ""           # Use all pre-trained models (multi-model detection)
+  threshold: 0.001               # Detection threshold (0.0-1.0) - very low for testing
+  custom_model_path: "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx"  # Custom "Hey Computer" model
   
   # Test engine settings (only used when engine="test")
   detection_probability: 0.01    # Probability of detection per audio chunk

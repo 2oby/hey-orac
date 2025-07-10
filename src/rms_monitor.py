@@ -34,12 +34,18 @@ class RMSMonitor:
             if self._rms_data['volume_history']:
                 self._rms_data['avg_rms'] = np.mean(self._rms_data['volume_history'])
                 self._rms_data['max_rms'] = max(self._rms_data['volume_history'])
+            
+            # Debug logging (only log every 100 updates to avoid spam)
+            if len(self._rms_data['volume_history']) % 100 == 0:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"🔊 RMS Monitor Updated: current={rms_level:.4f}, avg={self._rms_data['avg_rms']:.4f}, max={self._rms_data['max_rms']:.4f}")
     
     def get_rms_data(self) -> Dict[str, Any]:
         """Get current RMS data for web interface"""
         with self._lock:
-            # Check if data is stale (older than 5 seconds)
-            if time.time() - self._rms_data['last_update'] > 5.0:
+            # Check if data is stale (older than 30 seconds) - increased from 5s
+            if time.time() - self._rms_data['last_update'] > 30.0:
                 self._rms_data['is_active'] = False
             
             return self._rms_data.copy()
