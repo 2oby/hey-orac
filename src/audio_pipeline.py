@@ -134,17 +134,14 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                 # Check if we're too close to the last detection (debouncing)
                 chunks_since_last_detection = chunk_count - last_detection_chunk
                 
-                # Only process for detection if:
-                # 1. Not in cooldown period
-                # 2. Not in debounce period
-                # 3. Not currently capturing post-roll
-                # 4. Audio is above silence threshold
-                if (time_since_last_detection >= detection_cooldown_seconds and 
-                    chunks_since_last_detection >= detection_debounce_samples and
-                    not audio_buffer.is_capturing_postroll() and
-                    avg_volume >= silence_threshold):
-                    
-                    # Process audio for wake-word detection
+                # Check if we should process for detection
+                should_process = (time_since_last_detection >= detection_cooldown_seconds and 
+                                chunks_since_last_detection >= detection_debounce_samples and
+                                not audio_buffer.is_capturing_postroll() and
+                                avg_volume >= silence_threshold)
+                
+                # Process audio for wake-word detection only if conditions are met
+                if should_process:
                     detection_result = wake_detector.process_audio(audio_data)
                     
                     if detection_result:
