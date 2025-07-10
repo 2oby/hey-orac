@@ -40,13 +40,31 @@ class RMSMonitor:
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.info(f"🔊 RMS Monitor Updated: current={rms_level:.4f}, avg={self._rms_data['avg_rms']:.4f}, max={self._rms_data['max_rms']:.4f}")
+            
+            # Additional debug logging for first few updates
+            if len(self._rms_data['volume_history']) <= 5:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"🔊 RMS Monitor Update #{len(self._rms_data['volume_history'])}: rms={rms_level:.4f}, is_active=True")
     
     def get_rms_data(self) -> Dict[str, Any]:
         """Get current RMS data for web interface"""
         with self._lock:
+            current_time = time.time()
+            time_diff = current_time - self._rms_data['last_update']
+            
+            # Debug logging for timestamp issues
+            if time_diff > 5.0:  # Log if data is getting stale
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"⚠️ RMS data getting stale: {time_diff:.2f}s since last update")
+            
             # Check if data is stale (older than 30 seconds) - increased from 5s
-            if time.time() - self._rms_data['last_update'] > 30.0:
+            if time_diff > 30.0:
                 self._rms_data['is_active'] = False
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"⚠️ RMS data is stale ({time_diff:.2f}s), setting is_active=False")
             
             return self._rms_data.copy()
     
