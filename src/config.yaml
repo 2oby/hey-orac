@@ -47,4 +47,22 @@ volume_monitoring:
 # Performance
 performance:
   cpu_affinity: null             # CPU core affinity (null for auto)
-  memory_limit_mb: 200           # Memory limit in MB 
+  memory_limit_mb: 200           # Memory limit in MB
+
+# Global settings for web interface
+global:
+  cooldown_s: 1.5
+  debounce_ms: 200
+  rms_filter: 50
+
+# Model settings for web interface
+models:
+  Hay--compUta_v_lrg:
+    api_url: https://api.example.com/webhook
+    sensitivity: 0.05
+  Hey_computer:
+    api_url: https://api.example.com/webhook
+    sensitivity: 0.05
+  hey-CompUter_lrg:
+    api_url: https://api.example.com/webhook
+    sensitivity: 0.05 
