@@ -1217,7 +1217,13 @@
                         let volume = 0;
                         if (rmsData.is_active && rmsData.current_rms > 0) {
                             // Scale RMS to 0-1 range, with some reasonable bounds
-                            volume = Math.min(1, rmsData.current_rms / 1000); // Adjust scaling as needed
+                            // RMS values are typically 0-1000, so we scale accordingly
+                            volume = Math.min(1, rmsData.current_rms / 100); // More sensitive scaling
+                        }
+                        
+                        // Debug logging (remove in production)
+                        if (rmsData.current_rms > 0) {
+                            console.log(`RMS: ${rmsData.current_rms.toFixed(2)}, Volume: ${volume.toFixed(3)}, Active: ${rmsData.is_active}`);
                         }
                         
                         updateVolumeMeter(volume);
