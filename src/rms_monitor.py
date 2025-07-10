@@ -1,6 +1,8 @@
 import threading
 import time
 import numpy as np
+import json
+import os
 from typing import Optional, Dict, Any
 
 class RMSMonitor:
@@ -17,6 +19,7 @@ class RMSMonitor:
         }
         self._lock = threading.Lock()
         self._volume_window_size = 50  # Keep last 50 RMS values for averaging
+        self._data_file = '/tmp/rms_monitor_data.json'
         
     def update_rms(self, rms_level: float):
         """Update RMS level from audio pipeline"""
@@ -35,6 +38,24 @@ class RMSMonitor:
                 self._rms_data['avg_rms'] = np.mean(self._rms_data['volume_history'])
                 self._rms_data['max_rms'] = max(self._rms_data['volume_history'])
             
+            # Save to file for cross-process sharing
+            try:
+                # Convert numpy types to native Python types for JSON serialization
+                data_to_save = {
+                    'current_rms': float(self._rms_data['current_rms']),
+                    'avg_rms': float(self._rms_data['avg_rms']),
+                    'max_rms': float(self._rms_data['max_rms']),
+                    'volume_history': [float(x) for x in self._rms_data['volume_history']],
+                    'last_update': self._rms_data['last_update'],
+                    'is_active': self._rms_data['is_active']
+                }
+                with open(self._data_file, 'w') as f:
+                    json.dump(data_to_save, f)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"⚠️ Failed to save RMS data to file: {e}")
+            
             # Debug logging (only log every 100 updates to avoid spam)
             if len(self._rms_data['volume_history']) % 100 == 0:
                 import logging
@@ -50,6 +71,18 @@ class RMSMonitor:
     def get_rms_data(self) -> Dict[str, Any]:
         """Get current RMS data for web interface"""
         with self._lock:
+            # Try to load from file first (for cross-process sharing)
+            try:
+                if os.path.exists(self._data_file):
+                    with open(self._data_file, 'r') as f:
+                        file_data = json.load(f)
+                        # Update local data from file
+                        self._rms_data.update(file_data)
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"⚠️ Failed to load RMS data from file: {e}")
+            
             current_time = time.time()
             time_diff = current_time - self._rms_data['last_update']
             
@@ -79,6 +112,12 @@ class RMSMonitor:
                 'last_update': time.time(),
                 'is_active': False
             }
+            # Also clear the file
+            try:
+                if os.path.exists(self._data_file):
+                    os.remove(self._data_file)
+            except Exception:
+                pass
 
 # Global RMS monitor instance
 rms_monitor = RMSMonitor() 
