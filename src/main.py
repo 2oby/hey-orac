@@ -21,6 +21,7 @@ import pyaudio
 # Import the new monitor modules
 from monitor_default_model import monitor_default_models
 from monitor_custom_model import monitor_custom_models, test_custom_model_with_speech
+from audio_pipeline import run_audio_pipeline
 
 # Configure logging
 logging.basicConfig(
@@ -246,6 +247,11 @@ def main():
         default=10,
         help="Duration for startup model testing in seconds"
     )
+    parser.add_argument(
+        "--pipeline",
+        action="store_true",
+        help="Run optimized audio pipeline with volume monitoring"
+    )
     
     args = parser.parse_args()
     
@@ -437,6 +443,11 @@ def main():
         custom_config = config.copy()
         custom_config['wake_word']['custom_model_path'] = args.startup_test_model
         return monitor_custom_models(custom_config, usb_device, audio_manager, args.startup_test_model)
+    
+    # Handle pipeline mode
+    if args.pipeline:
+        logger.info("🎯 Starting optimized audio pipeline with volume monitoring...")
+        return run_audio_pipeline(config, usb_device, audio_manager)
     
     # Default behavior: Monitor default models
     logger.info("🎯 Starting default model monitoring (default behavior)...")

@@ -39,6 +39,11 @@ logging:
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: /app/logs/hey-orac.log
 
+# Volume monitoring settings (for optimized pipeline)
+volume_monitoring:
+  silence_threshold: 100         # RMS threshold for silence detection
+  window_size: 10                # Number of samples for volume trend analysis
+
 # Performance
 performance:
   cpu_affinity: null             # CPU core affinity (null for auto)
