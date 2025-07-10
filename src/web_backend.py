@@ -103,7 +103,10 @@ def get_custom_models():
     # Find which model is currently active
     current_model = None
     for model in available_models:
-        if model['path'] == current_model_path:
+        # Compare both the full path and the relative path
+        if (model['path'] == current_model_path or 
+            model['path'].replace('/app/', '') == current_model_path or
+            f"/app/{current_model_path}" == model['path']):
             current_model = model['name']
             break
     
