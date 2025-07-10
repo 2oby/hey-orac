@@ -57,7 +57,8 @@ ssh "$REMOTE_ALIAS" "\
     echo '${BLUE}📂 Updating code from repository...${NC}'; \
     cd \$HOME/$PROJECT_NAME; \
     git fetch origin; \
-    git reset --hard origin/option-3-web-backend-as-service; \
+    # Don't force reset to remote - respect current state
+    # git reset --hard origin/option-3-web-backend-as-service; \
     git clean -fd; \
     
     echo '${BLUE}🔍 Checking system resources...${NC}'; \
