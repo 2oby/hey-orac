@@ -6,7 +6,7 @@ set -euo pipefail
 # Example: ./scripts/deploy_and_test.sh "Add audio buffer implementation"
 
 # Default parameters
-COMMIT_MSG=${1:-"Update hey-orac - Enable OpenWakeWord with enhanced debugging"}
+COMMIT_MSG=${1:-"Option 3: Web Backend as a Service - Multi-process implementation"}
 REMOTE_ALIAS="pi"
 PROJECT_NAME="hey-orac"
 
@@ -57,7 +57,7 @@ ssh "$REMOTE_ALIAS" "\
     echo '${BLUE}📂 Updating code from repository...${NC}'; \
     cd \$HOME/$PROJECT_NAME; \
     git fetch origin; \
-    git reset --hard origin/master; \
+    git reset --hard origin/option-3-web-backend-as-service; \
     git clean -fd; \
     
     echo '${BLUE}🔍 Checking system resources...${NC}'; \
