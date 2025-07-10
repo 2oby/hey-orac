@@ -418,3 +418,5 @@ src/
 - ✅ "Hey Computer" wake word detected with >80% confidence
 - ✅ Custom models trigger detections like pre-trained models
 - ✅ System responds to custom wake words as core requirement 
+
+# ToDo: Review if the new deploy_and_test.sh solution (syncing Pi to the exact commit and branch of the dev machine) is the right approach for deployment. Ensure this method is robust and doesn't cause issues with collaborative workflows or remote-only changes. 

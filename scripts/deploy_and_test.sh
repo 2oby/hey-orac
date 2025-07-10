@@ -50,6 +50,12 @@ else
     git push origin option-3-web-backend-as-service
 fi
 
+# Get current commit hash and branch
+COMMIT_HASH=$(git rev-parse HEAD)
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+
+echo -e "${YELLOW}Deploying commit: $COMMIT_HASH on branch: $BRANCH_NAME${NC}"
+
 # 2) Remote: pull, build & test
 echo -e "${YELLOW}👉 Running remote update & tests on $REMOTE_ALIAS...${NC}"
 ssh "$REMOTE_ALIAS" "\
@@ -57,8 +63,8 @@ ssh "$REMOTE_ALIAS" "\
     echo '${BLUE}📂 Updating code from repository...${NC}'; \
     cd \$HOME/$PROJECT_NAME; \
     git fetch origin; \
-    # Don't force reset to remote - respect current state
-    # git reset --hard origin/option-3-web-backend-as-service; \
+    git checkout $BRANCH_NAME || git checkout -b $BRANCH_NAME origin/$BRANCH_NAME; \
+    git reset --hard $COMMIT_HASH; \
     git clean -fd; \
     
     echo '${BLUE}🔍 Checking system resources...${NC}'; \
