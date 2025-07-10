@@ -853,9 +853,9 @@
                 // Set global sliders from config
                 if (config.global) {
                                 document.getElementById('rmsFilter').value = config.global.rms_filter;
-            // Show both linear and logarithmic values for RMS filter
+            // Show both linear and enhanced logarithmic values for RMS filter
             const linearValue = config.global.rms_filter;
-            const logValue = Math.log(1 + linearValue / 10) / Math.log(1 + 100);
+            const logValue = Math.log(1 + linearValue / 5) / Math.log(1 + 200 / 5);
             document.getElementById('rmsFilterValue').textContent = `${linearValue} (${(logValue * 100).toFixed(1)}% log)`;
                     document.getElementById('debounce').value = config.global.debounce_ms;
                     document.getElementById('debounceValue').textContent = config.global.debounce_ms + 'ms';
@@ -1051,10 +1051,10 @@
                 const valueElement = document.getElementById(slider.valueId);
                 
                 sliderElement.addEventListener('input', (e) => {
-                    // Special handling for RMS filter - show both linear and logarithmic values
+                    // Special handling for RMS filter - show both linear and enhanced logarithmic values
                     if (slider.id === 'rmsFilter') {
                         const linearValue = parseInt(e.target.value);
-                        const logValue = Math.log(1 + linearValue / 10) / Math.log(1 + 100);
+                        const logValue = Math.log(1 + linearValue / 5) / Math.log(1 + 200 / 5);
                         valueElement.textContent = `${linearValue} (${(logValue * 100).toFixed(1)}% log)`;
                         updateFilterIndicator();
                     } else {
@@ -1174,10 +1174,10 @@
             const segments = document.querySelectorAll('.volume-segment');
             const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
             
-            // Convert filter to logarithmic scale to match volume meter
-            // For slider range 0-100, use: log(1 + filter/10) / log(1 + 100/10)
-            // This ensures slider at 100 maps to full meter width
-            const filterThreshold = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 100 / 10);
+            // Convert filter to enhanced logarithmic scale to match volume meter
+            // For slider range 0-100, use: log(1 + filter/5) / log(1 + 200/5)
+            // This ensures slider at 100 maps to full meter width with enhanced low-end sensitivity
+            const filterThreshold = Math.log(1 + rmsFilterValue / 5) / Math.log(1 + 200 / 5);
             
             // Calculate how many segments should be active based on volume
             const activeSegments = Math.floor(volume * 12);
@@ -1210,10 +1210,10 @@
         function updateFilterIndicator() {
             const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
             
-            // Convert filter to logarithmic scale for visual indicator
-            // For slider range 0-100, use: log(1 + filter/10) / log(1 + 100/10)
-            // This ensures slider at 100 maps to full meter width
-            const logFilterValue = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 100 / 10);
+            // Convert filter to enhanced logarithmic scale for visual indicator
+            // For slider range 0-100, use: log(1 + filter/5) / log(1 + 200/5)
+            // This ensures slider at 100 maps to full meter width with enhanced low-end sensitivity
+            const logFilterValue = Math.log(1 + rmsFilterValue / 5) / Math.log(1 + 200 / 5);
             const filterPosition = logFilterValue * 600; // 600px is meter width
             const indicator = document.getElementById('filterIndicator');
             indicator.style.left = `${filterPosition}px`;
@@ -1227,17 +1227,18 @@
                     if (response.ok) {
                         const rmsData = await response.json();
                         
-                        // Convert RMS to volume level (0-1) using logarithmic scale
-                        // This makes low volumes more sensitive and high volumes less sensitive
+                        // Convert RMS to volume level (0-1) using enhanced logarithmic scale
+                        // This provides much better sensitivity at low volumes for fine control
                         let volume = 0;
                         if (rmsData.is_active && rmsData.current_rms > 0) {
-                            // Use logarithmic scaling for better sensitivity at low volumes
+                            // Use enhanced logarithmic scaling for maximum low-end sensitivity
                             // RMS values typically range from 0-1000
                             const rms = rmsData.current_rms;
                             
-                            // Logarithmic scale: log(1 + rms/10) / log(1 + 100)
-                            // This gives us 0-1 range with better low-end sensitivity
-                            volume = Math.log(1 + rms / 10) / Math.log(1 + 100);
+                            // Enhanced logarithmic scale: log(1 + rms/5) / log(1 + 200)
+                            // This provides much more granular control at low volumes
+                            // Lower divisor (5 instead of 10) and higher range (200 instead of 100)
+                            volume = Math.log(1 + rms / 5) / Math.log(1 + 200);
                             volume = Math.min(1, volume); // Clamp to 0-1
                         }
                         
