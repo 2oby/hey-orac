@@ -61,9 +61,16 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
         postroll_seconds=config['buffer'].get('postroll_seconds', 2.0)
     )
     
+    # Detection debouncing and cooldown
+    last_detection_time = 0
+    detection_cooldown_seconds = 3.0  # Minimum time between detections
+    detection_debounce_samples = int(wake_detector.get_sample_rate() * 0.5)  # 0.5s debounce
+    last_detection_chunk = 0
+    
     # Start continuous audio stream
     logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
     logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
+    logger.info(f"🛡️ Detection cooldown: {detection_cooldown_seconds}s, Debounce: {detection_debounce_samples} samples")
     
     stream = audio_manager.start_stream(
         device_index=usb_device.index,
@@ -127,93 +134,116 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                     except Exception as e:
                         logger.debug(f"⚠️ Could not get detailed confidence scores: {e}")
                 
-                # Process audio for wake-word detection
-                detection_result = wake_detector.process_audio(audio_data)
+                # Check if we're in cooldown period
+                current_time = time.time()
+                time_since_last_detection = current_time - last_detection_time
                 
-                if detection_result:
-                    detection_count += 1
+                # Check if we're too close to the last detection (debouncing)
+                chunks_since_last_detection = chunk_count - last_detection_chunk
+                
+                # Only process for detection if:
+                # 1. Not in cooldown period
+                # 2. Not in debounce period
+                # 3. Not currently capturing post-roll
+                if (time_since_last_detection >= detection_cooldown_seconds and 
+                    chunks_since_last_detection >= detection_debounce_samples and
+                    not audio_buffer.is_capturing_postroll()):
                     
-                    # PROMINENT DETECTION LOG
-                    logger.info("🎯🎯🎯 CUSTOM WAKE WORD DETECTED! 🎯🎯🎯")
-                    logger.info(f"🎯 DETECTION #{detection_count} - {wake_detector.get_wake_word_name()} detected!")
+                    # Process audio for wake-word detection
+                    detection_result = wake_detector.process_audio(audio_data)
                     
-                    # Detection log with timestamp
-                    detection_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    detection_log_line = f"[{detection_time}] CUSTOM WAKE WORD DETECTED: {wake_detector.get_wake_word_name()} (Detection #{detection_count})"
-                    logger.info(detection_log_line)
-                    
-                    # Write to dedicated detection log file
-                    try:
-                        with open("/app/logs/custom_detections.log", "a") as f:
-                            f.write(f"{detection_log_line}\n")
-                    except Exception as e:
-                        logger.warning(f"⚠️ Could not write to detection log: {e}")
-                    
-                    # Log detection details
-                    logger.info(f"📊 Detection details:")
-                    logger.info(f"   Chunk number: {chunk_count}")
-                    logger.info(f"   Audio RMS level: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
-                    logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
-                    logger.info(f"   Buffer status: {audio_buffer.get_buffer_status()}")
-                    
-                    # Audio feedback
-                    if audio_feedback:
+                    if detection_result:
+                        detection_count += 1
+                        last_detection_time = current_time
+                        last_detection_chunk = chunk_count
+                        
+                        # PROMINENT DETECTION LOG
+                        logger.info("🎯🎯🎯 CUSTOM WAKE WORD DETECTED! 🎯🎯🎯")
+                        logger.info(f"🎯 DETECTION #{detection_count} - {wake_detector.get_wake_word_name()} detected!")
+                        logger.info(f"⏱️ Time since last detection: {time_since_last_detection:.2f}s")
+                        logger.info(f"📦 Chunks since last detection: {chunks_since_last_detection}")
+                        
+                        # Detection log with timestamp
+                        detection_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        detection_log_line = f"[{detection_time}] CUSTOM WAKE WORD DETECTED: {wake_detector.get_wake_word_name()} (Detection #{detection_count})"
+                        logger.info(detection_log_line)
+                        
+                        # Write to dedicated detection log file
                         try:
-                            logger.info("🔊 Providing audio feedback with beep...")
-                            success = audio_feedback.play_wake_word_detected()
-                            if success:
-                                logger.info("✅ Audio feedback completed successfully")
-                            else:
-                                logger.warning("⚠️ Audio feedback failed (but system continues)")
+                            with open("/app/logs/custom_detections.log", "a") as f:
+                                f.write(f"{detection_log_line}\n")
                         except Exception as e:
-                            logger.error(f"❌ Audio feedback failed: {e}")
-                    
-                    # Start post-roll capture
-                    logger.info("📦 Starting post-roll capture...")
-                    audio_buffer.start_postroll_capture()
-                    
-                    # Wait for post-roll capture to complete
-                    postroll_chunks = 0
-                    while audio_buffer.is_capturing_postroll():
-                        audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
-                        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
-                        audio_buffer.add_audio(audio_data)
-                        chunk_count += 1
-                        postroll_chunks += 1
+                            logger.warning(f"⚠️ Could not write to detection log: {e}")
                         
-                        if postroll_chunks % 10 == 0:
-                            logger.debug(f"📦 Post-roll capture: {postroll_chunks} chunks captured")
-                    
-                    logger.info(f"📦 Post-roll capture completed: {postroll_chunks} chunks")
-                    
-                    # Get complete audio clip
-                    logger.info("🎵 Retrieving complete audio clip...")
-                    complete_audio = audio_buffer.get_complete_audio_clip()
-                    if complete_audio is not None:
-                        clip_filename = f"/tmp/custom_wake_word_detection_{detection_count}.wav"
-                        logger.info(f"💾 Saving audio clip to: {clip_filename}")
+                        # Log detection details
+                        logger.info(f"📊 Detection details:")
+                        logger.info(f"   Chunk number: {chunk_count}")
+                        logger.info(f"   Audio RMS level: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
+                        logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
+                        logger.info(f"   Buffer status: {audio_buffer.get_buffer_status()}")
                         
-                        if audio_buffer.save_audio_clip(clip_filename):
-                            logger.info(f"✅ Audio clip saved successfully")
-                            logger.info(f"📦 Audio clip details:")
-                            logger.info(f"   Duration: {len(complete_audio)/audio_buffer.sample_rate:.2f}s")
-                            logger.info(f"   Samples: {len(complete_audio)}")
-                            logger.info(f"   RMS level: {np.sqrt(np.mean(complete_audio**2)):.4f}")
-                            logger.info(f"   Max level: {np.max(np.abs(complete_audio)):.4f}")
+                        # Audio feedback
+                        if audio_feedback:
+                            try:
+                                logger.info("🔊 Providing audio feedback with beep...")
+                                success = audio_feedback.play_wake_word_detected()
+                                if success:
+                                    logger.info("✅ Audio feedback completed successfully")
+                                else:
+                                    logger.warning("⚠️ Audio feedback failed (but system continues)")
+                            except Exception as e:
+                                logger.error(f"❌ Audio feedback failed: {e}")
+                        
+                        # Start post-roll capture
+                        logger.info("📦 Starting post-roll capture...")
+                        audio_buffer.start_postroll_capture()
+                        
+                        # Wait for post-roll capture to complete
+                        postroll_chunks = 0
+                        while audio_buffer.is_capturing_postroll():
+                            audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
+                            audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+                            audio_buffer.add_audio(audio_data)
+                            chunk_count += 1
+                            postroll_chunks += 1
+                            
+                            if postroll_chunks % 10 == 0:
+                                logger.debug(f"📦 Post-roll capture: {postroll_chunks} chunks captured")
+                        
+                        logger.info(f"📦 Post-roll capture completed: {postroll_chunks} chunks")
+                        
+                        # Get complete audio clip
+                        logger.info("🎵 Retrieving complete audio clip...")
+                        complete_audio = audio_buffer.get_complete_audio_clip()
+                        if complete_audio is not None:
+                            clip_filename = f"/tmp/custom_wake_word_detection_{detection_count}.wav"
+                            logger.info(f"💾 Saving audio clip to: {clip_filename}")
+                            
+                            if audio_buffer.save_audio_clip(clip_filename):
+                                logger.info(f"✅ Audio clip saved successfully")
+                                logger.info(f"📦 Audio clip details:")
+                                logger.info(f"   Duration: {len(complete_audio)/audio_buffer.sample_rate:.2f}s")
+                                logger.info(f"   Samples: {len(complete_audio)}")
+                                logger.info(f"   RMS level: {np.sqrt(np.mean(complete_audio**2)):.4f}")
+                                logger.info(f"   Max level: {np.max(np.abs(complete_audio)):.4f}")
+                            else:
+                                logger.error("❌ Failed to save audio clip")
                         else:
-                            logger.error("❌ Failed to save audio clip")
-                    else:
-                        logger.warning("⚠️ No complete audio clip available")
-                    
-                    logger.info("📡 Audio capture completed - ready for streaming to Jetson")
-                    logger.info("🔄 Resuming custom model monitoring...")
+                            logger.warning("⚠️ No complete audio clip available")
+                        
+                        logger.info("📡 Audio capture completed - ready for streaming to Jetson")
+                        logger.info("🔄 Resuming custom model monitoring...")
+                        logger.info(f"🛡️ Cooldown active for {detection_cooldown_seconds}s...")
                 
                 # Progress logging
                 if chunk_count % 1000 == 0:
                     buffer_status = audio_buffer.get_buffer_status()
+                    time_since_last = time.time() - last_detection_time
                     logger.info(f"📊 Progress Report:")
                     logger.info(f"   Processed chunks: {chunk_count}")
                     logger.info(f"   Detections: {detection_count}")
+                    logger.info(f"   Time since last detection: {time_since_last:.1f}s")
+                    logger.info(f"   Cooldown remaining: {max(0, detection_cooldown_seconds - time_since_last):.1f}s")
                     logger.info(f"   Buffer pre-roll samples: {buffer_status['preroll_samples']}")
                     logger.info(f"   Buffer post-roll samples: {buffer_status['postroll_samples']}")
                     logger.info(f"   Runtime: {chunk_count * wake_detector.get_frame_length() / wake_detector.get_sample_rate():.1f}s")
