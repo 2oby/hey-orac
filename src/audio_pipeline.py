@@ -63,7 +63,7 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
     last_detection_time = 0
     detection_cooldown_seconds = 3.0  # Minimum time between detections
     detection_debounce_samples = int(wake_detector.get_sample_rate() * 0.5)  # 0.5s debounce
-    last_detection_chunk = 0
+    last_detection_chunk = -detection_debounce_samples  # Initialize to negative so first detection can get through
     
     logger.info(f"🔊 Volume monitoring: threshold={silence_threshold}, window={volume_window_size}")
     logger.info(f"🛡️ Detection cooldown: {detection_cooldown_seconds}s, Debounce: {detection_debounce_samples} samples")

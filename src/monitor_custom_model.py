@@ -66,7 +66,7 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     last_detection_time = 0  # Initialize to 0 so first detection can get through
     detection_cooldown_seconds = 1.5  # Reduced from 3.0s to 1.5s - minimum time between detections
     detection_debounce_samples = int(wake_detector.get_sample_rate() * 0.2)  # Reduced from 0.5s to 0.2s debounce
-    last_detection_chunk = 0
+    last_detection_chunk = -detection_debounce_samples  # Initialize to negative so first detection can get through
     
     # Start continuous audio stream
     logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
