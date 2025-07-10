@@ -14,6 +14,7 @@ from audio_utils import AudioManager
 from wake_word_interface import WakeWordDetector
 from audio_buffer import AudioBuffer
 from audio_feedback import create_audio_feedback
+from rms_monitor import rms_monitor
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,10 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                     rms_level = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
                     max_level = np.max(np.abs(audio_data))
                     logger.info(f"📊 Chunk {chunk_count}: RMS={rms_level:.2f}, Max={max_level}, Samples={len(audio_data)}")
+                
+                # Update RMS monitor for web interface (every chunk)
+                rms_level = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
+                rms_monitor.update_rms(rms_level)
                 
                 # Add to audio buffer
                 audio_buffer.add_audio(audio_data)
