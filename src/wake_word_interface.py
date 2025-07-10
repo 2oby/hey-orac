@@ -111,8 +111,9 @@ class WakeWordDetector:
                 logger.error(f"Unknown wake-word engine: {self.engine_name}")
                 return False
             
-            # Initialize the engine
-            if self.engine.initialize(config):
+            # Initialize the engine with the correct config section
+            engine_config = config.get('wake_word', config)  # Use wake_word section if available, otherwise use full config
+            if self.engine.initialize(engine_config):
                 self.is_initialized = True
                 logger.info(f"Wake-word engine '{self.engine_name}' initialized successfully")
                 logger.info(f"Wake word: {self.engine.get_wake_word_name()}")
