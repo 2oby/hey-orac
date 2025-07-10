@@ -825,7 +825,7 @@
                 </div>
                 <form class="modal-form" id="settingsForm">
                     <div class="form-group">
-                        <label class="form-label" for="sensitivityInput">Threshold</label>
+                        <label class="form-label" for="sensitivityInput">Sensitivity</label>
                         <input type="range" class="form-input" id="sensitivityInput" 
                                min="0.00001" max="1.00000" step="0.00050" value="0.05">
                         <span class="slider-value" id="sensitivityValue">0.95</span>
@@ -1099,8 +1099,11 @@
         
         // Function to trigger detection pulse on model card
         function triggerDetectionPulse(modelName) {
+            console.log(`🔍 DEBUG: Looking for model card with name: "${modelName}"`);
             const modelCard = document.querySelector(`[data-model-name="${modelName}"]`);
+            console.log(`🔍 DEBUG: Found model card:`, modelCard);
             if (modelCard) {
+                console.log(`🔍 DEBUG: Triggering pulse for model: "${modelName}"`);
                 // Remove any existing detection class
                 modelCard.classList.remove('detected');
                 
@@ -1114,6 +1117,11 @@
                 setTimeout(() => {
                     modelCard.classList.remove('detected');
                 }, 500);
+            } else {
+                console.log(`🔍 DEBUG: No model card found for: "${modelName}"`);
+                // Log all available model cards for debugging
+                const allCards = document.querySelectorAll('.model-card');
+                console.log(`🔍 DEBUG: Available model cards:`, Array.from(allCards).map(card => card.dataset.modelName));
             }
         }
 
@@ -1124,10 +1132,9 @@
             
             document.getElementById('modalTitle').textContent = `${modelName} Settings`;
             
-            // Convert sensitivity to threshold for display
-            const threshold = 1.0 - model.sensitivity;
-            document.getElementById('sensitivityInput').value = threshold;
-            document.getElementById('sensitivityValue').textContent = threshold.toFixed(5);
+            // Use sensitivity directly - high sensitivity = easier detection
+            document.getElementById('sensitivityInput').value = model.sensitivity;
+            document.getElementById('sensitivityValue').textContent = model.sensitivity.toFixed(5);
             document.getElementById('apiUrlInput').value = model.apiUrl;
             
             document.getElementById('settingsModal').classList.add('active');
@@ -1143,9 +1150,8 @@
             
             const model = sampleModels.find(m => m.name === currentEditingModel);
             if (model) {
-                // Convert threshold back to sensitivity for backend
-                const threshold = parseFloat(document.getElementById('sensitivityInput').value);
-                const sensitivity = 1.0 - threshold;
+                // Use sensitivity directly - high sensitivity = easier detection
+                const sensitivity = parseFloat(document.getElementById('sensitivityInput').value);
                 model.sensitivity = sensitivity;
                 model.apiUrl = document.getElementById('apiUrlInput').value;
                 
@@ -1206,6 +1212,7 @@
                         let foundRecent = false;
                         detections.forEach(detection => {
                             if (now - detection.timestamp < 2000) {
+                                console.log(`🔍 DEBUG: Detection received for model: "${detection.model_name}"`);
                                 // Trigger pulse for the detected model
                                 triggerDetectionPulse(detection.model_name);
                                 // Show notification

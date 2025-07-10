@@ -40,11 +40,10 @@ class OpenWakeWordEngine(WakeWordEngine):
         try:
             keyword = config.get('keyword', 'hey_jarvis')
             
-            # Convert sensitivity to threshold (they are opposites)
-            # Low sensitivity = High threshold = Fewer detections
-            # High sensitivity = Low threshold = More detections
-            sensitivity = config.get('sensitivity', 0.5)
-            self.threshold = 1.0 - sensitivity  # Convert sensitivity to threshold
+            # Use sensitivity directly - high sensitivity = easier detection (lower threshold)
+            # Low sensitivity = harder detection (higher threshold)
+            self.sensitivity = config.get('sensitivity', 0.5)
+            self.threshold = 1.0 - self.sensitivity  # Convert sensitivity to threshold
             
             # Check if custom model is specified
             custom_model_path = config.get('custom_model_path')
@@ -85,7 +84,7 @@ class OpenWakeWordEngine(WakeWordEngine):
                     # Use the correct API: wakeword_model_paths and class_mapping_dicts
                     self.model = openwakeword.Model(
                         wakeword_model_paths=[custom_model_path],
-                        class_mapping_dicts=[{0: keyword}],
+                        class_mapping_dicts=[{0: self.wake_word_name}],
                         vad_threshold=0.5,
                         enable_speex_noise_suppression=False
                     )
