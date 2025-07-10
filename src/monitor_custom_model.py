@@ -64,12 +64,15 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     
     # Detection debouncing and cooldown
     last_detection_time = 0  # Initialize to 0 so first detection can get through
-    detection_cooldown_seconds = 3.0  # Increased from 1.5s to 3.0s - minimum time between detections
-    detection_debounce_chunks = int((wake_detector.get_sample_rate() * 0.5) / wake_detector.get_frame_length())  # 0.5s debounce in chunks (increased from 0.2s)
+    detection_cooldown_seconds = config.get('global', {}).get('cooldown_s', 1.5)  # Use config value from web UI
+    debounce_seconds = config.get('global', {}).get('debounce_ms', 200) / 1000.0  # Convert ms to seconds
+    detection_debounce_chunks = int((wake_detector.get_sample_rate() * debounce_seconds) / wake_detector.get_frame_length())
     last_detection_chunk = -detection_debounce_chunks  # Initialize to negative so first detection can get through
     
-    # Volume filtering for efficiency
-    silence_threshold = 0.1  # RMS threshold for silence detection
+    # Volume filtering for efficiency - use RMS filter from web UI
+    rms_filter_value = config.get('global', {}).get('rms_filter', 50)
+    # Convert RMS filter (0-100) to silence threshold (0.01-1.0)
+    silence_threshold = (rms_filter_value / 100.0) * 0.99 + 0.01  # Map 0-100 to 0.01-1.0
     volume_window_size = 10  # Number of chunks to average for volume calculation
     volume_history = []
     
@@ -77,6 +80,7 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
     logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
     logger.info(f"🛡️ Detection cooldown: {detection_cooldown_seconds}s, Debounce: {detection_debounce_chunks} chunks")
+    logger.info(f"🔧 Using config values - Cooldown: {detection_cooldown_seconds}s, Debounce: {debounce_seconds}s, RMS Filter: {rms_filter_value}")
     
     stream = audio_manager.start_stream(
         device_index=usb_device.index,

@@ -1172,6 +1172,18 @@
             // Sensitivity slider in modal
             document.getElementById('sensitivityInput').addEventListener('input', (e) => {
                 document.getElementById('sensitivityValue').textContent = e.target.value;
+                // Auto-save sensitivity changes
+                if (currentEditingModel) {
+                    saveModelSettings();
+                }
+            });
+            
+            // API URL input in modal
+            document.getElementById('apiUrlInput').addEventListener('input', (e) => {
+                // Auto-save API URL changes
+                if (currentEditingModel) {
+                    saveModelSettings();
+                }
             });
         }
 
@@ -1279,13 +1291,9 @@
         function updateFilterIndicator() {
             const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
             
-            // Convert filter to match volume meter scaling exactly
-            // Volume meter uses: log(1 + rms/5) / log(1 + 200) for RMS 0-1000
-            // Filter slider is 0-100, so we need to scale it to match RMS range
-            // Map slider value 0-100 to RMS range 0-1000, then apply same scaling
-            const scaledRms = (rmsFilterValue / 100) * 1000; // Convert slider 0-100 to RMS 0-1000
-            const logFilterValue = Math.log(1 + scaledRms / 5) / Math.log(1 + 200);
-            const filterPosition = logFilterValue * 600; // 600px is meter width
+            // Use linear positioning for the filter indicator
+            // Slider value 0-100 maps linearly to position 0-600px
+            const filterPosition = (rmsFilterValue / 100) * 600; // 600px is meter width
             const indicator = document.getElementById('filterIndicator');
             indicator.style.left = `${filterPosition}px`;
         }
