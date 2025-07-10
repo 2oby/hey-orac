@@ -1059,24 +1059,42 @@
         }
 
         function startVolumeSimulation() {
-            let currentTargetVolume = 0;
-            let currentSmoothVolume = 0;
-            
-            setInterval(() => {
-                // Generate volume more likely to be in the 3-5 segment range (0.25-0.42)
-                const baseVolume = Math.random() * 0.15; // Lower base noise
-                const speechSpike = Math.random() < 0.2 ? Math.random() * 0.4 : 0; // More frequent, smaller spikes
-                
-                // Add bias toward 3-5 range (0.25-0.42)
-                const bias = Math.random() < 0.6 ? 0.3 : 0; // 60% chance of bias toward middle
-                const targetVolume = Math.min(1, baseVolume + speechSpike + bias);
-                
-                // Smooth transition to target volume
-                currentTargetVolume = targetVolume;
-                currentSmoothVolume += (currentTargetVolume - currentSmoothVolume) * 0.3; // Smoothing factor
-                
-                updateVolumeMeter(currentSmoothVolume);
-            }, 150); // Slightly slower updates (6-7 FPS instead of 10 FPS)
+            // Fetch real RMS data from API
+            setInterval(async () => {
+                try {
+                    const response = await fetch('/api/audio/rms');
+                    if (response.ok) {
+                        const rmsData = await response.json();
+                        
+                        // Convert RMS to volume level (0-1)
+                        // RMS values are typically small, so we scale them appropriately
+                        let volume = 0;
+                        if (rmsData.is_active && rmsData.current_rms > 0) {
+                            // Scale RMS to 0-1 range, with some reasonable bounds
+                            volume = Math.min(1, rmsData.current_rms / 1000); // Adjust scaling as needed
+                        }
+                        
+                        updateVolumeMeter(volume);
+                        
+                        // Update status based on RMS data
+                        const audioStatus = document.getElementById('audioStatus');
+                        const audioText = document.getElementById('audioText');
+                        
+                        if (rmsData.is_active) {
+                            audioStatus.classList.remove('error');
+                            audioText.textContent = `Audio: Active (RMS: ${rmsData.current_rms.toFixed(2)})`;
+                        } else {
+                            audioStatus.classList.add('error');
+                            audioText.textContent = 'Audio: Inactive';
+                        }
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch RMS data:', error);
+                    // Fall back to demo data if API fails
+                    const demoVolume = Math.random() * 0.3;
+                    updateVolumeMeter(demoVolume);
+                }
+            }, 200); // Update every 200ms (5 FPS)
         }
 
         // Demo: Simulate detections every few seconds
