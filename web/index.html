@@ -827,7 +827,7 @@
                     <div class="form-group">
                         <label class="form-label" for="sensitivityInput">Sensitivity</label>
                         <input type="range" class="form-input" id="sensitivityInput" 
-                               min="0" max="1" step="0.01" value="0.05">
+                               min="0.00001" max="1.00000" step="0.00050" value="0.05">
                         <span class="slider-value" id="sensitivityValue">0.05</span>
                     </div>
                     <div class="form-group">
@@ -910,7 +910,7 @@
             }
         }
 
-        async function saveModelSettings(modelName, settings) {
+        async function saveModelSettingsToAPI(modelName, settings) {
             try {
                 await fetch(`${API_BASE}/config/models/${encodeURIComponent(modelName)}`, {
                     method: 'POST',
@@ -1144,7 +1144,7 @@
                 model.apiUrl = document.getElementById('apiUrlInput').value;
                 
                 // Save to API
-                saveModelSettings(currentEditingModel, {
+                saveModelSettingsToAPI(currentEditingModel, {
                     sensitivity: model.sensitivity,
                     apiUrl: model.apiUrl
                 });
@@ -1172,18 +1172,11 @@
             // Sensitivity slider in modal
             document.getElementById('sensitivityInput').addEventListener('input', (e) => {
                 document.getElementById('sensitivityValue').textContent = e.target.value;
-                // Auto-save sensitivity changes
-                if (currentEditingModel) {
-                    saveModelSettings();
-                }
             });
             
             // API URL input in modal
             document.getElementById('apiUrlInput').addEventListener('input', (e) => {
-                // Auto-save API URL changes
-                if (currentEditingModel) {
-                    saveModelSettings();
-                }
+                // No auto-save - let user explicitly save with save button
             });
         }
 
