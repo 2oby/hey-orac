@@ -167,7 +167,13 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                 
                 # Check if we're in cooldown period
                 current_time = time.time()
-                time_since_last_detection = current_time - last_detection_time
+                if last_detection_time == 0:
+                    time_since_last_detection = -1  # No previous detection
+                else:
+                    time_since_last_detection = current_time - last_detection_time
+                    # If cooldown has expired, reset to -1
+                    if time_since_last_detection > detection_cooldown_seconds:
+                        time_since_last_detection = -1
                 
                 # Check if we're too close to the last detection (debouncing)
                 chunks_since_last_detection = chunk_count - last_detection_chunk
@@ -228,18 +234,15 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                         try:
                             import json
                             import os
-                            
                             # Record detection to a file for web interface to read
                             detection_data = {
-                                'model_name': wake_detector.get_wake_word_name(),
-                                'confidence': wake_detector.engine.get_latest_confidence() if hasattr(wake_detector, 'engine') else 0.0,
-                                'timestamp': time.time()
+                                'model_name': str(wake_detector.get_wake_word_name()),
+                                'confidence': float(wake_detector.engine.get_latest_confidence()) if hasattr(wake_detector, 'engine') else 0.0,
+                                'timestamp': float(time.time())
                             }
-                            
                             # Write to detection log file
                             detection_file = '/tmp/recent_detections.json'
                             detections = []
-                            
                             # Read existing detections if file exists
                             if os.path.exists(detection_file):
                                 try:
@@ -247,18 +250,14 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                                         detections = json.load(f)
                                 except:
                                     detections = []
-                            
                             # Add new detection
                             detections.append(detection_data)
-                            
                             # Keep only last 50 detections
                             if len(detections) > 50:
                                 detections = detections[-50:]
-                            
                             # Write back to file
                             with open(detection_file, 'w') as f:
                                 json.dump(detections, f)
-                            
                             logger.info(f"🌐 Detection recorded to file: {wake_detector.get_wake_word_name()}")
                         except Exception as e:
                             logger.warning(f"⚠️ Could not record detection to file: {e}")
