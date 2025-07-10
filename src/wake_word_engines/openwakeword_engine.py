@@ -40,7 +40,18 @@ class OpenWakeWordEngine(WakeWordEngine):
         try:
             keyword = config.get('keyword', 'hey_jarvis')
             self.threshold = config.get('threshold', 0.5)
-            self.wake_word_name = keyword
+            
+            # Check if custom model is specified
+            custom_model_path = config.get('custom_model_path')
+            
+            if custom_model_path and os.path.exists(custom_model_path):
+                # For custom models, use the model name from the file path
+                model_name = os.path.splitext(os.path.basename(custom_model_path))[0]
+                self.wake_word_name = model_name
+                logger.info(f"🔍 Using custom model name: {model_name}")
+            else:
+                # For pre-trained models, use the config keyword
+                self.wake_word_name = keyword
             
             # Enhanced debugging: Log OpenWakeWord version and available models
             logger.info("🔍 DEBUGGING: OpenWakeWord initialization")
