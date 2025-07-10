@@ -63,8 +63,8 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     
     # Detection debouncing and cooldown
     last_detection_time = time.time()  # Initialize to current time instead of 0
-    detection_cooldown_seconds = 3.0  # Minimum time between detections
-    detection_debounce_samples = int(wake_detector.get_sample_rate() * 0.5)  # 0.5s debounce
+    detection_cooldown_seconds = 1.5  # Reduced from 3.0s to 1.5s - minimum time between detections
+    detection_debounce_samples = int(wake_detector.get_sample_rate() * 0.2)  # Reduced from 0.5s to 0.2s debounce
     last_detection_chunk = 0
     
     # Start continuous audio stream
@@ -232,8 +232,18 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                         logger.info("🔄 Resuming custom model monitoring...")
                         logger.info(f"🛡️ Cooldown active for {detection_cooldown_seconds}s...")
                     else:
+                        # Update time tracking even when detection is blocked
+                        last_detection_time = current_time
+                        last_detection_chunk = chunk_count
+                        
                         # Log that detection was blocked by cooldown/debounce
-                        logger.debug(f"🛡️ Detection blocked: time_since={time_since_last_detection:.2f}s, chunks_since={chunks_since_last_detection}, cooldown={detection_cooldown_seconds}s, debounce={detection_debounce_samples}")
+                        logger.info(f"🛡️ Detection blocked: time_since={time_since_last_detection:.2f}s, chunks_since={chunks_since_last_detection}, cooldown={detection_cooldown_seconds}s, debounce={detection_debounce_samples}")
+                        if time_since_last_detection < detection_cooldown_seconds:
+                            logger.info(f"   Reason: Cooldown period active (need {detection_cooldown_seconds - time_since_last_detection:.1f}s more)")
+                        elif chunks_since_last_detection < detection_debounce_samples:
+                            logger.info(f"   Reason: Debounce period active (need {detection_debounce_samples - chunks_since_last_detection} more chunks)")
+                        elif audio_buffer.is_capturing_postroll():
+                            logger.info(f"   Reason: Post-roll capture in progress")
                 
                 # Progress logging
                 if chunk_count % 1000 == 0:
