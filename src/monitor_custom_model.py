@@ -207,7 +207,6 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                         # Notify web interface of detection
                         try:
                             import json
-                            import time
                             import os
                             
                             # Record detection to a file for web interface to read
