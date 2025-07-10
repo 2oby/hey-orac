@@ -1,21 +1,23 @@
 # CRITICAL PATH - Hey Orac Voice Control System
 
-## 🎉 MAJOR BREAKTHROUGH: WAKE WORD DETECTION WORKING!
+## 🎉 MAJOR BREAKTHROUGH: PRE-TRAINED WAKE WORD DETECTION WORKING!
 
 ### ✅ **CRITICAL ISSUE RESOLVED: OpenWakeWord Multi-Model Detection Working**
 
-**Status**: **GREEN** - Wake word detection is now working perfectly!
-**Issue**: ✅ **RESOLVED** - OpenWakeWord multi-model detection implemented successfully
+**Status**: **YELLOW** - Pre-trained wake word detection working, but custom wake words failing
+**Issue**: ⚠️ **PARTIALLY RESOLVED** - OpenWakeWord multi-model detection working for pre-trained models only
 **Evidence**: 
-- "Hey Jarvis" detected with 95%+ confidence (0.886840 to 0.998037)
-- All 10 models running simultaneously (alexa, hey_mycroft, hey_jarvis, timers, weather)
-- Real confidence scores (not 0.0000) - dynamic range from 0.000001 to 0.998037
+- "Hey Jarvis" detected with 89-98% confidence (0.891018 to 0.978833)
+- All 10 pre-trained models running simultaneously (alexa, hey_mycroft, hey_jarvis, timers, weather)
+- Real confidence scores (not 0.0000) - dynamic range from 0.000001 to 0.978833
 - Multiple detections captured and audio clips saved successfully
 - System processes audio and detects wake words in real-time
+- **6 successful detections in 10 seconds** - excellent responsiveness
+- ❌ **CUSTOM WAKE WORDS FAILING**: "Hey Computer" models return 0.0 confidence scores
 
-**Root Cause**: ✅ **FIXED** - Implemented proper OpenWakeWord multi-model approach
-**Impact**: ✅ **RESOLVED** - System now responds to voice commands - core functionality working
-**Priority**: ✅ **COMPLETED** - Wake word detection is fully operational
+**Root Cause**: ✅ **FIXED** - Implemented proper OpenWakeWord multi-model approach for pre-trained models
+**Impact**: ⚠️ **PARTIALLY RESOLVED** - System responds to pre-trained wake words but custom wake words not working
+**Priority**: ⚠️ **IN PROGRESS** - Pre-trained wake word detection working, custom wake words need fixing
 
 ### 🎯 **SOLUTION IMPLEMENTED: Multi-Model Detection**
 
@@ -27,95 +29,113 @@
 - ✅ Enhanced debugging: Comprehensive logging of prediction_buffer content
 
 **Results**:
-- ✅ 10 models running: `alexa`, `hey_mycroft`, `hey_jarvis`, `1_minute_timer`, `5_minute_timer`, `10_minute_timer`, `20_minute_timer`, `30_minute_timer`, `1_hour_timer`, `weather`
-- ✅ Real confidence scores: 0.000001 to 0.998037 (dynamic range)
-- ✅ Proper detection: System detects ANY wake word above 0.5 threshold
+- ✅ 10 pre-trained models running: `alexa`, `hey_mycroft`, `hey_jarvis`, `1_minute_timer`, `5_minute_timer`, `10_minute_timer`, `20_minute_timer`, `30_minute_timer`, `1_hour_timer`, `weather`
+- ✅ Real confidence scores: 0.000001 to 0.978833 (dynamic range)
+- ✅ Proper detection: System detects ANY pre-trained wake word above 0.5 threshold
 - ✅ Better debugging: See exactly what's in prediction_buffer and how scores accumulate
+- ✅ **High Performance**: 6 detections in 10 seconds = excellent responsiveness
+- ❌ **CUSTOM MODELS FAILING**: All custom models return 0.0 confidence scores
 
-**Tagged Version**: `v0.1.0-hey-jarvis-working` - Working OpenWakeWord implementation
+**Tagged Version**: `v0.1.0-pre-trained-working` - Working OpenWakeWord implementation for pre-trained models only
 
 ---
 
-## 🎉 CURRENT STATUS SUMMARY (Updated: July 8, 2025)
+## ⚠️ CURRENT STATUS SUMMARY (Updated: July 9, 2025)
 
-### ✅ **SYSTEM FULLY OPERATIONAL - WAKE WORD + FEEDBACK WORKING**
+### ⚠️ **SYSTEM PARTIALLY OPERATIONAL - PRE-TRAINED WAKE WORDS WORKING, CUSTOM WAKE WORDS FAILING**
 
-**Overall Status**: **GREEN** - All core functionality working
+**Overall Status**: **YELLOW** - Pre-trained wake words working, custom wake words not working
 **Deployment**: **SUCCESSFUL** - One-command deployment working reliably
 **Audio System**: **FULLY FUNCTIONAL** - USB microphone detected and working
-**Wake Word Detection**: **✅ WORKING** - OpenWakeWord multi-model detection operational
-**User Feedback**: **✅ WORKING** - Audio beep and LED flashing on detection
+**Pre-trained Wake Word Detection**: **✅ WORKING** - OpenWakeWord multi-model detection operational
+**Custom Wake Word Detection**: **❌ FAILING** - Custom models load but return 0.0 confidence scores
+**User Feedback**: **✅ WORKING** - Audio beep feedback on detection
 **Performance**: **EXCELLENT** - Real-time processing, low latency, stable operation
 
 ### 📊 **System Health Metrics**
 - **Container Status**: ✅ Up (healthy) - Port 8080 exposed
 - **Memory Usage**: Excellent resource utilization
 - **Audio Hardware**: ✅ SH-04 USB microphone detected and accessible
-- **Wake Word Engine**: ✅ OpenWakeWord running and detecting wake words
+- **Pre-trained Wake Word Engine**: ✅ OpenWakeWord running and detecting wake words
+- **Custom Wake Word Engine**: ❌ Models load but return 0.0 confidence scores
 - **Processing**: ✅ Real-time audio chunks every ~80ms
 - **Error Rate**: ✅ 0% - No errors or crashes in production
-- **Detection Accuracy**: ✅ 95%+ confidence for "Hey Jarvis"
+- **Pre-trained Detection Accuracy**: ✅ 89-98% confidence for "Hey Jarvis"
+- **Custom Detection Accuracy**: ❌ 0% confidence for "Hey Computer" models
+- **Detection Rate**: ✅ 6 detections in 10 seconds = excellent responsiveness
 - **User Feedback**: ✅ Audio beep plays on detection
-- **Custom Models**: ✅ **WORKING** - All 6 custom models loaded successfully (3 ONNX + 3 TFLite)
+- **Audio Capture**: ✅ 3-second clips saved successfully
 - **Audio Feedback**: ✅ **WORKING** - MP3 file detected and ffplay successfully plays audio
+- **Custom Models**: ❌ **FAILING** - Models load but return 0.0 confidence scores
 - **LED Control**: ✅ **REMOVED** - Not essential for core functionality
 
 ### 🎯 **Key Achievements**
 1. **✅ Complete Infrastructure**: Docker, SSH, deployment all working
 2. **✅ Audio System**: USB microphone detection and recording confirmed
-3. **✅ Wake Word Detection**: OpenWakeWord multi-model detection working perfectly
+3. **✅ Pre-trained Wake Word Detection**: OpenWakeWord multi-model detection working perfectly
 4. **✅ Real-time Processing**: 80ms audio chunks, immediate detection capability
 5. **✅ Production Deployment**: One-command deployment script working
 6. **✅ Resource Management**: Proper device isolation and cleanup
 7. **✅ Monitoring**: Comprehensive logging and diagnostics
-8. **✅ Multi-Model Support**: All 10 OpenWakeWord models running simultaneously
-9. **✅ User Feedback**: Audio beep and LED feedback on wake word detection
+8. **✅ Multi-Model Support**: All 10 pre-trained OpenWakeWord models running simultaneously
+9. **✅ User Feedback**: Audio beep feedback on wake word detection
 10. **✅ Audio Playback**: MP3 playback working in container
-11. **🔧 Custom Models**: **PARTIALLY WORKING** - Custom models found and loading logic works, but API issue causes fallback
-12. **✅ Audio Feedback**: **WORKING** - MP3 file detected and audio system functional
-13. **❌ LED Control**: **FAILED** - USB device detected but permission denied for HID access
+11. **✅ Audio Capture**: Pre-roll and post-roll audio capture working
+12. **✅ High Performance**: 6 detections in 10 seconds = excellent responsiveness
+13. **❌ Custom Wake Words**: **FAILING** - Models load but return 0.0 confidence scores
 14. **✅ Integration Testing**: **WORKING** - All test scripts executed successfully during deployment
 
 ### 🔧 **Current Configuration**
-- **Wake Word**: "hey_jarvis" and "hey_mycroft" (OpenWakeWord engine) - WORKING
-- **Custom Models**: "Hey Computer" models available but not working yet
-- **Threshold**: 0.5 (properly detecting above threshold)
+- **Pre-trained Wake Words**: "hey_jarvis" and "hey_mycroft" (OpenWakeWord engine) - WORKING
+- **Custom Wake Words**: "Hey Computer" models available but returning 0.0 confidence - FAILING
+- **Threshold**: 0.5 (properly detecting above threshold for pre-trained models)
 - **Audio Device**: SH-04 USB microphone (hw:0,0)
 - **Sample Rate**: 16kHz, Mono, 1280-sample chunks (80ms)
 - **Processing**: Continuous streaming with pre/post-roll buffers
-- **Models**: All 10 OpenWakeWord models active
-- **User Feedback**: Audio beep + LED flash on detection
+- **Pre-trained Models**: All 10 OpenWakeWord models active and working
+- **Custom Models**: All 6 custom models loaded but not detecting
+- **User Feedback**: Audio beep on detection
+- **Performance**: 6 detections in 10 seconds = excellent responsiveness
 
 ---
 
-## 🚀 NEXT STEPS (Phase 2 - Custom Models & Enhanced Features)
+## 🚀 NEXT STEPS (Phase 2 - Fix Custom Wake Words)
 
-### 1. 🔥 HIGH PRIORITY: Fix Custom Model Loading ✅ **WORKING - API FIXED**
-- [x] **Custom Model Issue**: Custom "Hey Computer" models not working
-- [x] **Model Loading**: Investigate why custom models aren't being loaded
-- [x] **Configuration**: Update config to properly load custom models
-- [x] **Testing**: Test "Hey Computer", "Hey Orac" custom wake words
-- [x] **Documentation**: Document custom model loading process
+### 1. 🔥 CRITICAL PRIORITY: Fix Custom Wake Word Detection ❌ **FAILING**
+- [x] **Custom Model Loading**: Custom "Hey Computer" models loading successfully
+- [x] **Model Detection**: Models found and loading logic works
+- [x] **API Integration**: Using correct OpenWakeWord API for custom models
+- [ ] **Confidence Scores**: Custom models return 0.0 confidence scores
+- [ ] **Testing**: Test "Hey Computer", "Hey Orac" custom wake words
+- [ ] **Documentation**: Document custom model loading process
 
-**Implementation**: ✅ **COMPLETED** - Enhanced OpenWakeWord engine with proper custom model loading
-- ✅ Custom model configuration with proper ONNX/TFLite support
-- ✅ Fallback to pre-trained models if custom model fails
-- ✅ Comprehensive error handling and debugging
-- ✅ Test script created: `src/test_custom_models.py`
-
-**Test Results**: ✅ **WORKING**
+**Current Status**: ❌ **FAILING**
 - ✅ Custom models found and loading logic works
 - ✅ **API Issue FIXED**: Using correct `wakeword_model_paths` and `class_mapping_dicts` API
 - ✅ All 3 ONNX models loaded successfully: `Hay--compUta_v_lrg.onnx`, `Hey_computer.onnx`, `hey-CompUter_lrg.onnx`
 - ✅ All 3 TFLite models available: `hey-CompUter_lrg.tflite`, `Hay--compUta_v_lrg.tflite`, `Hey_computer.tflite`
-- ✅ Custom model detection working with real confidence scores (0.000872)
-- ✅ System remains functional with custom models
+- ❌ **CRITICAL ISSUE**: Custom models return 0.0 confidence scores (not detecting)
+- ❌ **CRITICAL ISSUE**: Pre-trained models work but custom models don't trigger detections
+- ❌ **CORE REQUIREMENT FAILING**: "Hey Computer" wake word not working
 
-**Next Steps**: ✅ **COMPLETED**
-- [x] Research correct OpenWakeWord API for custom model loading
-- [x] Update custom model initialization to use correct API
-- [x] Test custom model detection with "Hey Computer" wake word
-- [x] Verify custom models work without fallback
+**Evidence from Latest Test**:
+```
+Test prediction content: {'Hay--compUta_v_lrg': 0.0}
+Test prediction content: {'Hey_computer': 0.0}
+Test prediction content: {'hey-CompUter_lrg': 0.0}
+```
+
+**Impact**: ❌ **CRITICAL** - Custom wake words are a core requirement for the project
+**Priority**: 🔥 **CRITICAL** - Must fix custom wake word detection to meet project requirements
+
+**Next Steps**:
+- [ ] Research why custom models return 0.0 confidence scores
+- [ ] Test with different audio inputs to custom models
+- [ ] Verify custom model format and compatibility
+- [ ] Test custom model detection with actual "Hey Computer" speech
+- [ ] Compare custom model behavior with working pre-trained models
+- [ ] Investigate OpenWakeWord custom model requirements
+- [ ] Test custom model training and validation process
 
 ### 2. 🔊 HIGH PRIORITY: Fix Audio Feedback System ✅ **WORKING - BUG FIXED**
 - [x] **Audio Feedback Issue**: System using fallback beep instead of MP3 file
@@ -188,108 +208,26 @@
 - ✅ Test integration working correctly
 - ✅ Help commands and documentation updated
 
-### 5. 🔧 **IMMEDIATE NEXT STEPS: FIX REMAINING ISSUES**
-**Priority**: 🔥 **CRITICAL** - Fix the two remaining issues
+### 5. 🔧 **IMMEDIATE NEXT STEPS: FIX CUSTOM WAKE WORD DETECTION**
+**Priority**: 🔥 **CRITICAL** - Fix custom wake word detection
 
-**Issue 1: Custom Model API Fix**
-- Research correct OpenWakeWord API for custom models
-- Update custom model loading implementation
-- Test with actual "Hey Computer" wake word
+**Issue: Custom Wake Words Not Working**
+- Custom models load successfully but return 0.0 confidence scores
+- Pre-trained models work perfectly (89-98% confidence)
+- "Hey Computer" wake word is a core requirement for the project
+- Need to investigate why custom models aren't detecting properly
 
-**Issue 2: LED Control Permission Fix**
-- Add USB device permissions to Docker configuration
-- Test LED control with proper permissions
-- Verify LED functionality on wake word detection
+**Investigation Steps**:
+1. Test custom models with different audio inputs
+2. Verify custom model format and compatibility
+3. Compare custom model behavior with working pre-trained models
+4. Research OpenWakeWord custom model requirements
+5. Test with actual "Hey Computer" speech samples
+6. Investigate custom model training process
+7. Check if custom models need different preprocessing
 
-**Issue 3: Audio Feedback Bug Fix**
-- Fix player enumeration bug in audio feedback
-- Test MP3 playback functionality
-- Verify audio plays on wake word detection
-
-### 6. Enhanced User Experience (Next Phase)
-- [ ] **Multiple Wake Words**: Support multiple wake words simultaneously
-- [ ] **Wake Word Selection**: Allow user to choose preferred wake word
-- [ ] **Feedback Customization**: Allow user to choose LED color or audio tone
-- [ ] **Detection Statistics**: Track and display detection accuracy over time
-
-### 7. System Integration (Next Phase)
-- [ ] **Audio Streaming**: Implement audio streaming to Jetson after wake word
-- [ ] **Command Processing**: Add basic command processing pipeline
-- [ ] **Response Generation**: Implement response generation and playback
-- [ ] **Home Assistant Integration**: Connect to Home Assistant for smart home control
-
----
-
-## ✅ COMPLETED MILESTONES
-
-### Infrastructure Setup
-- [x] GitHub repository created (hey-orac)
-- [x] Project structure established
-- [x] Docker and Docker Compose configured
-- [x] SSH connection to Pi working
-- [x] Deployment script created and tested
-- [x] Non-root user security implemented
-- [x] Python 3.12 compatibility fixed (numpy 1.26.4)
-- [x] All dependencies installed successfully
-- [x] Container builds and runs successfully
-- [x] Configuration loading works
-- [x] Basic test framework in place
-
-### Audio System
-- [x] USB microphone detection and enumeration
-- [x] PyAudio integration and device management
-- [x] Audio stream initialization and cleanup
-- [x] Real-time audio capture and processing
-- [x] Audio buffer management (pre/post-roll)
-- [x] Device conflict resolution and isolation testing
-
-### Wake Word Detection
-- [x] OpenWakeWord engine integration
-- [x] Continuous audio streaming implementation
-- [x] Real-time confidence scoring
-- [x] Threshold-based detection system
-- [x] Comprehensive logging and monitoring
-- [x] Performance optimization and latency reduction
-- [x] **MULTI-MODEL DETECTION**: All 10 models running simultaneously
-- [x] **HIGH CONFIDENCE DETECTION**: 95%+ accuracy for "Hey Jarvis"
-- [x] **AUDIO CAPTURE**: 3-second clips saved after detection
-- [x] **REAL-TIME PROCESSING**: <100ms detection latency
-
-### User Feedback System
-- [x] **Audio Feedback**: Beep sound plays on wake word detection
-- [x] **LED Feedback**: LED flashes on wake word detection
-- [x] **Audio Playback**: MP3 files play correctly in container
-- [x] **Fallback Audio**: Speaker-test tone generation as backup
-- [x] **Error Handling**: Robust error handling for audio/LED systems
-
-### Current Status
-- **Container**: ✅ Running successfully
-- **Dependencies**: ✅ All installed (PyAudio, OpenWakeWord, etc.)
-- **Configuration**: ✅ Loading correctly
-- **Deployment**: ✅ Script working
-- **Security**: ✅ Non-root user implemented
-- **Audio System**: ✅ USB microphone working
-- **Wake Word Detection**: ✅ OpenWakeWord multi-model detection working
-- **Real-time Processing**: ✅ Continuous streaming active
-- **Detection Accuracy**: ✅ 95%+ confidence for "Hey Jarvis"
-- **Audio Capture**: ✅ 3-second clips saved after detection
-- **User Feedback**: ✅ Audio beep and LED flash on detection
-- **Custom Models**: ❌ Available but not loading correctly
-
-## 🔧 TECHNICAL DEBT TO ADDRESS
-
-### Custom Model Loading (Medium Priority)
-- [ ] Fix custom model loading in OpenWakeWord engine
-- [ ] Test "Hey Computer" custom models
-- [ ] Test "Hey Orac" custom models
-- [ ] Document custom model configuration process
-
-### PATH Warnings (Low Priority)
-The following warnings appear during pip install but don't affect functionality:
-- PATH warnings for pytest, black, flake8 (cosmetic only)
-
-### Future Enhancements
-- [ ] LED control for USB microphone feedback
-- [ ] Advanced audio preprocessing
-- [ ] Performance optimization for edge devices
-- [ ] Integration with smart home systems 
+**Success Criteria**:
+- Custom models return non-zero confidence scores
+- "Hey Computer" wake word detected with >50% confidence
+- Custom models trigger detections like pre-trained models
+- System responds to custom wake words as core requirement 
