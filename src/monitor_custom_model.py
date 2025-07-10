@@ -64,8 +64,8 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     
     # Detection debouncing and cooldown
     last_detection_time = 0  # Initialize to 0 so first detection can get through
-    detection_cooldown_seconds = 1.5  # Reduced from 3.0s to 1.5s - minimum time between detections
-    detection_debounce_chunks = int((wake_detector.get_sample_rate() * 0.2) / wake_detector.get_frame_length())  # 0.2s debounce in chunks
+    detection_cooldown_seconds = 3.0  # Increased from 1.5s to 3.0s - minimum time between detections
+    detection_debounce_chunks = int((wake_detector.get_sample_rate() * 0.5) / wake_detector.get_frame_length())  # 0.5s debounce in chunks (increased from 0.2s)
     last_detection_chunk = -detection_debounce_chunks  # Initialize to negative so first detection can get through
     
     # Volume filtering for efficiency
@@ -172,7 +172,7 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                 else:
                     time_since_last_detection = current_time - last_detection_time
                     # If cooldown has expired, reset to -1
-                    if time_since_last_detection > detection_cooldown_seconds:
+                    if time_since_last_detection >= detection_cooldown_seconds:
                         time_since_last_detection = -1
                 
                 # Check if we're too close to the last detection (debouncing)
@@ -190,6 +190,11 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                     not_postrolling = not audio_buffer.is_capturing_postroll()
                     
                     should_allow = cooldown_ok and debounce_ok and not_postrolling
+                    
+                    # Debug logging for cooldown logic
+                    if detection_result:
+                        logger.info(f"🔍 COOLDOWN DEBUG: time_since={time_since_last_detection:.2f}s, cooldown_ok={cooldown_ok}, debounce_ok={debounce_ok}, not_postrolling={not_postrolling}, should_allow={should_allow}")
+                        logger.info(f"🔍 COOLDOWN DEBUG: last_detection_time={last_detection_time}, current_time={current_time:.2f}")
                     
                     if should_allow:
                         
