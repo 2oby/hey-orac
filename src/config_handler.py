@@ -3,8 +3,8 @@ import glob
 import yaml
 
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'config.yaml')
-OPENWAKEWORD_MODELS_DIR = os.path.join('..', 'third_party', 'openwakeword', 'custom_models')
-PORCUPINE_MODELS_DIR = os.path.join('..', 'third_party', 'porcupine', 'custom_models')
+OPENWAKEWORD_MODELS_DIR = os.path.join('third_party', 'openwakeword', 'custom_models')
+PORCUPINE_MODELS_DIR = os.path.join('third_party', 'porcupine', 'custom_models')
 
 DEFAULT_GLOBAL = {
     'rms_filter': 50,
