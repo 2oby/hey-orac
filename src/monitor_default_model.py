@@ -50,8 +50,8 @@ def monitor_default_models(config: dict, usb_device, audio_manager: AudioManager
     # Initialize audio buffer
     audio_buffer = AudioBuffer(
         sample_rate=wake_detector.get_sample_rate(),
-        buffer_duration=config['audio'].get('buffer_duration', 3.0),
-        postroll_duration=config['audio'].get('postroll_duration', 1.0)
+        preroll_seconds=config['buffer'].get('preroll_seconds', 1.0),
+        postroll_seconds=config['buffer'].get('postroll_seconds', 2.0)
     )
     
     # Start continuous audio stream
