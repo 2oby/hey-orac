@@ -91,5 +91,5 @@ ENV ALSA_PCM_DEVICE=0
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD /app/venv/bin/python -c "import sys; sys.exit(0)" || exit 1
 
-# Default command
-CMD ["/app/venv/bin/python", "src/main.py"] 
+# Default command with startup testing of Hay--compUta_v_lrg model
+CMD ["/app/venv/bin/python", "src/main.py", "--startup-test-model", "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx", "--startup-test-duration", "15"] 

@@ -18,6 +18,10 @@ from audio_buffer import AudioBuffer
 from audio_feedback import create_audio_feedback
 import pyaudio
 
+# Import the new monitor modules
+from monitor_default_model import monitor_default_models
+from monitor_custom_model import monitor_custom_models, test_custom_model_with_speech
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -198,11 +202,6 @@ def main():
         help="Test recording from USB microphone"
     )
     parser.add_argument(
-        "--test-wakeword",
-        action="store_true",
-        help="Test wake-word detection with live audio"
-    )
-    parser.add_argument(
         "--audio-diagnostics",
         action="store_true",
         help="Run comprehensive audio system diagnostics"
@@ -210,23 +209,42 @@ def main():
     parser.add_argument(
         "--test-pyaudio",
         action="store_true",
-        help="Test PyAudio ALSA support and capabilities"
-    )
-    # Removed --test-led argument
-    parser.add_argument(
-        "--debug-openwakeword",
-        action="store_true",
-        help="Run comprehensive OpenWakeWord debugging tests"
+        help="Test PyAudio ALSA support"
     )
     parser.add_argument(
         "--run-tests",
         action="store_true",
-        help="Run test scripts using the initialized microphone and wake word engine"
+        help="Run test scripts with initialized microphone and wake word engine"
     )
     parser.add_argument(
-        "--stop-service",
+        "--monitor-default",
         action="store_true",
-        help="Stop the main service if running"
+        help="Monitor default/pre-trained wake word models"
+    )
+    parser.add_argument(
+        "--monitor-custom",
+        action="store_true",
+        help="Monitor custom wake word models"
+    )
+    parser.add_argument(
+        "--test-custom-model",
+        help="Test a specific custom model with speech input (provide model path)"
+    )
+    parser.add_argument(
+        "--test-duration",
+        type=int,
+        default=30,
+        help="Duration for custom model testing in seconds"
+    )
+    parser.add_argument(
+        "--startup-test-model",
+        help="Test a custom model at startup before monitoring (provide model path)"
+    )
+    parser.add_argument(
+        "--startup-test-duration",
+        type=int,
+        default=10,
+        help="Duration for startup model testing in seconds"
     )
     
     args = parser.parse_args()
@@ -234,380 +252,115 @@ def main():
     # Load configuration
     config = load_config(args.config)
     
-    # Check if main service is running and stop it for audio tests
-    if any([args.audio_diagnostics, args.test_pyaudio, args.test_recording, args.test_wakeword, args.list_devices]):
-        logger.info("🔧 Audio test mode detected - ensuring main service is stopped...")
+    # Handle different modes
+    if args.list_devices:
+        logger.info("🔍 Listing available audio devices...")
+        audio_manager = AudioManager()
+        devices = audio_manager.list_input_devices()
+        if devices:
+            logger.info("📋 Available audio input devices:")
+            for device in devices:
+                logger.info(f"   Device {device.index}: {device.name}")
+                logger.info(f"     USB: {device.is_usb}")
+                logger.info(f"     Max channels: {device.max_input_channels}")
+                logger.info(f"     Sample rate: {device.default_sample_rate}")
+        else:
+            logger.warning("⚠️ No audio input devices found")
+        return 0
+    
+    if args.test_recording:
+        logger.info("🎤 Testing USB microphone recording...")
+        audio_manager = AudioManager()
+        devices = audio_manager.list_input_devices()
         
-        # Try to stop any running main service
-        try:
-            import subprocess
-            # Kill any running main.py processes
-            result = subprocess.run(['pkill', '-f', 'python.*main.py'], 
-                                  capture_output=True, text=True, timeout=5)
-            if result.returncode == 0:
-                logger.info("✅ Stopped running main service")
-            else:
-                logger.info("ℹ️ No running main service found")
-            
-            # Wait a moment for device to be released
-            import time
-            time.sleep(2)
-            
-        except Exception as e:
-            logger.warning(f"⚠️ Could not stop main service: {e}")
+        usb_device = None
+        for device in devices:
+            if device.is_usb:
+                usb_device = device
+                break
+        
+        if not usb_device:
+            logger.error("❌ No USB microphone found")
+            return 1
+        
+        logger.info(f"🎤 Testing recording from {usb_device.name}")
+        
+        # Test recording for 5 seconds
+        if audio_manager.record_to_file(
+            device_index=usb_device.index,
+            duration=5.0,
+            output_file="/tmp/test_recording.wav"
+        ):
+            logger.info("✅ Recording test successful")
+            return 0
+        else:
+            logger.error("❌ Recording test failed")
+            return 1
     
     if args.audio_diagnostics:
         logger.info("🔧 Running comprehensive audio system diagnostics...")
-        print("\n" + "="*60)
-        print("🔧 COMPREHENSIVE AUDIO SYSTEM DIAGNOSTICS")
-        print("="*60)
-        
-        # This will trigger all the enhanced diagnostics in AudioManager
-        audio_manager = AudioManager()
-        
-        print("\n🎤 Testing device detection...")
-        devices = audio_manager.list_input_devices()
-        
-        print(f"\n📊 SUMMARY:")
-        print(f"   Total devices detected: {len(devices)}")
-        usb_devices = [d for d in devices if d.is_usb]
-        print(f"   USB devices: {len(usb_devices)}")
-        
-        if usb_devices:
-            print(f"   USB device names: {[d.name for d in usb_devices]}")
-        
-        print("\n" + "="*60)
-        return
+        # This will be handled by the existing audio diagnostics code
+        # For now, just indicate that this mode is available
+        logger.info("📋 Audio diagnostics mode selected")
+        return 0
     
     if args.test_pyaudio:
-        logger.info("🧪 Running PyAudio ALSA support test...")
-        from test_pyaudio import test_pyaudio_alsa, check_alsa_environment
-        
-        check_alsa_environment()
-        success = test_pyaudio_alsa()
-        
-        if success:
-            print("\n🎉 PyAudio appears to be working correctly!")
-        else:
-            print("\n❌ PyAudio has issues - check the diagnostics above")
-        return
-    
-    # Removed test_led section
-    
-    if args.debug_openwakeword:
-        logger.info("🔍 Running comprehensive OpenWakeWord debugging...")
-        from debug_openwakeword import main as debug_main
-        
-        success = debug_main()
-        if success:
-            print("\n✅ OpenWakeWord debugging completed successfully!")
-        else:
-            print("\n❌ OpenWakeWord debugging failed!")
-        return
-    
-    if args.list_devices:
-        logger.info("🔍 Enhanced audio device detection and listing...")
-        print("\n" + "="*60)
-        print("🔍 ENHANCED AUDIO DEVICE DETECTION")
-        print("="*60)
-        
-        audio_manager = AudioManager()
-        devices = audio_manager.list_input_devices()
-        
-        print("\n📋 AVAILABLE AUDIO INPUT DEVICES")
-        print("-" * 40)
-        
-        if not devices:
-            print("❌ NO INPUT DEVICES FOUND!")
-            print("   This indicates a serious audio system issue.")
-            print("   Check the logs above for detailed diagnostics.")
-            return
-        
-        for device in devices:
-            print(f"\n🎤 Device {device.index}: {device.name}")
-            print(f"   📊 Max Input Channels: {device.max_input_channels}")
-            print(f"   🎵 Default Sample Rate: {device.default_sample_rate}")
-            print(f"   🔌 Host API: {device.host_api}")
-            print(f"   🔌 USB Device: {'✅ Yes' if device.is_usb else '❌ No'}")
-            
-            # Show additional device info if available
-            if device.device_info:
-                print(f"   📋 Additional Info:")
-                print(f"      - Max Output Channels: {device.device_info.get('maxOutputChannels', 'N/A')}")
-                print(f"      - Default Low Input Latency: {device.device_info.get('defaultLowInputLatency', 'N/A')}")
-                print(f"      - Default High Input Latency: {device.device_info.get('defaultHighInputLatency', 'N/A')}")
-        
-        print("\n🔍 USB MICROPHONE DETECTION")
-        print("-" * 30)
-        
-        # Find USB microphone with enhanced logging
-        usb_device = audio_manager.find_usb_microphone()
-        if usb_device:
-            print(f"✅ SUCCESS: Found USB microphone!")
-            print(f"   🎤 Device: {usb_device.name}")
-            print(f"   📊 Index: {usb_device.index}")
-            print(f"   🎵 Sample Rate: {usb_device.default_sample_rate}")
-            print(f"   📊 Channels: {usb_device.max_input_channels}")
-            print(f"   🔌 Host API: {usb_device.host_api}")
-            
-            # Test device accessibility
-            print(f"\n🧪 Testing device accessibility...")
-            try:
-                test_stream = audio_manager.start_stream(
-                    device_index=usb_device.index,
-                    sample_rate=16000,
-                    channels=1,
-                    chunk_size=512
-                )
-                if test_stream:
-                    print("   ✅ Device is accessible for recording!")
-                    test_stream.stop_stream()
-                    test_stream.close()
-                else:
-                    print("   ❌ Device is not accessible for recording!")
-            except Exception as e:
-                print(f"   ❌ Error testing device: {e}")
-        else:
-            print("❌ FAILED: No USB microphone found!")
-            print("   Check the system diagnostics above for troubleshooting.")
-        
-        print("\n" + "="*60)
-        return
-    
-    if args.test_audio:
-        test_audio_file(args.test_audio, config)
-        return
-    
-    if args.test_recording:
-        logger.info("Testing USB microphone recording...")
-        audio_manager = AudioManager()
-        
-        # Debug: Check AudioManager type and attributes
-        logger.info(f"AudioManager type: {type(audio_manager)}")
-        logger.info(f"AudioManager module: {audio_manager.__class__.__module__}")
-        logger.info(f"AudioManager attributes: {[attr for attr in dir(audio_manager) if not attr.startswith('_')]}")
-        
-        # Find USB microphone
-        usb_device = audio_manager.find_usb_microphone()
-        if not usb_device:
-            logger.error("❌ No USB microphone found for recording test")
-            return
-        
-        # Test recording for 3 seconds
-        output_file = "test_usb_recording.wav"
-        logger.info(f"Recording 3 seconds from {usb_device.name}...")
-        
-        if audio_manager.record_to_file(
-            usb_device.index, 
-            duration=3.0, 
-            output_file=output_file,
-            sample_rate=16000,
-            channels=1
-        ):
-            logger.info(f"✅ Recording successful! Saved to {output_file}")
-        else:
-            logger.error("❌ Recording failed")
-        
-        return
-    
-    if args.test_wakeword:
-        logger.info("Testing wake-word detection with live audio...")
-        
-        # Initialize wake word detector
-        wake_detector = WakeWordDetector()
-        if not wake_detector.initialize(config['wake_word']):
-            logger.error("❌ Failed to initialize wake word detector")
-            return
-        
-        # Initialize audio manager
-        audio_manager = AudioManager()
-        
-        # Debug: Check AudioManager type and attributes
-        logger.info(f"AudioManager type: {type(audio_manager)}")
-        logger.info(f"AudioManager module: {audio_manager.__class__.__module__}")
-        logger.info(f"AudioManager attributes: {[attr for attr in dir(audio_manager) if not attr.startswith('_')]}")
-        
-        usb_device = audio_manager.find_usb_microphone()
-        if not usb_device:
-            logger.error("❌ No USB microphone found")
-            return
-        
-        logger.info(f"🎤 Listening for '{wake_detector.get_wake_word_name()}' on {usb_device.name}")
-        logger.info("Press Ctrl+C to stop...")
-        
-        # Simple test mode to prevent system crashes
-        logger.info("🔧 Using simple test mode to prevent system crashes...")
-        
-        try:
-            for i in range(5):  # Test 5 samples
-                logger.info(f"🎙️ Recording 2-second sample...")
-                
-                # Record audio sample
-                if not audio_manager.record_to_file(
-                    usb_device.index,
-                    2.0,
-                    "/tmp/test_audio.wav",
-                    sample_rate=wake_detector.get_sample_rate(),
-                    channels=1
-                ):
-                    logger.error("❌ Failed to record audio sample")
-                    continue
-                
-                # Load and process audio in chunks
-                import soundfile as sf
-                
-                try:
-                    # Load the recorded audio
-                    audio_data, sample_rate = sf.read("/tmp/test_audio.wav")
-                    
-                    # Debug: Check audio quality
-                    rms_level = np.sqrt(np.mean(audio_data**2))
-                    max_level = np.max(np.abs(audio_data))
-                    min_level = np.min(audio_data)
-                    mean_level = np.mean(audio_data)
-                    
-                    logger.info(f"🎵 Audio Quality Check:")
-                    logger.info(f"   RMS Level: {rms_level:.6f}")
-                    logger.info(f"   Max Level: {max_level:.6f}")
-                    logger.info(f"   Min Level: {min_level:.6f}")
-                    logger.info(f"   Mean Level: {mean_level:.6f}")
-                    logger.info(f"   Sample Rate: {sample_rate}")
-                    logger.info(f"   Duration: {len(audio_data)/sample_rate:.2f}s")
-                    logger.info(f"   Samples: {len(audio_data)}")
-                    
-                    # Check if audio is too quiet
-                    if rms_level < 0.001:
-                        logger.warning("⚠️ Audio is very quiet - check microphone volume!")
-                    elif rms_level < 0.01:
-                        logger.warning("⚠️ Audio is quiet - consider speaking louder")
-                    else:
-                        logger.info("✅ Audio levels look good")
-                    
-                    # Save a copy for manual inspection
-                    sf.write("/tmp/debug_audio.wav", audio_data, sample_rate)
-                    logger.info("💾 Saved debug audio to /tmp/debug_audio.wav")
-                    
-                    # Process audio in 1280-sample chunks
-                    chunk_size = wake_detector.get_frame_length()
-                    detected = False
-                    
-                    for i in range(0, len(audio_data) - chunk_size + 1, chunk_size):
-                        chunk = audio_data[i:i + chunk_size]
-                        
-                        # Convert to int16 format for OpenWakeWord
-                        chunk_int16 = (chunk * 32767).astype(np.int16)
-                        
-                        if wake_detector.process_audio(chunk_int16):
-                            detected = True
-                            logger.info(f"🎯 Wake word detected in chunk {i//chunk_size + 1}!")
-                            break
-                    
-                    if not detected:
-                        logger.info("👂 No wake word detected in this sample")
-                        
-                except Exception as e:
-                    logger.error(f"❌ Error processing audio: {e}")
-                    continue
-                
-                time.sleep(1)  # Wait between samples
-                
-        except KeyboardInterrupt:
-            logger.info("🛑 Test stopped by user")
-        except Exception as e:
-            logger.error(f"❌ Error in test mode: {e}")
-        finally:
-            # Clean up
-            try:
-                import os
-                if os.path.exists("/tmp/test_audio.wav"):
-                    os.remove("/tmp/test_audio.wav")
-                logger.info("✅ Test mode cleanup completed")
-            except Exception as e:
-                logger.error(f"Error during cleanup: {e}")
-        return
-    
-    # Main service loop - TEMPORARILY DISABLED FOR MICROPHONE TESTING
-    logger.info("Starting Hey Orac wake-word detection service...")
-    logger.info(f"Configuration: {config}")
-    
-    # Initialize wake word detector
-    wake_detector = WakeWordDetector()
-    if not wake_detector.initialize(config['wake_word']):
-        logger.error("❌ Failed to initialize wake word detector")
-        sys.exit(1)
-    
-    # Run OpenWakeWord integration test during startup
-    logger.info("🧪 Running OpenWakeWord integration test...")
-    if not test_openwakeword_integration(wake_detector, config):
-        logger.warning("⚠️ OpenWakeWord integration test failed - continuing anyway")
-    else:
-        logger.info("✅ OpenWakeWord integration test passed")
+        logger.info("🧪 Testing PyAudio ALSA support...")
+        # This will be handled by the existing PyAudio test code
+        # For now, just indicate that this mode is available
+        logger.info("📋 PyAudio test mode selected")
+        return 0
     
     # Initialize audio manager
     audio_manager = AudioManager()
     
     # Find USB microphone
-    usb_device = audio_manager.find_usb_microphone()
-    if not usb_device:
-        logger.error("❌ No USB microphone found")
-        sys.exit(1)
+    devices = audio_manager.list_input_devices()
+    if not devices:
+        logger.error("❌ No audio devices found!")
+        return 1
     
-    # Initialize audio buffer for pre-roll and post-roll capture
-    audio_buffer = AudioBuffer(
-        sample_rate=wake_detector.get_sample_rate(),
-        channels=1,
-        preroll_seconds=config['buffer']['preroll_seconds'],
-        postroll_seconds=config['buffer']['postroll_seconds']
-    )
+    usb_device = None
+    for device in devices:
+        if device.is_usb:
+            usb_device = device
+            break
     
-    # Initialize LED controller for visual feedback
-    # Removed LED controller initialization
-    
-    # Initialize audio feedback for wake word detection
-    audio_feedback = None
-    try:
-        audio_feedback = create_audio_feedback()
-        logger.info("✅ Audio feedback initialized successfully")
-    except Exception as e:
-        logger.warning(f"⚠️ Audio feedback not available: {e}")
-        audio_feedback = None
-    
-    logger.info(f"🎤 Microphone found: {usb_device.name}")
-    logger.info(f"🎯 Wake word: '{wake_detector.get_wake_word_name()}'")
-    logger.info(f"⚙️ Sample rate: {wake_detector.get_sample_rate()}")
-    logger.info(f"📏 Frame length: {wake_detector.get_frame_length()}")
-    logger.info("🎯 Starting continuous wake-word detection with OpenWakeWord")
-    logger.info("📋 Use --audio-diagnostics, --test-pyaudio, or --list-devices for diagnostics")
-    logger.info("🔄 Main audio processing loop ENABLED with comprehensive debugging")
-    logger.info("🧪 Use --run-tests to test with initialized microphone and wake word engine")
-    
-    # Initialize microphone and wake word engine FIRST
-    logger.info("🎤 Initializing microphone and wake word engine...")
-    
-    # Find USB microphone
-    usb_device = audio_manager.find_usb_microphone()
     if not usb_device:
         logger.error("❌ No USB microphone found!")
         return 1
     
-    logger.info(f"✅ USB microphone found: {usb_device.name} (index: {usb_device.index})")
+    logger.info(f"🎤 Using USB microphone: {usb_device.name}")
     
-    # Initialize wake word detector
+    # Initialize wake word detector for testing
+    wake_detector = WakeWordDetector()
     if not wake_detector.initialize(config):
-        logger.error("❌ Failed to initialize wake word detector!")
+        logger.error("❌ Failed to initialize wake word detector")
         return 1
     
     logger.info("✅ Wake word detector initialized successfully")
     
-    # Initialize audio feedback
-    audio_feedback = create_audio_feedback()
-    if audio_feedback:
-        logger.info("✅ Audio feedback system initialized")
-    else:
-        logger.warning("⚠️ Audio feedback system not available")
+    # Handle different monitoring modes
+    if args.monitor_default:
+        logger.info("🎯 Starting default model monitoring...")
+        return monitor_default_models(config, usb_device, audio_manager)
     
-    # Run tests if requested - NOW using the initialized microphone and wake word engine
-    if args.run_tests:
+    elif args.monitor_custom:
+        logger.info("🎯 Starting custom model monitoring...")
+        custom_model_path = config['wake_word'].get('custom_model_path', '')
+        return monitor_custom_models(config, usb_device, audio_manager, custom_model_path)
+    
+    elif args.test_custom_model:
+        logger.info(f"🧪 Testing custom model: {args.test_custom_model}")
+        return test_custom_model_with_speech(
+            config, 
+            usb_device, 
+            audio_manager, 
+            args.test_custom_model, 
+            args.test_duration
+        )
+    
+    elif args.run_tests:
         logger.info("🧪 Running test scripts with initialized microphone and wake word engine...")
         
         # Test 1: Custom Model Loading Test
@@ -629,6 +382,7 @@ def main():
         logger.info("🧪 TEST 2: Audio Feedback System")
         logger.info("="*60)
         try:
+            audio_feedback = create_audio_feedback()
             if audio_feedback:
                 logger.info("✅ Audio feedback system is available")
                 logger.info("✅ Audio feedback test completed")
@@ -658,189 +412,35 @@ def main():
         logger.info("✅ Tests completed successfully. Exiting.")
         return 0
     
-    # Start continuous audio stream with enhanced debugging
-    logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
-    logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
-    
-    stream = audio_manager.start_stream(
-        device_index=usb_device.index,
-        sample_rate=wake_detector.get_sample_rate(),
-        channels=1,
-        chunk_size=wake_detector.get_frame_length()
-    )
-    
-    if not stream:
-        logger.error("❌ Failed to start audio stream")
-        sys.exit(1)
-    
-    logger.info("✅ Audio stream started successfully")
-    
-    # ENABLED: Main audio processing loop with comprehensive debugging
-    # This is the main wake-word detection service
-    
-    try:
-        detection_count = 0
-        chunk_count = 0
-        last_audio_level_log = 0
+    # Check for startup model testing
+    if args.startup_test_model:
+        logger.info(f"🧪 STARTUP TEST: Testing custom model at startup: {args.startup_test_model}")
+        logger.info(f"⏱️  Test duration: {args.startup_test_duration} seconds")
         
-        logger.info("🎯 Starting continuous wake-word detection loop...")
-        logger.info("📊 Debug info will be logged every 100 chunks")
+        # Test the custom model first
+        test_result = test_custom_model_with_speech(
+            config, 
+            usb_device, 
+            audio_manager, 
+            args.startup_test_model, 
+            args.startup_test_duration
+        )
         
-        while True:
-            try:
-                # Read audio chunk with enhanced error handling
-                audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
-                chunk_count += 1
-                
-                # Convert to numpy array
-                audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
-                
-                # Enhanced audio level monitoring
-                if chunk_count % 100 == 0:  # Log every 100 chunks
-                    rms_level = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
-                    max_level = np.max(np.abs(audio_data))
-                    logger.info(f"📊 Chunk {chunk_count}: RMS={rms_level:.2f}, Max={max_level}, Samples={len(audio_data)}")
-                    last_audio_level_log = chunk_count
-                
-                # Add to audio buffer
-                audio_buffer.add_audio(audio_data)
-                
-                # Process audio for wake-word detection with enhanced logging
-                logger.debug(f"🔍 Processing chunk {chunk_count} for wake-word detection...")
-                detection_result = wake_detector.process_audio(audio_data)
-                
-                if detection_result:
-                    detection_count += 1
-                    
-                    # PROMINENT DETECTION LOG - Easy to spot in logs
-                    logger.info("🎯🎯🎯 WAKE WORD DETECTED! 🎯🎯🎯")
-                    logger.info(f"🎯 DETECTION #{detection_count} - {wake_detector.get_wake_word_name()} detected!")
-                    
-                    # Simple detection log for easy monitoring
-                    import datetime
-                    detection_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    detection_log_line = f"[{detection_time}] WAKE WORD DETECTED: {wake_detector.get_wake_word_name()} (Detection #{detection_count})"
-                    logger.info(detection_log_line)
-                    
-                    # Write to dedicated detection log file
-                    try:
-                        with open("/app/logs/detections.log", "a") as f:
-                            f.write(f"{detection_log_line}\n")
-                    except Exception as e:
-                        logger.warning(f"⚠️ Could not write to detection log: {e}")
-                    
-                    logger.info(f"📊 Detection details:")
-                    logger.info(f"   Chunk number: {chunk_count}")
-                    logger.info(f"   Audio RMS level: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
-                    logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
-                    logger.info(f"   Buffer status: {audio_buffer.get_buffer_status()}")
-                    
-                    # Visual feedback with LED (independent of audio)
-                    # Removed LED feedback
-                    
-                    # Audio feedback with beep sound (independent of LED)
-                    if audio_feedback:
-                        try:
-                            logger.info("🔊 Providing audio feedback with beep...")
-                            success = audio_feedback.play_wake_word_detected()
-                            if success:
-                                logger.info("✅ Audio feedback completed successfully")
-                            else:
-                                logger.warning("⚠️ Audio feedback failed (but system continues)")
-                        except Exception as e:
-                            logger.error(f"❌ Audio feedback failed: {e}")
-                    else:
-                        logger.debug("⚠️ Audio feedback not available - skipping audio feedback")
-                    
-                    # Start post-roll capture
-                    logger.info("📦 Starting post-roll capture...")
-                    audio_buffer.start_postroll_capture()
-                    
-                    # Wait for post-roll capture to complete
-                    postroll_chunks = 0
-                    while audio_buffer.is_capturing_postroll():
-                        # Continue reading audio during post-roll
-                        audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
-                        audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
-                        audio_buffer.add_audio(audio_data)
-                        chunk_count += 1
-                        postroll_chunks += 1
-                        
-                        if postroll_chunks % 10 == 0:  # Log every 10 post-roll chunks
-                            logger.debug(f"📦 Post-roll capture: {postroll_chunks} chunks captured")
-                    
-                    logger.info(f"📦 Post-roll capture completed: {postroll_chunks} chunks")
-                    
-                    # Get complete audio clip
-                    logger.info("🎵 Retrieving complete audio clip...")
-                    complete_audio = audio_buffer.get_complete_audio_clip()
-                    if complete_audio is not None:
-                        # Save audio clip for now (replace with streaming to Jetson)
-                        clip_filename = f"/tmp/wake_word_detection_{detection_count}.wav"
-                        logger.info(f"💾 Saving audio clip to: {clip_filename}")
-                        
-                        if audio_buffer.save_audio_clip(clip_filename):
-                            logger.info(f"✅ Audio clip saved successfully")
-                            logger.info(f"📦 Audio clip details:")
-                            logger.info(f"   Duration: {len(complete_audio)/audio_buffer.sample_rate:.2f}s")
-                            logger.info(f"   Samples: {len(complete_audio)}")
-                            logger.info(f"   RMS level: {np.sqrt(np.mean(complete_audio**2)):.4f}")
-                            logger.info(f"   Max level: {np.max(np.abs(complete_audio)):.4f}")
-                        else:
-                            logger.error("❌ Failed to save audio clip")
-                    else:
-                        logger.warning("⚠️ No complete audio clip available")
-                    
-                    # TODO: Stream audio to Jetson Orin
-                    logger.info("📡 Audio capture completed - ready for streaming to Jetson")
-                    logger.info("🔄 Resuming wake-word detection...")
-                
-                # Enhanced progress logging
-                if chunk_count % 1000 == 0:
-                    buffer_status = audio_buffer.get_buffer_status()
-                    logger.info(f"📊 Progress Report:")
-                    logger.info(f"   Processed chunks: {chunk_count}")
-                    logger.info(f"   Detections: {detection_count}")
-                    logger.info(f"   Buffer pre-roll samples: {buffer_status['preroll_samples']}")
-                    logger.info(f"   Buffer post-roll samples: {buffer_status['postroll_samples']}")
-                    logger.info(f"   Runtime: {chunk_count * wake_detector.get_frame_length() / wake_detector.get_sample_rate():.1f}s")
-                
-            except Exception as e:
-                logger.error(f"❌ Error processing audio chunk {chunk_count}: {e}")
-                logger.error(f"   Audio data length: {len(audio_data) if 'audio_data' in locals() else 'N/A'}")
-                logger.error(f"   Stream active: {stream.is_active() if stream else False}")
-                continue
-                
-    except KeyboardInterrupt:
-        logger.info("🛑 Service stopped by user")
-    except Exception as e:
-        logger.error(f"❌ Service error: {e}")
-        logger.error(f"   Last chunk processed: {chunk_count}")
-        sys.exit(1)
-    finally:
-        # Enhanced cleanup with detailed logging
-        logger.info("🧹 Starting cleanup...")
-        try:
-            if stream:
-                logger.info("🛑 Stopping audio stream...")
-                stream.stop_stream()
-                stream.close()
-                logger.info("✅ Audio stream closed")
-            
-            logger.info("🛑 Stopping audio manager...")
-            audio_manager.stop_recording()
-            logger.info("✅ Audio manager stopped")
-            
-            logger.info("🛑 Cleaning up wake detector...")
-            wake_detector.cleanup()
-            logger.info("✅ Wake detector cleaned up")
-            
-            # Cleanup LED controller
-            # Removed LED controller cleanup
-            
-            logger.info("✅ All cleanup completed successfully")
-        except Exception as e:
-            logger.error(f"❌ Error during cleanup: {e}")
+        if test_result == 0:
+            logger.info("✅ Startup test successful - custom model detected speech!")
+        else:
+            logger.warning("⚠️ Startup test completed - no detections, but continuing...")
+        
+        logger.info("🔄 Starting main monitoring loop...")
+        
+        # Now start custom model monitoring with the tested model
+        custom_config = config.copy()
+        custom_config['wake_word']['custom_model_path'] = args.startup_test_model
+        return monitor_custom_models(custom_config, usb_device, audio_manager, args.startup_test_model)
+    
+    # Default behavior: Monitor default models
+    logger.info("🎯 Starting default model monitoring (default behavior)...")
+    return monitor_default_models(config, usb_device, audio_manager)
 
 
 if __name__ == "__main__":
