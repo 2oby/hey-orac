@@ -66,6 +66,7 @@ USER appuser
 COPY --chown=appuser:appuser src/ ./src/
 COPY --chown=appuser:appuser models/ ./models/
 COPY --chown=appuser:appuser third_party/ ./third_party/
+COPY --chown=appuser:appuser web/ ./web/
 # Copy assets directory if it exists (for audio feedback)
 COPY --chown=appuser:appuser assets/ ./assets/
 COPY --chown=appuser:appuser src/config.yaml ./config.yaml
@@ -73,7 +74,7 @@ COPY --chown=appuser:appuser src/config.yaml ./config.yaml
 # Copy ALSA configuration for USB microphone
 COPY --chown=appuser:appuser .asoundrc /home/appuser/.asoundrc
 
-# Expose port for health checks (optional)
+# Expose port for web interface
 EXPOSE 8080
 
 # Set environment variables
@@ -91,5 +92,5 @@ ENV ALSA_PCM_DEVICE=0
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD /app/venv/bin/python -c "import sys; sys.exit(0)" || exit 1
 
-# Default command with startup testing of Hay--compUta_v_lrg model
-CMD ["/app/venv/bin/python", "src/main.py", "--startup-test-model", "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx", "--startup-test-duration", "15"] 
+# Default command - run the Flask web backend
+CMD ["/app/venv/bin/python", "src/web_backend.py"] 

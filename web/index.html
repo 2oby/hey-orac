@@ -730,23 +730,91 @@
         </div>
 
     <script>
-        // Sample model data - will be replaced with real data from backend
-        const sampleModels = [
-            { name: 'Hay--compUta_v_lrg', active: true, sensitivity: 0.05, apiUrl: 'https://api.example.com/webhook' },
-            { name: 'Hey_computer', active: false, sensitivity: 0.1, apiUrl: 'https://api.example.com/webhook' },
-            { name: 'hey-CompUter_lrg', active: false, sensitivity: 0.08, apiUrl: 'https://api.example.com/webhook' }
-        ];
-
+        // Real API integration
+        const API_BASE = '/api';
+        let sampleModels = [];
         let currentEditingModel = null;
         let currentVolume = 0;
         let volumeHistory = [];
 
+        // API functions
+        async function loadConfig() {
+            try {
+                const response = await fetch(`${API_BASE}/config`);
+                const config = await response.json();
+                
+                // Convert config to our model format
+                sampleModels = Object.keys(config.models).map(name => ({
+                    name: name,
+                    active: false, // We'll need to add active state to config later
+                    sensitivity: config.models[name].sensitivity,
+                    apiUrl: config.models[name].api_url
+                }));
+                
+                // Set global sliders from config
+                if (config.global) {
+                    document.getElementById('rmsFilter').value = config.global.rms_filter;
+                    document.getElementById('rmsFilterValue').textContent = config.global.rms_filter;
+                    document.getElementById('debounce').value = config.global.debounce_ms;
+                    document.getElementById('debounceValue').textContent = config.global.debounce_ms + 'ms';
+                    document.getElementById('cooldown').value = config.global.cooldown_s;
+                    document.getElementById('cooldownValue').textContent = config.global.cooldown_s + 's';
+                }
+                
+                generateModelCards();
+                updateFilterIndicator();
+            } catch (error) {
+                console.error('Failed to load config:', error);
+                // Fallback to demo data
+                sampleModels = [
+                    { name: 'Hay--compUta_v_lrg', active: true, sensitivity: 0.05, apiUrl: 'https://api.example.com/webhook' },
+                    { name: 'Hey_computer', active: false, sensitivity: 0.1, apiUrl: 'https://api.example.com/webhook' },
+                    { name: 'hey-CompUter_lrg', active: false, sensitivity: 0.08, apiUrl: 'https://api.example.com/webhook' }
+                ];
+                generateModelCards();
+            }
+        }
+
+        async function saveGlobalSettings() {
+            const settings = {
+                rms_filter: parseInt(document.getElementById('rmsFilter').value),
+                debounce_ms: parseInt(document.getElementById('debounce').value),
+                cooldown_s: parseFloat(document.getElementById('cooldown').value)
+            };
+            
+            try {
+                await fetch(`${API_BASE}/config/global`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+            } catch (error) {
+                console.error('Failed to save global settings:', error);
+            }
+        }
+
+        async function saveModelSettings(modelName, settings) {
+            try {
+                await fetch(`${API_BASE}/config/models/${encodeURIComponent(modelName)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sensitivity: settings.sensitivity,
+                        api_url: settings.apiUrl
+                    })
+                });
+            } catch (error) {
+                console.error('Failed to save model settings:', error);
+            }
+        }
+
         // Initialize the interface
         function initializeInterface() {
-            generateModelCards();
-            setupSliders();
-            setupVolumeMeter();
-            updateStatusBar();
+            loadConfig().then(() => {
+                setupSliders();
+                setupVolumeMeter();
+                updateStatusBar();
+            });
         }
 
         // Generate model cards
@@ -787,8 +855,6 @@
                     e.stopPropagation();
                     openSettingsModal(model.name);
                 });
-                
-
 
                 modelsGrid.appendChild(modelCard);
             });
@@ -814,14 +880,6 @@
             });
         }
 
-        // Update model sensitivity
-        function updateModelSensitivity(modelName, sensitivity) {
-            const model = sampleModels.find(m => m.name === modelName);
-            if (model) {
-                model.sensitivity = parseFloat(sensitivity);
-            }
-        }
-
         // Setup global sliders
         function setupSliders() {
             const sliders = [
@@ -841,6 +899,9 @@
                     if (slider.id === 'rmsFilter') {
                         updateFilterIndicator();
                     }
+                    
+                    // Save global settings when sliders change
+                    saveGlobalSettings();
                 });
             });
         }
@@ -893,6 +954,12 @@
             if (model) {
                 model.sensitivity = parseFloat(document.getElementById('sensitivityInput').value);
                 model.apiUrl = document.getElementById('apiUrlInput').value;
+                
+                // Save to API
+                saveModelSettings(currentEditingModel, {
+                    sensitivity: model.sensitivity,
+                    apiUrl: model.apiUrl
+                });
             }
             
             closeSettingsModal();
