@@ -2,6 +2,126 @@
 
 ## 🎉 MAJOR BREAKTHROUGH: CUSTOM WAKE WORD DETECTION WORKING!
 
+## 🌐 NEW PRIORITY: Web Admin Console & API Integration
+
+### 1. 🔥 **CRITICAL PRIORITY: Web Admin Console APIs**
+**Priority**: 🔥 **HIGH** - Create APIs to feed the web admin console
+
+**Objective**: Create backend APIs to support the web admin console functionality
+- Create REST API endpoints for model management
+- Create WebSocket connection for real-time updates
+- Create configuration API for settings persistence
+- Create audio level streaming API for volume meter
+- Create detection event streaming API
+
+**Required APIs**:
+- `GET /api/models` - List available wake word models
+- `GET /api/models/{name}/status` - Get model status (active/inactive)
+- `POST /api/models/{name}/activate` - Activate a model
+- `POST /api/models/{name}/deactivate` - Deactivate a model
+- `GET /api/models/{name}/config` - Get model configuration
+- `PUT /api/models/{name}/config` - Update model configuration
+- `GET /api/audio/levels` - Get current audio levels (WebSocket)
+- `GET /api/detections` - Get detection events (WebSocket)
+- `GET /api/system/status` - Get system status
+- `PUT /api/system/config` - Update global configuration
+
+**Implementation Steps**:
+1. Create Flask/FastAPI backend server
+2. Implement model discovery from filesystem
+3. Implement WebSocket for real-time audio levels
+4. Implement WebSocket for detection events
+5. Create configuration persistence system
+6. Integrate with existing wake word detection system
+7. Add CORS support for web interface
+8. Create API documentation
+
+**Success Criteria**:
+- Web interface connects to backend APIs
+- Real-time audio levels displayed in volume meter
+- Model activation/deactivation works through web interface
+- Settings saved and loaded from backend
+- Detection events stream to web interface
+- System status displayed in web interface
+
+### 2. 💾 **CRITICAL PRIORITY: Settings Persistence**
+**Priority**: 🔥 **HIGH** - Save and load settings from device storage
+
+**Objective**: Implement settings persistence for web admin console configuration
+- Save model configurations to JSON file
+- Save global system settings to JSON file
+- Load settings at system startup
+- Validate settings on load
+- Provide default settings for new installations
+
+**Required Settings**:
+- Model configurations (active state, sensitivity, API URLs)
+- Global system settings (RMS filter, debounce, cooldown)
+- Audio device configuration
+- Network configuration for Orin integration
+- Detection thresholds and parameters
+
+**Implementation Steps**:
+1. Create settings schema and validation
+2. Implement settings save/load functions
+3. Create default settings file
+4. Add settings validation on startup
+5. Integrate with web admin console
+6. Add settings backup/restore functionality
+7. Create settings migration system for updates
+
+**File Structure**:
+```
+config/
+├── models.json          # Model configurations
+├── system.json          # Global system settings
+├── audio.json          # Audio device settings
+└── network.json        # Network configuration
+```
+
+**Success Criteria**:
+- Settings saved to device storage
+- Settings loaded at system startup
+- Web interface reflects saved settings
+- Settings validation prevents invalid configurations
+- Default settings provided for new installations
+- Settings backup/restore functionality working
+
+### 3. 🎯 **COMPLETED: Web Admin Console Mockup** ✅ **COMPLETED**
+**Priority**: ✅ **COMPLETED** - Web admin console mockup created and committed
+
+**Achievement**: Created comprehensive web admin console with:
+- Dark neon pixel theme with scanlines effect
+- Volume meter with LCD-style segments (amber/green/red)
+- Model configuration with settings popup
+- Real-time monitoring (demo mode)
+- Responsive design for different screen sizes
+- Settings cog for each model with sensitivity and API URL configuration
+- RMS filter integration with visual indicator
+- Smooth animations and transitions
+
+**Files Created**:
+- `web/index.html` - Main admin console interface
+- `web/css/style.css` - Neon pixel theme stylesheet
+- `web/assets/audio/beep.mp3` - Audio resources
+- `web/README.md` - Documentation and usage instructions
+
+**Features Implemented**:
+- ✅ Model cards with activation/deactivation
+- ✅ Settings popup with sensitivity and API URL configuration
+- ✅ Volume meter with 12 LCD-style segments
+- ✅ RMS filter integration with visual boundary indicator
+- ✅ Real-time demo mode with smooth animations
+- ✅ Responsive design for mobile and desktop
+- ✅ Dark neon pixel theme with scanlines
+- ✅ Settings persistence ready for backend integration
+
+**Next Steps**: 
+- [ ] Create backend APIs to feed the web interface
+- [ ] Implement settings persistence system
+- [ ] Add WebSocket for real-time updates
+- [ ] Integrate with existing wake word detection system
+
 ### ✅ **CRITICAL ISSUE RESOLVED: Custom Wake Word Detection Working**
 
 **Status**: **GREEN** - Both pre-trained and custom wake word detection working perfectly
