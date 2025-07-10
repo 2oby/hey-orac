@@ -42,7 +42,7 @@ echo "✅ Web backend started successfully (PID: $WEB_PID)"
 
 # Start main wake word detection in background
 echo "🎤 Starting wake word detection..."
-/app/venv/bin/python src/main.py --pipeline &
+/app/venv/bin/python src/main.py --monitor-custom &
 MAIN_PID=$!
 
 # Wait a moment for main process to start

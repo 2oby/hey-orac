@@ -46,8 +46,8 @@ else
     echo -e "${YELLOW}Committing with message: $COMMIT_MSG${NC}"
     git commit -m "$COMMIT_MSG"
     
-    echo -e "${YELLOW}Pushing to origin/master${NC}"
-    git push origin master
+    echo -e "${YELLOW}Pushing to origin/option-3-web-backend-as-service${NC}"
+    git push origin option-3-web-backend-as-service
 fi
 
 # 2) Remote: pull, build & test
