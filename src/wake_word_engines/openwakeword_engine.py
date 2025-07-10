@@ -211,6 +211,33 @@ class OpenWakeWordEngine(WakeWordEngine):
             logger.error(f"❌ Error processing audio: {e}")
             return False
     
+    def get_latest_confidence(self) -> float:
+        """Get the latest confidence score for the wake word."""
+        if not self.is_initialized or self.model is None:
+            return 0.0
+            
+        try:
+            # Get the latest confidence from the prediction buffer
+            if hasattr(self.model, 'prediction_buffer') and self.model.prediction_buffer:
+                # Get the confidence for our specific wake word
+                if self.wake_word_name in self.model.prediction_buffer:
+                    scores = self.model.prediction_buffer[self.wake_word_name]
+                    if scores:
+                        return scores[-1]  # Return the latest score
+                
+                # If our specific wake word isn't found, return the highest confidence
+                max_confidence = 0.0
+                for model_name, scores in self.model.prediction_buffer.items():
+                    if scores and scores[-1] > max_confidence:
+                        max_confidence = scores[-1]
+                return max_confidence
+            
+            return 0.0
+            
+        except Exception as e:
+            logger.error(f"❌ Error getting latest confidence: {e}")
+            return 0.0
+    
     def get_wake_word_name(self) -> str:
         """Get the name of the wake word being detected."""
         return self.wake_word_name
