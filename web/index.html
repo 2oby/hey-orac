@@ -852,8 +852,11 @@
                 
                 // Set global sliders from config
                 if (config.global) {
-                    document.getElementById('rmsFilter').value = config.global.rms_filter;
-                    document.getElementById('rmsFilterValue').textContent = config.global.rms_filter;
+                                document.getElementById('rmsFilter').value = config.global.rms_filter;
+            // Show both linear and logarithmic values for RMS filter
+            const linearValue = config.global.rms_filter;
+            const logValue = Math.log(1 + linearValue / 10) / Math.log(1 + 100);
+            document.getElementById('rmsFilterValue').textContent = `${linearValue} (${(logValue * 100).toFixed(1)}% log)`;
                     document.getElementById('debounce').value = config.global.debounce_ms;
                     document.getElementById('debounceValue').textContent = config.global.debounce_ms + 'ms';
                     document.getElementById('cooldown').value = config.global.cooldown_s;
@@ -1048,11 +1051,14 @@
                 const valueElement = document.getElementById(slider.valueId);
                 
                 sliderElement.addEventListener('input', (e) => {
-                    valueElement.textContent = slider.format(e.target.value);
-                    
-                    // Update filter indicator when RMS filter changes
+                    // Special handling for RMS filter - show both linear and logarithmic values
                     if (slider.id === 'rmsFilter') {
+                        const linearValue = parseInt(e.target.value);
+                        const logValue = Math.log(1 + linearValue / 10) / Math.log(1 + 100);
+                        valueElement.textContent = `${linearValue} (${(logValue * 100).toFixed(1)}% log)`;
                         updateFilterIndicator();
+                    } else {
+                        valueElement.textContent = slider.format(e.target.value);
                     }
                     
                     // Save global settings when sliders change
@@ -1167,7 +1173,10 @@
 
             const segments = document.querySelectorAll('.volume-segment');
             const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
-            const filterThreshold = rmsFilterValue / 100; // Convert to 0-1 range
+            
+            // Convert filter to logarithmic scale to match volume meter
+            // Use the same logarithmic formula: log(1 + filter/10) / log(1 + 100)
+            const filterThreshold = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 100);
             
             // Calculate how many segments should be active based on volume
             const activeSegments = Math.floor(volume * 12);
@@ -1199,7 +1208,11 @@
 
         function updateFilterIndicator() {
             const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
-            const filterPosition = (rmsFilterValue / 100) * 600; // 600px is meter width
+            
+            // Convert filter to logarithmic scale for visual indicator
+            // Use the same logarithmic formula: log(1 + filter/10) / log(1 + 100)
+            const logFilterValue = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 100);
+            const filterPosition = logFilterValue * 600; // 600px is meter width
             const indicator = document.getElementById('filterIndicator');
             indicator.style.left = `${filterPosition}px`;
         }
@@ -1212,18 +1225,23 @@
                     if (response.ok) {
                         const rmsData = await response.json();
                         
-                        // Convert RMS to volume level (0-1)
-                        // RMS values are typically small, so we scale them appropriately
+                        // Convert RMS to volume level (0-1) using logarithmic scale
+                        // This makes low volumes more sensitive and high volumes less sensitive
                         let volume = 0;
                         if (rmsData.is_active && rmsData.current_rms > 0) {
-                            // Scale RMS to 0-1 range, with some reasonable bounds
-                            // RMS values are typically 0-1000, so we scale accordingly
-                            volume = Math.min(1, rmsData.current_rms / 100); // More sensitive scaling
+                            // Use logarithmic scaling for better sensitivity at low volumes
+                            // RMS values typically range from 0-1000
+                            const rms = rmsData.current_rms;
+                            
+                            // Logarithmic scale: log(1 + rms/10) / log(1 + 100)
+                            // This gives us 0-1 range with better low-end sensitivity
+                            volume = Math.log(1 + rms / 10) / Math.log(1 + 100);
+                            volume = Math.min(1, volume); // Clamp to 0-1
                         }
                         
                         // Debug logging (remove in production)
                         if (rmsData.current_rms > 0) {
-                            console.log(`RMS: ${rmsData.current_rms.toFixed(2)}, Volume: ${volume.toFixed(3)}, Active: ${rmsData.is_active}`);
+                            console.log(`🔊 RMS: ${rmsData.current_rms.toFixed(2)}, Log Volume: ${volume.toFixed(3)}, Active: ${rmsData.is_active}`);
                         }
                         
                         updateVolumeMeter(volume);

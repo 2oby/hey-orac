@@ -56,17 +56,7 @@ class RMSMonitor:
                 logger = logging.getLogger(__name__)
                 logger.warning(f"⚠️ Failed to save RMS data to file: {e}")
             
-            # Debug logging (only log every 100 updates to avoid spam)
-            if len(self._rms_data['volume_history']) % 100 == 0:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info(f"🔊 RMS Monitor Updated: current={rms_level:.4f}, avg={self._rms_data['avg_rms']:.4f}, max={self._rms_data['max_rms']:.4f}")
-            
-            # Additional debug logging for first few updates
-            if len(self._rms_data['volume_history']) <= 5:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info(f"🔊 RMS Monitor Update #{len(self._rms_data['volume_history'])}: rms={rms_level:.4f}, is_active=True")
+
     
     def get_rms_data(self) -> Dict[str, Any]:
         """Get current RMS data for web interface"""
@@ -85,12 +75,6 @@ class RMSMonitor:
             
             current_time = time.time()
             time_diff = current_time - self._rms_data['last_update']
-            
-            # Debug logging for timestamp issues
-            if time_diff > 5.0:  # Log if data is getting stale
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"⚠️ RMS data getting stale: {time_diff:.2f}s since last update")
             
             # Check if data is stale (older than 30 seconds) - increased from 5s
             if time_diff > 30.0:
