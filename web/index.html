@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hey Orac - Wake Word Monitor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #0a0a0a;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Scanlines effect */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                transparent 50%,
+                rgba(0, 255, 65, 0.02) 50%
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .container {
+            position: relative;
+            z-index: 2;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #00ff41;
+            padding-bottom: 20px;
+        }
+
+        .title {
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #00ff41;
+            margin-bottom: 10px;
+        }
+
+        .subtitle {
+            font-size: 1.2em;
+            color: #00cc33;
+        }
+
+        .controls-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .sliders-container {
+            display: flex;
+            gap: 30px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .slider-label {
+            font-size: 1.1em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .slider {
+            -webkit-appearance: none;
+            width: 200px;
+            height: 8px;
+            border-radius: 4px;
+            background: #1a1a1a;
+            outline: none;
+            border: 2px solid #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00ff41;
+            cursor: pointer;
+            box-shadow: 0 0 15px #00ff41;
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00ff41;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 15px #00ff41;
+        }
+
+        .slider-value {
+            font-size: 0.9em;
+            color: #00cc33;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        /* Volume Meter Styles */
+        .volume-meter-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 30px;
+            width: 100%;
+        }
+
+        .volume-meter {
+            position: relative;
+            width: 600px; /* Same width as 3 sliders */
+            height: 40px;
+            background: #0a0a0a;
+            border: 2px solid #00ff41;
+            border-radius: 4px;
+            padding: 4px;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.2);
+        }
+
+        .volume-segments {
+            display: flex;
+            gap: 2px;
+            height: 100%;
+            position: relative;
+        }
+
+        .volume-segment {
+            flex: 1;
+            background: #1a1a1a;
+            border: 1px solid #333;
+            border-radius: 2px;
+            transition: all 0.1s ease;
+            position: relative;
+        }
+
+        .volume-segment.active {
+            box-shadow: 0 0 10px currentColor;
+        }
+
+        .volume-segment.amber {
+            background: linear-gradient(145deg, #cc7000, #b35a00);
+            border-color: #cc7000;
+            color: #cc7000;
+            box-shadow: 0 0 10px rgba(204, 112, 0, 0.6);
+        }
+
+        .volume-segment.green {
+            background: linear-gradient(145deg, #00ff41, #00cc33);
+            border-color: #00ff41;
+            color: #00ff41;
+            box-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
+        }
+
+        .volume-segment.red {
+            background: linear-gradient(145deg, #ff0066, #cc0052);
+            border-color: #ff0066;
+            color: #ff0066;
+            box-shadow: 0 0 10px rgba(255, 0, 102, 0.6);
+        }
+
+        .volume-segment.lead {
+            opacity: 0.6;
+        }
+
+        .filter-indicator {
+            position: absolute;
+            top: -8px;
+            width: 2px;
+            height: 56px;
+            background: #00ff41;
+            box-shadow: 0 0 10px #00ff41;
+            transition: left 0.3s ease;
+        }
+
+        .volume-labels {
+            display: flex;
+            justify-content: space-between;
+            width: 600px;
+            margin-top: 10px;
+            font-size: 0.8em;
+            color: #00cc33;
+        }
+
+        .volume-labels span {
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .models-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .models-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            padding: 20px;
+        }
+
+        .model-card {
+            background: linear-gradient(145deg, #1a1a1a, #0d0d0d);
+            border: 2px solid #ff8c00;
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 0 20px rgba(255, 140, 0, 0.2);
+        }
+
+        .model-card:hover {
+            box-shadow: 0 0 30px rgba(255, 140, 0, 0.4);
+            transform: translateY(-2px);
+        }
+
+        .model-card.active {
+            border-color: #00ff41;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.4);
+        }
+
+        .model-card.detected {
+            animation: pulse 0.5s ease-in-out;
+            border-color: #ff0066;
+            box-shadow: 0 0 40px rgba(255, 0, 102, 0.8);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .model-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .model-controls {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .settings-cog {
+            width: 20px;
+            height: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            filter: drop-shadow(0 0 5px currentColor);
+        }
+
+        .settings-cog:hover {
+            transform: rotate(90deg);
+            filter: drop-shadow(0 0 10px currentColor);
+        }
+
+        .model-card .settings-cog {
+            color: #ff8c00;
+        }
+
+        .model-card.active .settings-cog {
+            color: #00ff41;
+        }
+
+        .model-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            text-shadow: 0 0 5px #ff8c00;
+        }
+
+        .model-card.active .model-name {
+            text-shadow: 0 0 5px #00ff41;
+        }
+
+        .model-status {
+            font-size: 0.9em;
+            padding: 5px 10px;
+            border-radius: 4px;
+            background: #1a1a1a;
+            border: 1px solid #ff8c00;
+            color: #ff8c00;
+        }
+
+        .model-status.active {
+            background: #00ff41;
+            border-color: #00ff41;
+            color: #000;
+        }
+
+        .model-sensitivity {
+            margin-top: 15px;
+        }
+
+        .model-sensitivity .slider {
+            width: 100%;
+        }
+
+        .model-sensitivity .slider-label {
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .model-sensitivity .slider-value {
+            font-size: 0.8em;
+        }
+
+        .status-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.9);
+            border-top: 2px solid #00ff41;
+            padding: 10px 20px;
+            font-size: 0.9em;
+            display: flex;
+            justify-content: space-between;
+            z-index: 3;
+        }
+
+        .status-item {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .status-indicator {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #00ff41;
+            box-shadow: 0 0 10px #00ff41;
+        }
+
+        .status-indicator.error {
+            background: #ff0066;
+            box-shadow: 0 0 10px #ff0066;
+        }
+
+        /* Glitch effect for detected models */
+        .model-card.detected .model-name {
+            animation: glitch 0.3s ease-in-out;
+            text-shadow: 0 0 5px #ff0066;
+        }
+
+        @keyframes glitch {
+            0% { transform: translate(0); }
+            20% { transform: translate(-2px, 2px); }
+            40% { transform: translate(-2px, -2px); }
+            60% { transform: translate(2px, 2px); }
+            80% { transform: translate(2px, -2px); }
+            100% { transform: translate(0); }
+        }
+
+        /* Modal/Popup styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: linear-gradient(145deg, #1a1a1a, #0d0d0d);
+            border: 2px solid #00ff41;
+            border-radius: 8px;
+            padding: 30px;
+            min-width: 400px;
+            max-width: 500px;
+            box-shadow: 0 0 30px rgba(0, 255, 65, 0.4);
+            position: relative;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #00ff41;
+            padding-bottom: 10px;
+        }
+
+        .modal-title {
+            font-size: 1.5em;
+            color: #00ff41;
+            text-shadow: 0 0 5px #00ff41;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #00ff41;
+            font-size: 1.5em;
+            cursor: pointer;
+            padding: 5px;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+        }
+
+        .modal-close:hover {
+            background: rgba(0, 255, 65, 0.2);
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
+        }
+
+        .modal-form {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .form-label {
+            font-size: 1em;
+            color: #00cc33;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .form-input {
+            background: #1a1a1a;
+            border: 2px solid #00ff41;
+            border-radius: 4px;
+            padding: 10px;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+        }
+
+        /* Style the range input in the modal to match the green theme */
+        .modal-content input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: #1a1a1a;
+            outline: none;
+            border: 2px solid #00ff41;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.3);
+        }
+
+        .modal-content input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00ff41;
+            cursor: pointer;
+            box-shadow: 0 0 15px #00ff41;
+        }
+
+        .modal-content input[type="range"]::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00ff41;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 15px #00ff41;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: 2px solid #00ff41;
+            background: transparent;
+            color: #00ff41;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn:hover {
+            background: rgba(0, 255, 65, 0.2);
+            box-shadow: 0 0 15px rgba(0, 255, 65, 0.4);
+        }
+
+        .btn-primary {
+            background: rgba(0, 255, 65, 0.2);
+        }
+
+        .btn-primary:hover {
+            background: rgba(0, 255, 65, 0.3);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .sliders-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .models-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .title {
+                font-size: 2em;
+            }
+
+            .modal-content {
+                min-width: 90%;
+                margin: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 class="title">HEY ORAC</h1>
+            <p class="subtitle">Wake Word Detection Monitor</p>
+        </div>
+
+        <div class="controls-section">
+            <div class="sliders-container">
+                <div class="slider-group">
+                    <label class="slider-label">RMS Filter</label>
+                    <input type="range" class="slider" id="rmsFilter" min="0" max="100" value="50">
+                    <span class="slider-value" id="rmsFilterValue">50</span>
+                </div>
+                
+                <div class="slider-group">
+                    <label class="slider-label">Debounce (ms)</label>
+                    <input type="range" class="slider" id="debounce" min="0" max="1000" value="200">
+                    <span class="slider-value" id="debounceValue">200ms</span>
+                </div>
+                
+                <div class="slider-group">
+                    <label class="slider-label">Cooldown (s)</label>
+                    <input type="range" class="slider" id="cooldown" min="0" max="5" step="0.1" value="1.5">
+                    <span class="slider-value" id="cooldownValue">1.5s</span>
+                </div>
+            </div>
+
+            <div class="volume-meter-container">
+                <div class="volume-meter">
+                    <div class="volume-segments" id="volumeSegments">
+                        <!-- 12 segments will be generated here -->
+                    </div>
+                    <div class="filter-indicator" id="filterIndicator"></div>
+                </div>
+                <div class="volume-labels">
+                    <span>Low</span>
+                    <span>Medium</span>
+                    <span>High</span>
+                </div>
+            </div>
+
+            <div class="models-section">
+                <h2 style="text-align: center; margin-bottom: 20px; color: #00cc33;">DETECTION MODELS</h2>
+                <div class="models-grid" id="modelsGrid">
+                    <!-- Models will be dynamically generated here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+            <div class="status-bar">
+            <div class="status-item">
+                <div class="status-indicator" id="connectionStatus"></div>
+                <span id="connectionText">Connecting...</span>
+            </div>
+            <div class="status-item">
+                <div class="status-indicator" id="audioStatus"></div>
+                <span id="audioText">Audio: Inactive</span>
+            </div>
+            <div class="status-item">
+                <span id="lastDetection">Last Detection: Never</span>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div class="modal-overlay" id="settingsModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 class="modal-title" id="modalTitle">Model Settings</h3>
+                    <button class="modal-close" id="modalClose">&times;</button>
+                </div>
+                <form class="modal-form" id="settingsForm">
+                    <div class="form-group">
+                        <label class="form-label" for="sensitivityInput">Sensitivity</label>
+                        <input type="range" class="form-input" id="sensitivityInput" 
+                               min="0" max="1" step="0.01" value="0.05">
+                        <span class="slider-value" id="sensitivityValue">0.05</span>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="apiUrlInput">API URL</label>
+                        <input type="url" class="form-input" id="apiUrlInput" 
+                               placeholder="https://api.example.com/webhook" 
+                               value="https://api.example.com/webhook">
+                    </div>
+                    <div class="modal-actions">
+                        <button type="button" class="btn" id="cancelBtn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="saveBtn">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+    <script>
+        // Sample model data - will be replaced with real data from backend
+        const sampleModels = [
+            { name: 'Hay--compUta_v_lrg', active: true, sensitivity: 0.05, apiUrl: 'https://api.example.com/webhook' },
+            { name: 'Hey_computer', active: false, sensitivity: 0.1, apiUrl: 'https://api.example.com/webhook' },
+            { name: 'hey-CompUter_lrg', active: false, sensitivity: 0.08, apiUrl: 'https://api.example.com/webhook' }
+        ];
+
+        let currentEditingModel = null;
+        let currentVolume = 0;
+        let volumeHistory = [];
+
+        // Initialize the interface
+        function initializeInterface() {
+            generateModelCards();
+            setupSliders();
+            setupVolumeMeter();
+            updateStatusBar();
+        }
+
+        // Generate model cards
+        function generateModelCards() {
+            const modelsGrid = document.getElementById('modelsGrid');
+            modelsGrid.innerHTML = '';
+
+            sampleModels.forEach(model => {
+                const modelCard = document.createElement('div');
+                modelCard.className = `model-card ${model.active ? 'active' : ''}`;
+                modelCard.dataset.modelName = model.name;
+
+                modelCard.innerHTML = `
+                    <div class="model-header">
+                        <span class="model-name">${model.name}</span>
+                        <div class="model-controls">
+                            <span class="model-status ${model.active ? 'active' : ''}">${model.active ? 'ACTIVE' : 'INACTIVE'}</span>
+                            <svg class="settings-cog" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.22,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.22,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.68 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+                            </svg>
+                        </div>
+                    </div>
+                `;
+
+                // Add click handler for card (but not settings cog)
+                modelCard.addEventListener('click', (e) => {
+                    if (!e.target.closest('.settings-cog')) {
+                        toggleModel(model.name);
+                    }
+                });
+                
+                // Add settings cog click handler
+                const settingsCog = modelCard.querySelector('.settings-cog');
+                settingsCog.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    openSettingsModal(model.name);
+                });
+                
+
+
+                modelsGrid.appendChild(modelCard);
+            });
+        }
+
+        // Toggle model active state
+        function toggleModel(modelName) {
+            sampleModels.forEach(model => {
+                if (model.name === modelName) {
+                    model.active = !model.active;
+                } else {
+                    model.active = false; // Only one active at a time
+                }
+            });
+            
+            // Update UI
+            document.querySelectorAll('.model-card').forEach(card => {
+                const cardModelName = card.dataset.modelName;
+                const model = sampleModels.find(m => m.name === cardModelName);
+                card.classList.toggle('active', model.active);
+                card.querySelector('.model-status').textContent = model.active ? 'ACTIVE' : 'INACTIVE';
+                card.querySelector('.model-status').classList.toggle('active', model.active);
+            });
+        }
+
+        // Update model sensitivity
+        function updateModelSensitivity(modelName, sensitivity) {
+            const model = sampleModels.find(m => m.name === modelName);
+            if (model) {
+                model.sensitivity = parseFloat(sensitivity);
+            }
+        }
+
+        // Setup global sliders
+        function setupSliders() {
+            const sliders = [
+                { id: 'rmsFilter', valueId: 'rmsFilterValue', format: (v) => v },
+                { id: 'debounce', valueId: 'debounceValue', format: (v) => v + 'ms' },
+                { id: 'cooldown', valueId: 'cooldownValue', format: (v) => v + 's' }
+            ];
+
+            sliders.forEach(slider => {
+                const sliderElement = document.getElementById(slider.id);
+                const valueElement = document.getElementById(slider.valueId);
+                
+                sliderElement.addEventListener('input', (e) => {
+                    valueElement.textContent = slider.format(e.target.value);
+                    
+                    // Update filter indicator when RMS filter changes
+                    if (slider.id === 'rmsFilter') {
+                        updateFilterIndicator();
+                    }
+                });
+            });
+        }
+
+        // Update status bar
+        function updateStatusBar() {
+            // Simulate status updates
+            setTimeout(() => {
+                document.getElementById('connectionStatus').classList.remove('error');
+                document.getElementById('connectionText').textContent = 'Connected';
+                
+                document.getElementById('audioStatus').classList.remove('error');
+                document.getElementById('audioText').textContent = 'Audio: Active';
+            }, 1000);
+        }
+
+        // Simulate detection event
+        function simulateDetection(modelName) {
+            const modelCard = document.querySelector(`[data-model-name="${modelName}"]`);
+            if (modelCard) {
+                modelCard.classList.add('detected');
+                setTimeout(() => {
+                    modelCard.classList.remove('detected');
+                }, 500);
+            }
+        }
+
+        // Modal functions
+        function openSettingsModal(modelName) {
+            currentEditingModel = modelName;
+            const model = sampleModels.find(m => m.name === modelName);
+            
+            document.getElementById('modalTitle').textContent = `${modelName} Settings`;
+            document.getElementById('sensitivityInput').value = model.sensitivity;
+            document.getElementById('sensitivityValue').textContent = model.sensitivity;
+            document.getElementById('apiUrlInput').value = model.apiUrl;
+            
+            document.getElementById('settingsModal').classList.add('active');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('active');
+            currentEditingModel = null;
+        }
+
+        function saveModelSettings() {
+            if (!currentEditingModel) return;
+            
+            const model = sampleModels.find(m => m.name === currentEditingModel);
+            if (model) {
+                model.sensitivity = parseFloat(document.getElementById('sensitivityInput').value);
+                model.apiUrl = document.getElementById('apiUrlInput').value;
+            }
+            
+            closeSettingsModal();
+        }
+
+        // Setup modal event listeners
+        function setupModalListeners() {
+            document.getElementById('modalClose').addEventListener('click', closeSettingsModal);
+            document.getElementById('cancelBtn').addEventListener('click', closeSettingsModal);
+            document.getElementById('settingsForm').addEventListener('submit', (e) => {
+                e.preventDefault();
+                saveModelSettings();
+            });
+            
+            // Close modal when clicking overlay
+            document.getElementById('settingsModal').addEventListener('click', (e) => {
+                if (e.target.id === 'settingsModal') {
+                    closeSettingsModal();
+                }
+            });
+            
+            // Sensitivity slider in modal
+            document.getElementById('sensitivityInput').addEventListener('input', (e) => {
+                document.getElementById('sensitivityValue').textContent = e.target.value;
+            });
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeInterface();
+            setupModalListeners();
+        });
+
+        // Volume meter functions
+        function setupVolumeMeter() {
+            generateVolumeSegments();
+            updateFilterIndicator();
+            startVolumeSimulation();
+        }
+
+        function generateVolumeSegments() {
+            const segmentsContainer = document.getElementById('volumeSegments');
+            segmentsContainer.innerHTML = '';
+            
+            for (let i = 0; i < 12; i++) {
+                const segment = document.createElement('div');
+                segment.className = 'volume-segment';
+                segment.dataset.index = i;
+                segmentsContainer.appendChild(segment);
+            }
+        }
+
+        function updateVolumeMeter(volume) {
+            currentVolume = volume;
+            volumeHistory.push(volume);
+            if (volumeHistory.length > 10) {
+                volumeHistory.shift();
+            }
+
+            const segments = document.querySelectorAll('.volume-segment');
+            const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
+            const filterThreshold = rmsFilterValue / 100; // Convert to 0-1 range
+            
+            // Calculate how many segments should be active based on volume
+            const activeSegments = Math.floor(volume * 12);
+            
+            segments.forEach((segment, index) => {
+                segment.classList.remove('active', 'amber', 'green', 'red', 'lead');
+                
+                if (index < activeSegments) {
+                    segment.classList.add('active');
+                    
+                    // Determine color based on position and filter threshold
+                    const segmentPosition = index / 12;
+                    
+                    if (segmentPosition < filterThreshold) {
+                        segment.classList.add('amber');
+                    } else if (segmentPosition < 0.8) {
+                        segment.classList.add('green');
+                    } else {
+                        segment.classList.add('red');
+                    }
+                    
+                    // Make the last active segment (the "lead" segment) transparent
+                    if (index === activeSegments - 1) {
+                        segment.classList.add('lead');
+                    }
+                }
+            });
+        }
+
+        function updateFilterIndicator() {
+            const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
+            const filterPosition = (rmsFilterValue / 100) * 600; // 600px is meter width
+            const indicator = document.getElementById('filterIndicator');
+            indicator.style.left = `${filterPosition}px`;
+        }
+
+        function startVolumeSimulation() {
+            let currentTargetVolume = 0;
+            let currentSmoothVolume = 0;
+            
+            setInterval(() => {
+                // Generate volume more likely to be in the 3-5 segment range (0.25-0.42)
+                const baseVolume = Math.random() * 0.15; // Lower base noise
+                const speechSpike = Math.random() < 0.2 ? Math.random() * 0.4 : 0; // More frequent, smaller spikes
+                
+                // Add bias toward 3-5 range (0.25-0.42)
+                const bias = Math.random() < 0.6 ? 0.3 : 0; // 60% chance of bias toward middle
+                const targetVolume = Math.min(1, baseVolume + speechSpike + bias);
+                
+                // Smooth transition to target volume
+                currentTargetVolume = targetVolume;
+                currentSmoothVolume += (currentTargetVolume - currentSmoothVolume) * 0.3; // Smoothing factor
+                
+                updateVolumeMeter(currentSmoothVolume);
+            }, 150); // Slightly slower updates (6-7 FPS instead of 10 FPS)
+        }
+
+        // Demo: Simulate detections every few seconds
+        setInterval(() => {
+            const activeModel = sampleModels.find(m => m.active);
+            if (activeModel && Math.random() < 0.3) {
+                simulateDetection(activeModel.name);
+                document.getElementById('lastDetection').textContent = 
+                    `Last Detection: ${new Date().toLocaleTimeString()}`;
+            }
+        }, 3000);
+    </script>
+</body>
+</html> 
