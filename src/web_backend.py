@@ -163,11 +163,11 @@ def get_detections():
             # If file is corrupted, return empty list
             detections = []
     
-    # Return detections from the last 10 seconds
+    # Return detections from the last 60 seconds (increased from 10s)
     current_time = time.time()
     recent_detections = [
         detection for detection in detections 
-        if current_time - detection['timestamp'] < 10
+        if current_time - detection['timestamp'] < 60
     ]
     
     return jsonify(recent_detections)

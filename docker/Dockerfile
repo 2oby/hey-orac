@@ -58,6 +58,9 @@ RUN /app/venv/bin/pip uninstall -y pyaudio || true \
 # Change ownership of virtual environment to appuser
 RUN chown -R appuser:appuser /app/venv
 
+# Create logs directory with proper ownership (as root before switching to appuser)
+RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs && chmod 755 /app/logs
+
 # Switch to non-root user after setup
 USER appuser
 
@@ -73,9 +76,6 @@ COPY --chown=appuser:appuser src/config.yaml ./config.yaml
 
 # Copy ALSA configuration for USB microphone
 COPY --chown=appuser:appuser .asoundrc /home/appuser/.asoundrc
-
-# Create logs directory with proper ownership
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
 
 # Expose port for web interface
 EXPOSE 7171

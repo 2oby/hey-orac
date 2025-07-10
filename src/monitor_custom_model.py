@@ -68,6 +68,11 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     detection_debounce_chunks = int((wake_detector.get_sample_rate() * 0.2) / wake_detector.get_frame_length())  # 0.2s debounce in chunks
     last_detection_chunk = -detection_debounce_chunks  # Initialize to negative so first detection can get through
     
+    # Volume filtering for efficiency
+    silence_threshold = 0.1  # RMS threshold for silence detection
+    volume_window_size = 10  # Number of chunks to average for volume calculation
+    volume_history = []
+    
     # Start continuous audio stream
     logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
     logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
@@ -114,6 +119,19 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                 # Update RMS monitor for web interface (every chunk)
                 rms_level = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
                 rms_monitor.update_rms(rms_level)
+                
+                # Volume filtering - skip silent audio
+                volume_history.append(rms_level)
+                if len(volume_history) > volume_window_size:
+                    volume_history.pop(0)
+                
+                avg_volume = np.mean(volume_history) if volume_history else 0
+                
+                # Skip processing if audio is too quiet
+                if avg_volume < silence_threshold:
+                    if chunk_count % 100 == 0:  # Log every 100 chunks to avoid spam
+                        logger.debug(f"🔇 Skipping silent audio: avg_volume={avg_volume:.3f} < threshold={silence_threshold}")
+                    continue
                 
                 # Add to audio buffer
                 audio_buffer.add_audio(audio_data)
