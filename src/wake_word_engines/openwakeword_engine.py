@@ -39,7 +39,12 @@ class OpenWakeWordEngine(WakeWordEngine):
         """
         try:
             keyword = config.get('keyword', 'hey_jarvis')
-            self.threshold = config.get('threshold', 0.5)
+            
+            # Convert sensitivity to threshold (they are opposites)
+            # Low sensitivity = High threshold = Fewer detections
+            # High sensitivity = Low threshold = More detections
+            sensitivity = config.get('sensitivity', 0.5)
+            self.threshold = 1.0 - sensitivity  # Convert sensitivity to threshold
             
             # Check if custom model is specified
             custom_model_path = config.get('custom_model_path')

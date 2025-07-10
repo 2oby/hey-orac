@@ -825,10 +825,10 @@
                 </div>
                 <form class="modal-form" id="settingsForm">
                     <div class="form-group">
-                        <label class="form-label" for="sensitivityInput">Sensitivity</label>
+                        <label class="form-label" for="sensitivityInput">Threshold</label>
                         <input type="range" class="form-input" id="sensitivityInput" 
                                min="0.00001" max="1.00000" step="0.00050" value="0.05">
-                        <span class="slider-value" id="sensitivityValue">0.05</span>
+                        <span class="slider-value" id="sensitivityValue">0.95</span>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="apiUrlInput">API URL</label>
@@ -1123,8 +1123,11 @@
             const model = sampleModels.find(m => m.name === modelName);
             
             document.getElementById('modalTitle').textContent = `${modelName} Settings`;
-            document.getElementById('sensitivityInput').value = model.sensitivity;
-            document.getElementById('sensitivityValue').textContent = model.sensitivity;
+            
+            // Convert sensitivity to threshold for display
+            const threshold = 1.0 - model.sensitivity;
+            document.getElementById('sensitivityInput').value = threshold;
+            document.getElementById('sensitivityValue').textContent = threshold.toFixed(5);
             document.getElementById('apiUrlInput').value = model.apiUrl;
             
             document.getElementById('settingsModal').classList.add('active');
@@ -1140,7 +1143,10 @@
             
             const model = sampleModels.find(m => m.name === currentEditingModel);
             if (model) {
-                model.sensitivity = parseFloat(document.getElementById('sensitivityInput').value);
+                // Convert threshold back to sensitivity for backend
+                const threshold = parseFloat(document.getElementById('sensitivityInput').value);
+                const sensitivity = 1.0 - threshold;
+                model.sensitivity = sensitivity;
                 model.apiUrl = document.getElementById('apiUrlInput').value;
                 
                 // Save to API
@@ -1171,7 +1177,7 @@
             
             // Sensitivity slider in modal
             document.getElementById('sensitivityInput').addEventListener('input', (e) => {
-                document.getElementById('sensitivityValue').textContent = e.target.value;
+                document.getElementById('sensitivityValue').textContent = parseFloat(e.target.value).toFixed(5);
             });
             
             // API URL input in modal
