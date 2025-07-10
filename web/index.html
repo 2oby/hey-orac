@@ -412,6 +412,22 @@
             animation: pulse 0.5s ease-in-out;
             border-color: #ff0066;
             box-shadow: 0 0 40px rgba(255, 0, 102, 0.8);
+            background: linear-gradient(145deg, #330000, #1a0000);
+        }
+
+        .model-card.detected .model-name {
+            color: #ff0066 !important;
+            text-shadow: 0 0 5px #ff0066 !important;
+        }
+
+        .model-card.detected .model-status {
+            background: #ff0066 !important;
+            border-color: #ff0066 !important;
+            color: #000 !important;
+        }
+
+        .model-card.detected .settings-cog {
+            color: #ff0066 !important;
         }
 
         @keyframes pulse {
@@ -1227,10 +1243,10 @@
             const segments = document.querySelectorAll('.volume-segment');
             const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
             
-            // Convert filter to enhanced logarithmic scale to match volume meter
-            // For slider range 0-100, use: log(1 + filter/5) / log(1 + 200/5)
-            // This ensures slider at 100 maps to full meter width with enhanced low-end sensitivity
-            const filterThreshold = Math.log(1 + rmsFilterValue / 5) / Math.log(1 + 200 / 5);
+            // Convert filter to match volume meter scaling exactly
+            // Map slider value 0-100 to RMS range 0-1000, then apply same scaling as volume meter
+            const scaledRms = (rmsFilterValue / 100) * 1000; // Convert slider 0-100 to RMS 0-1000
+            const filterThreshold = Math.log(1 + scaledRms / 5) / Math.log(1 + 200);
             
             // Calculate how many segments should be active based on volume
             const activeSegments = Math.floor(volume * 12);
@@ -1263,10 +1279,12 @@
         function updateFilterIndicator() {
             const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
             
-            // Convert filter to enhanced logarithmic scale for visual indicator
-            // For slider range 0-100, use: log(1 + filter/5) / log(1 + 200/5)
-            // This ensures slider at 100 maps to full meter width with enhanced low-end sensitivity
-            const logFilterValue = Math.log(1 + rmsFilterValue / 5) / Math.log(1 + 200 / 5);
+            // Convert filter to match volume meter scaling exactly
+            // Volume meter uses: log(1 + rms/5) / log(1 + 200) for RMS 0-1000
+            // Filter slider is 0-100, so we need to scale it to match RMS range
+            // Map slider value 0-100 to RMS range 0-1000, then apply same scaling
+            const scaledRms = (rmsFilterValue / 100) * 1000; // Convert slider 0-100 to RMS 0-1000
+            const logFilterValue = Math.log(1 + scaledRms / 5) / Math.log(1 + 200);
             const filterPosition = logFilterValue * 600; // 600px is meter width
             const indicator = document.getElementById('filterIndicator');
             indicator.style.left = `${filterPosition}px`;
