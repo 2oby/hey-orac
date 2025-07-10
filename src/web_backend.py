@@ -146,7 +146,7 @@ def set_custom_model(model_name):
 
 @app.route('/api/detections', methods=['GET'])
 def get_detections():
-    """Get recent wake word detections"""
+    """Get recent wake word detections (ephemeral - clears file after reading)"""
     import json
     import time
     import os
@@ -159,18 +159,19 @@ def get_detections():
         try:
             with open(detection_file, 'r') as f:
                 detections = json.load(f)
+            # Clear the file after reading (ephemeral behavior)
+            os.remove(detection_file)
         except Exception as e:
-            # If file is corrupted, return empty list
+            # If file is corrupted, return empty list and try to remove the file
             detections = []
+            try:
+                if os.path.exists(detection_file):
+                    os.remove(detection_file)
+            except Exception:
+                pass
     
-    # Return detections from the last 5 minutes (300 seconds)
-    current_time = time.time()
-    recent_detections = [
-        detection for detection in detections 
-        if current_time - detection['timestamp'] < 300
-    ]
-    
-    return jsonify(recent_detections)
+    # Return all detections (no time filtering since file is cleared after reading)
+    return jsonify(detections)
 
 if __name__ == '__main__':
     # Run in production mode for service deployment
