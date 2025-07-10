@@ -134,6 +134,14 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                     except Exception as e:
                         logger.debug(f"⚠️ Could not get detailed confidence scores: {e}")
                 
+                # Log confidence scores periodically
+                if chunk_count % 50 == 0:
+                    confidence = wake_detector.engine.get_latest_confidence()
+                    audio_rms = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
+                    audio_max = np.max(np.abs(audio_data))
+                    logger.info(f"🔍 Custom Model Confidence #{chunk_count//50}: {wake_detector.get_wake_word_name()} = {confidence:.6f}")
+                    logger.info(f"📊 Audio levels - RMS: {audio_rms:.4f}, Max: {audio_max}")
+                
                 # Check if we're in cooldown period
                 current_time = time.time()
                 time_since_last_detection = current_time - last_detection_time
