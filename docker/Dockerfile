@@ -92,5 +92,8 @@ ENV ALSA_PCM_DEVICE=0
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD /app/venv/bin/python -c "import sys; sys.exit(0)" || exit 1
 
-# Default command - run the Flask web backend
-CMD ["/app/venv/bin/python", "src/web_backend.py"] 
+# Make startup script executable
+RUN chmod +x src/startup.sh
+
+# Default command - run the startup script for Option 3: Web Backend as a Service
+CMD ["src/startup.sh"] 

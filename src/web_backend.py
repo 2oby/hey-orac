@@ -70,4 +70,5 @@ def discover_models():
     })
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=7171, debug=True) 
+    # Run in production mode for service deployment
+    app.run(host='0.0.0.0', port=7171, debug=False, threaded=True) 
