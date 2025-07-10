@@ -1175,8 +1175,9 @@
             const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
             
             // Convert filter to logarithmic scale to match volume meter
-            // Use the same logarithmic formula: log(1 + filter/10) / log(1 + 100)
-            const filterThreshold = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 100);
+            // For slider range 0-100, use: log(1 + filter/10) / log(1 + 100/10)
+            // This ensures slider at 100 maps to full meter width
+            const filterThreshold = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 100 / 10);
             
             // Calculate how many segments should be active based on volume
             const activeSegments = Math.floor(volume * 12);
@@ -1210,8 +1211,9 @@
             const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
             
             // Convert filter to logarithmic scale for visual indicator
-            // Use the same logarithmic formula: log(1 + filter/10) / log(1 + 100)
-            const logFilterValue = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 100);
+            // For slider range 0-100, use: log(1 + filter/10) / log(1 + 100/10)
+            // This ensures slider at 100 maps to full meter width
+            const logFilterValue = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 100 / 10);
             const filterPosition = logFilterValue * 600; // 600px is meter width
             const indicator = document.getElementById('filterIndicator');
             indicator.style.left = `${filterPosition}px`;
