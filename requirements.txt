@@ -22,3 +22,5 @@ colorlog==6.7.0
 # Testing (needed for container testing)
 pytest==7.4.0
 pytest-asyncio==0.21.1 
+
+pyyaml 
