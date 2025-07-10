@@ -261,7 +261,7 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                             
                             logger.info(f"🌐 Detection recorded to file: {wake_detector.get_wake_word_name()}")
                         except Exception as e:
-                            logger.debug(f"⚠️ Could not record detection to file: {e}")
+                            logger.warning(f"⚠️ Could not record detection to file: {e}")
                         
                         # Start post-roll capture
                         logger.info("📦 Starting post-roll capture...")
