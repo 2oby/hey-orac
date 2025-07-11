@@ -65,7 +65,17 @@ class SettingsManager:
                 "threshold": 0.4,
                 "model": "Hay--compUta_v_lrg",
                 "cooldown": 1.5,
-                "debounce": 0.2
+                "debounce": 0.2,
+                "sensitivities": {
+                    "Hay--compUta_v_lrg": 0.4,
+                    "Hey_computer": 0.4,
+                    "hey-CompUter_lrg": 0.4
+                },
+                "api_urls": {
+                    "Hay--compUta_v_lrg": "https://api.example.com/webhook",
+                    "Hey_computer": "https://api.example.com/webhook", 
+                    "hey-CompUter_lrg": "https://api.example.com/webhook"
+                }
             },
             "detection": {
                 "rms_filter": 50,
@@ -309,6 +319,26 @@ class SettingsManager:
                 return self._save_settings()
         except Exception as e:
             logger.error(f"❌ Failed to set model sensitivity for {model_name}: {e}")
+            return False
+
+    def get_model_api_url(self, model_name: str, default: str = "https://api.example.com/webhook") -> str:
+        """Get API URL for a specific model."""
+        with self._lock:
+            api_urls = self._settings.get("wake_word", {}).get("api_urls", {})
+            return api_urls.get(model_name, default)
+
+    def set_model_api_url(self, model_name: str, value: str) -> bool:
+        """Set API URL for a specific model."""
+        try:
+            with self._lock:
+                if "wake_word" not in self._settings:
+                    self._settings["wake_word"] = {}
+                if "api_urls" not in self._settings["wake_word"]:
+                    self._settings["wake_word"]["api_urls"] = {}
+                self._settings["wake_word"]["api_urls"][model_name] = value
+                return self._save_settings()
+        except Exception as e:
+            logger.error(f"❌ Failed to set model API URL for {model_name}: {e}")
             return False
 
 # Global settings manager instance

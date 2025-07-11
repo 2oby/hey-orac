@@ -47,6 +47,7 @@ def get_config():
     """Get full configuration for web interface"""
     # Return the structure expected by the web interface
     sensitivities = settings_manager.get("wake_word.sensitivities", {})
+    api_urls = settings_manager.get("wake_word.api_urls", {})
     return jsonify({
         "global": {
             "rms_filter": settings_manager.get("detection.rms_filter", 50),
@@ -56,15 +57,15 @@ def get_config():
         "models": {
             "Hay--compUta_v_lrg": {
                 "sensitivity": sensitivities.get("Hay--compUta_v_lrg", 0.4),
-                "api_url": "https://api.example.com/webhook"
+                "api_url": api_urls.get("Hay--compUta_v_lrg", "https://api.example.com/webhook")
             },
             "Hey_computer": {
                 "sensitivity": sensitivities.get("Hey_computer", 0.4),
-                "api_url": "https://api.example.com/webhook"
+                "api_url": api_urls.get("Hey_computer", "https://api.example.com/webhook")
             },
             "hey-CompUter_lrg": {
                 "sensitivity": sensitivities.get("hey-CompUter_lrg", 0.4),
-                "api_url": "https://api.example.com/webhook"
+                "api_url": api_urls.get("hey-CompUter_lrg", "https://api.example.com/webhook")
             }
         }
     })
@@ -119,20 +120,24 @@ def get_models():
 
 @app.route('/api/config/models/<model_name>', methods=['GET'])
 def get_model_config(model_name):
-    """Get specific model settings (per-model sensitivity)"""
+    """Get specific model settings (per-model sensitivity and API URL)"""
     sensitivity = settings_manager.get_model_sensitivity(model_name, 0.4)
+    api_url = settings_manager.get_model_api_url(model_name, "https://api.example.com/webhook")
     return jsonify({
         "sensitivity": sensitivity,
+        "api_url": api_url,
         "model": model_name
     })
 
 @app.route('/api/config/models/<model_name>', methods=['POST'])
 def set_model_config(model_name):
-    """Update specific model settings (per-model sensitivity)"""
+    """Update specific model settings (per-model sensitivity and API URL)"""
     try:
         settings = request.json
         if "sensitivity" in settings:
             settings_manager.set_model_sensitivity(model_name, settings["sensitivity"])
+        if "api_url" in settings:
+            settings_manager.set_model_api_url(model_name, settings["api_url"])
         # Optionally update model selection
         if settings.get("activate", False):
             settings_manager.set("wake_word.model", model_name)
