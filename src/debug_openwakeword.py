@@ -296,7 +296,7 @@ def test_config_loading():
         logger.info("✅ Configuration loaded successfully")
         logger.info(f"   Wake word engine: {config['wake_word']['engine']}")
         logger.info(f"   Keyword: {config['wake_word']['keyword']}")
-        logger.info(f"   Threshold: {config['wake_word']['threshold']}")
+        logger.info(f"   Sensitivity: {config['wake_word'].get('sensitivity', 'Not set')}")
         logger.info(f"   Custom model path: {config['wake_word'].get('custom_model_path', 'None')}")
         
         return True

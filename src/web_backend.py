@@ -111,7 +111,6 @@ def get_models():
     # For now, return wake word settings
     return jsonify({
         "wake_word": {
-            "threshold": settings_manager.get("wake_word.threshold"),
             "model": settings_manager.get("wake_word.model"),
             "cooldown": settings_manager.get("wake_word.cooldown"),
             "debounce": settings_manager.get("wake_word.debounce")

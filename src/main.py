@@ -153,10 +153,10 @@ def test_openwakeword_integration(wake_detector, config: dict) -> bool:
         
         logger.info(f"✅ Sine wave test completed - detections: {sum(sine_results)}/5")
         
-        # Test 5: Verify threshold behavior
-        logger.info("🔍 Testing threshold behavior...")
-        threshold = config['wake_word'].get('threshold', 0.1)
-        logger.info(f"   Current threshold: {threshold}")
+        # Test 5: Verify sensitivity behavior
+        logger.info("🔍 Testing sensitivity behavior...")
+        sensitivity = config['wake_word'].get('sensitivity', 0.5)
+        logger.info(f"   Current sensitivity: {sensitivity}")
         logger.info(f"   Silence detections: {sum(silence_confidences)}/10")
         logger.info(f"   Noise detections: {sum(noise_results)}/5")
         logger.info(f"   Sine wave detections: {sum(sine_results)}/5")

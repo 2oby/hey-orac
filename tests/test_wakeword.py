@@ -35,7 +35,7 @@ class TestConfiguration:
         
         # Check wake-word settings
         assert config["wake_word"]["keyword"] == "alexa"  # Using OpenWakeWord alexa model
-        assert 0.0 <= config["wake_word"]["threshold"] <= 1.0  # OpenWakeWord uses threshold, not sensitivity
+        assert 0.0 <= config["wake_word"]["sensitivity"] <= 1.0  # OpenWakeWord uses sensitivity
 
 
 class TestAudioBuffer:

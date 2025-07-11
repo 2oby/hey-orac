@@ -62,14 +62,13 @@ class SettingsManager:
                 "device_index": 0
             },
             "wake_word": {
-                "threshold": 0.4,
                 "model": "Hay--compUta_v_lrg",
                 "cooldown": 1.5,
                 "debounce": 0.2,
                 "sensitivities": {
-                    "Hay--compUta_v_lrg": 0.4,
-                    "Hey_computer": 0.4,
-                    "hey-CompUter_lrg": 0.4
+                    "Hay--compUta_v_lrg": 0.95,
+                    "Hey_computer": 0.95,
+                    "hey-CompUter_lrg": 0.95
                 },
                 "api_urls": {
                     "Hay--compUta_v_lrg": "https://api.example.com/webhook",

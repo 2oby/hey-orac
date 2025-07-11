@@ -9,12 +9,11 @@ audio:
 wake_word:
   engine: "openwakeword"         # Engine to use: "porcupine", "openwakeword", "snowboy", "pocketsphinx", "test"
   model_path: /app/models/porcupine/orac.ppn
-  sensitivity: 0.6               # Detection sensitivity (0.0-1.0) - for Porcupine
+  sensitivity: 0.95              # Detection sensitivity (0.0-1.0) - high sensitivity for low threshold
   keyword: "hey_jarvis"          # Wake-word to detect (using pre-trained OpenWakeWord models)
   access_key: ""                 # Picovoice access key (get from console.picovoice.ai)
   
   # OpenWakeWord settings (only used when engine="openwakeword")
-  threshold: 0.001               # Detection threshold (0.0-1.0) - very low for testing
   custom_model_path: "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx"  # Custom "Hey Computer" model
   
   # Test engine settings (only used when engine="test")
@@ -59,10 +58,10 @@ global:
 models:
   Hay--compUta_v_lrg:
     api_url: https://api.example.com/webhook
-    sensitivity: 0.05
+    sensitivity: 0.95
   Hey_computer:
     api_url: https://api.example.com/webhook
-    sensitivity: 0.05
+    sensitivity: 0.95
   hey-CompUter_lrg:
     api_url: https://api.example.com/webhook
-    sensitivity: 0.05 
+    sensitivity: 0.95 
