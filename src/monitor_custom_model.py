@@ -110,6 +110,17 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
         rms_filter_value = new_settings.get('detection', {}).get('rms_filter', 50)
         silence_threshold = (rms_filter_value / 100.0) * 0.99 + 0.01
         
+        # Check if sensitivity changed for the current model
+        current_model = new_settings.get('wake_word', {}).get('model', 'Hay--compUta_v_lrg')
+        sensitivities = new_settings.get('wake_word', {}).get('sensitivities', {})
+        if current_model in sensitivities:
+            new_sensitivity = sensitivities[current_model]
+            logger.info(f"🔄 Sensitivity changed for active model {current_model}: {new_sensitivity:.6f}")
+            if wake_detector.update_sensitivity(new_sensitivity):
+                logger.info(f"✅ Sensitivity updated to {new_sensitivity:.6f}")
+            else:
+                logger.warning(f"⚠️ Failed to update sensitivity to {new_sensitivity:.6f}")
+        
         logger.info(f"🔄 Settings updated - Cooldown: {detection_cooldown_seconds}s, Debounce: {debounce_seconds}s, RMS Filter: {rms_filter_value}")
     
     # Register settings watcher

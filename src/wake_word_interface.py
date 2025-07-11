@@ -63,6 +63,19 @@ class WakeWordEngine(ABC):
     def cleanup(self) -> None:
         """Clean up resources used by the engine."""
         pass
+    
+    @abstractmethod
+    def update_sensitivity(self, new_sensitivity: float) -> bool:
+        """
+        Update the sensitivity dynamically without reinitializing the model.
+        
+        Args:
+            new_sensitivity: New sensitivity value (0.0-1.0)
+            
+        Returns:
+            bool: True if update successful, False otherwise
+        """
+        pass
 
 class WakeWordDetector:
     """Main wake-word detector that uses pluggable engines."""
@@ -169,6 +182,26 @@ class WakeWordDetector:
     def is_ready(self) -> bool:
         """Check if the detector is ready."""
         return self.is_initialized and self.engine and self.engine.is_ready()
+    
+    def update_sensitivity(self, new_sensitivity: float) -> bool:
+        """
+        Update the sensitivity dynamically without reinitializing the model.
+        
+        Args:
+            new_sensitivity: New sensitivity value (0.0-1.0)
+            
+        Returns:
+            bool: True if update successful, False otherwise
+        """
+        if not self.is_ready():
+            logger.warning("Wake-word detector not ready")
+            return False
+        
+        try:
+            return self.engine.update_sensitivity(new_sensitivity)
+        except Exception as e:
+            logger.error(f"Error updating sensitivity: {e}")
+            return False
     
     def cleanup(self) -> None:
         """Clean up resources."""

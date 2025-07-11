@@ -96,6 +96,26 @@ class TestEngine(WakeWordEngine):
         """Check if the engine is ready."""
         return self.is_initialized
     
+    def update_sensitivity(self, new_sensitivity: float) -> bool:
+        """
+        Update the sensitivity dynamically without reinitializing the model.
+        
+        Args:
+            new_sensitivity: New sensitivity value (0.0-1.0)
+            
+        Returns:
+            bool: True if update successful, False otherwise
+        """
+        try:
+            old_sensitivity = self.sensitivity
+            self.sensitivity = new_sensitivity
+            self.threshold = 1.0 - self.sensitivity
+            logger.info(f"🔧 Test engine sensitivity updated: {old_sensitivity:.6f} → {self.sensitivity:.6f}")
+            return True
+        except Exception as e:
+            logger.error(f"❌ Failed to update test engine sensitivity: {e}")
+            return False
+    
     def cleanup(self) -> None:
         """Clean up test engine resources (none needed)."""
         pass 

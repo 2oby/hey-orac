@@ -269,6 +269,37 @@ class OpenWakeWordEngine(WakeWordEngine):
         """Check if the engine is ready to process audio."""
         return self.is_initialized and self.model is not None
     
+    def update_sensitivity(self, new_sensitivity: float) -> bool:
+        """
+        Update the sensitivity dynamically without reinitializing the model.
+        
+        Args:
+            new_sensitivity: New sensitivity value (0.0-1.0)
+            
+        Returns:
+            bool: True if update successful, False otherwise
+        """
+        try:
+            if not self.is_initialized:
+                logger.warning("⚠️ Cannot update sensitivity - engine not initialized")
+                return False
+            
+            old_sensitivity = self.sensitivity
+            old_threshold = self.threshold
+            
+            # Update sensitivity and recalculate threshold
+            self.sensitivity = new_sensitivity
+            self.threshold = 0.8 - (self.sensitivity * 0.7)
+            
+            logger.info(f"🔧 Sensitivity updated: {old_sensitivity:.6f} → {self.sensitivity:.6f}")
+            logger.info(f"🔧 Threshold updated: {old_threshold:.6f} → {self.threshold:.6f}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update sensitivity: {e}")
+            return False
+    
     def cleanup(self) -> None:
         """Clean up resources."""
         self.model = None
