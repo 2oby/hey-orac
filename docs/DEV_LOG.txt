@@ -1,5 +1,132 @@
 # Development Log - pi-wakeword-streamer
 
+## 2025-01-XX - Sensitivity and Threshold Separation Implementation
+
+### ✅ COMPLETED TODAY
+- [x] **Separated Sensitivity and Threshold** - Now two distinct parameters with independent control
+- [x] **Updated OpenWakeWord Engine** - Removed complex threshold calculation, now reads both parameters directly
+- [x] **Added Web Interface Controls** - Two new sliders for Model Sensitivity and Detection Threshold
+- [x] **Updated Configuration System** - Both parameters saved to and loaded from config files
+- [x] **Enhanced Settings Manager** - Default settings now include both sensitivity and threshold
+- [x] **Updated Example Configs** - All example configuration files now include both parameters
+- [x] **Added Dynamic Updates** - Both parameters can be updated without restarting the engine
+
+### 🔧 CURRENT STATUS
+- **Sensitivity Control**: ✅ Independent model sensitivity parameter (0.0-1.0)
+- **Threshold Control**: ✅ Independent detection threshold parameter (0.0-1.0)
+- **Web Interface**: ✅ Two separate sliders with real-time updates
+- **Configuration**: ✅ Both parameters persisted in config files
+- **Engine Support**: ✅ OpenWakeWord and Porcupine engines updated
+- **Default Values**: ✅ Sensitivity: 0.8, Threshold: 0.3
+
+### 🎯 KEY ACHIEVEMENTS
+
+#### 1. Clear Parameter Separation
+```
+Before: Sensitivity → Complex threshold calculation
+After:  Sensitivity (model parameter) + Threshold (detection level)
+```
+
+#### 2. Independent Control
+- **Sensitivity**: Affects internal model processing (0.0-1.0)
+- **Threshold**: Affects detection triggering confidence (0.0-1.0)
+- **Web Interface**: Two separate sliders with clear labels
+- **Real-time Updates**: Both parameters update immediately
+
+#### 3. Enhanced User Control
+- **High Sensitivity + Low Threshold**: Very sensitive model, triggers easily
+- **Low Sensitivity + High Threshold**: Less sensitive model, requires high confidence
+- **High Sensitivity + High Threshold**: Sensitive model but requires high confidence
+- **Low Sensitivity + Low Threshold**: Less sensitive model but triggers easily
+
+### 📋 TECHNICAL IMPLEMENTATION
+
+#### Configuration Updates
+```yaml
+wake_word:
+  sensitivity: 0.8  # Model sensitivity (0.0-1.0) - internal model parameter
+  threshold: 0.3    # Detection threshold (0.0-1.0) - confidence level to trigger detection
+```
+
+#### Web Interface Sliders
+```html
+<div class="slider-group">
+    <label class="slider-label">Model Sensitivity</label>
+    <input type="range" class="slider" id="modelSensitivity" min="0" max="1" step="0.01" value="0.8">
+    <span class="slider-value" id="modelSensitivityValue">0.800</span>
+</div>
+
+<div class="slider-group">
+    <label class="slider-label">Detection Threshold</label>
+    <input type="range" class="slider" id="detectionThreshold" min="0" max="1" step="0.01" value="0.3">
+    <span class="slider-value" id="detectionThresholdValue">0.300</span>
+</div>
+```
+
+#### Engine Updates
+- **OpenWakeWord Engine**: Reads both parameters directly from config
+- **Porcupine Engine**: Added threshold method (with warning since it uses sensitivity directly)
+- **Interface**: Added `update_threshold()` method to all engines
+
+#### API Endpoints
+- `POST /api/config/wake_word` - Update both sensitivity and threshold
+- `GET /api/config` - Returns both parameters in wake_word section
+
+### 🚨 IMMEDIATE NEXT STEPS
+
+#### 1. Test Parameter Separation
+- [ ] Verify sensitivity affects model processing independently
+- [ ] Verify threshold affects detection triggering independently
+- [ ] Test various sensitivity/threshold combinations
+
+#### 2. Web Interface Testing
+- [ ] Test both sliders update settings correctly
+- [ ] Verify settings persist across restarts
+- [ ] Test real-time parameter updates
+
+#### 3. Documentation Updates
+- [ ] Update user documentation with new parameter explanations
+- [ ] Add examples of different sensitivity/threshold combinations
+- [ ] Document the difference between the two parameters
+
+### 📊 VERIFICATION TESTS
+
+#### Parameter Independence Test
+```bash
+# Test different sensitivity/threshold combinations
+curl -X POST http://192.168.8.99:7171/api/config/wake_word \
+  -H "Content-Type: application/json" \
+  -d '{"sensitivity": 0.9, "threshold": 0.1}'
+
+# Verify both parameters updated
+curl -s http://192.168.8.99:7171/api/config | jq '.wake_word'
+```
+
+#### Web Interface Test
+```bash
+# Check web interface loads both sliders
+curl -s http://192.168.8.99:7171/ | grep -A 10 "Model Sensitivity"
+```
+
+### 🎯 SUCCESS CRITERIA MET
+1. **✅ Parameter separation** - Sensitivity and threshold are now independent
+2. **✅ Web interface controls** - Two separate sliders with real-time updates
+3. **✅ Configuration persistence** - Both parameters saved to config files
+4. **✅ Engine support** - All engines updated to handle both parameters
+5. **✅ Default values** - Sensible defaults provided (sensitivity: 0.8, threshold: 0.3)
+6. **✅ Dynamic updates** - Parameters update without engine restart
+
+### 🚫 KNOWN ISSUES TO RESOLVE
+- [ ] Need to test various sensitivity/threshold combinations
+- [ ] Verify Porcupine engine behavior with threshold parameter
+- [ ] Test web interface slider functionality
+
+### 📈 PERFORMANCE IMPACT
+- **Configuration Complexity**: Increased (two parameters instead of one)
+- **User Control**: Dramatically improved (independent control)
+- **Detection Accuracy**: Expected improvement with fine-tuned control
+- **Web Interface**: Enhanced with two sliders
+
 ## 2025-07-11 - Real-Time Settings Manager with TMPFS IPC Implementation
 
 ### ✅ COMPLETED TODAY

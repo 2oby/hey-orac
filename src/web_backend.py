@@ -107,6 +107,10 @@ def get_config():
             "debounce_ms": settings_manager.get("wake_word.debounce", 200),
             "cooldown_s": settings_manager.get("wake_word.cooldown", 1.5)
         },
+        "wake_word": {
+            "sensitivity": settings_manager.get("wake_word.sensitivity", 0.95),
+            "threshold": settings_manager.get("wake_word.threshold", 0.13)
+        },
         "models": {
             "Hay--compUta_v_lrg": {
                 "sensitivity": sensitivities.get("Hay--compUta_v_lrg", 0.4),
@@ -117,8 +121,8 @@ def get_config():
                 "api_url": api_urls.get("Hey_computer", "https://api.example.com/webhook")
             },
             "hey-CompUter_lrg": {
-                "sensitivity": sensitivities.get("hey-CompUter_lrg", 0.4),
-                "api_url": api_urls.get("hey-CompUter_lrg", "https://api.example.com/webhook")
+                "sensitivity": sensitivities.get("hey-CompUta_v_lrg", 0.4),
+                "api_url": api_urls.get("hey-CompUta_v_lrg", "https://api.example.com/webhook")
             }
         }
     })
@@ -193,6 +197,19 @@ def set_model_config(model_name):
         # Optionally update model selection
         if settings.get("activate", False):
             settings_manager.set("wake_word.model", model_name)
+        return jsonify({"status": "success"})
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/config/wake_word', methods=['POST'])
+def set_wake_word_config():
+    """Update wake word detection settings (sensitivity and threshold)"""
+    try:
+        settings = request.json
+        if "sensitivity" in settings:
+            settings_manager.set("wake_word.sensitivity", settings["sensitivity"])
+        if "threshold" in settings:
+            settings_manager.set("wake_word.threshold", settings["threshold"])
         return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500

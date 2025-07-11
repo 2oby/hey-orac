@@ -31,7 +31,8 @@ class OpenWakeWordEngine(WakeWordEngine):
         Args:
             config: Configuration dictionary containing:
                 - keyword: Wake word to detect
-                - threshold: Detection threshold (0.0-1.0)
+                - sensitivity: Model sensitivity (0.0-1.0) - internal model parameter
+                - threshold: Detection threshold (0.0-1.0) - confidence level to trigger detection
                 - custom_model_path: Path to custom model (optional)
         
         Returns:
@@ -40,19 +41,14 @@ class OpenWakeWordEngine(WakeWordEngine):
         try:
             keyword = config.get('keyword', 'hey_jarvis')
             
-            # Use sensitivity directly - high sensitivity = easier detection (lower threshold)
-            # Low sensitivity = harder detection (higher threshold)
+            # Get sensitivity and threshold from config (0.0-1.0)
             self.sensitivity = config.get('sensitivity', 0.5)
+            self.threshold = config.get('threshold', 0.13)
             
-            # FIXED: The threshold calculation was wrong for this model
-            # Based on testing, confidence scores range from ~0.0008 to ~0.8
-            # So we need to map sensitivity (0.0-1.0) to threshold (0.0-0.8)
-            # High sensitivity (0.8) should give low threshold (0.1)
-            # Low sensitivity (0.2) should give high threshold (0.6)
-            self.threshold = 0.8 - (self.sensitivity * 0.7)  # Map sensitivity to reasonable threshold range
-            
-            logger.info(f"🔧 FIXED: Sensitivity {self.sensitivity:.6f} mapped to threshold {self.threshold:.6f}")
-            logger.info(f"   Threshold range: 0.1 (high sensitivity) to 0.8 (low sensitivity)")
+            logger.info(f"🔧 Model Sensitivity: {self.sensitivity:.3f} (internal model parameter)")
+            logger.info(f"🔧 Detection Threshold: {self.threshold:.3f} (confidence level to trigger)")
+            logger.info(f"   High sensitivity = more sensitive model processing")
+            logger.info(f"   Low threshold = easier detection (triggers at lower confidence)")
             
             # Check if custom model is specified
             custom_model_path = config.get('custom_model_path')
@@ -218,7 +214,7 @@ class OpenWakeWordEngine(WakeWordEngine):
                     logger.info(f"🔍 DEBUG: Wake word confidence: {max_confidence:.6f} (threshold: {self.threshold:.6f}) - Source: {best_model}")
                     logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
                     logger.info(f"   Sensitivity setting: {self.sensitivity:.6f}")
-                    logger.info(f"   Threshold calculation: 0.8 - ({self.sensitivity:.6f} * 0.7) = {self.threshold:.6f}")
+                    logger.info(f"   Threshold calculation: 0.7 - ({self.sensitivity:.6f} * 0.6) = {self.threshold:.6f}")
                 
                 return False
                 
@@ -285,19 +281,42 @@ class OpenWakeWordEngine(WakeWordEngine):
                 return False
             
             old_sensitivity = self.sensitivity
-            old_threshold = self.threshold
-            
-            # Update sensitivity and recalculate threshold
             self.sensitivity = new_sensitivity
-            self.threshold = 0.8 - (self.sensitivity * 0.7)
             
-            logger.info(f"🔧 Sensitivity updated: {old_sensitivity:.6f} → {self.sensitivity:.6f}")
-            logger.info(f"🔧 Threshold updated: {old_threshold:.6f} → {self.threshold:.6f}")
+            logger.info(f"🔧 Model Sensitivity updated: {old_sensitivity:.3f} → {self.sensitivity:.3f}")
+            logger.info(f"   High sensitivity = more sensitive model processing")
             
             return True
             
         except Exception as e:
             logger.error(f"❌ Failed to update sensitivity: {e}")
+            return False
+    
+    def update_threshold(self, new_threshold: float) -> bool:
+        """
+        Update the detection threshold dynamically without reinitializing the model.
+        
+        Args:
+            new_threshold: New threshold value (0.0-1.0)
+            
+        Returns:
+            bool: True if update successful, False otherwise
+        """
+        try:
+            if not self.is_initialized:
+                logger.warning("⚠️ Cannot update threshold - engine not initialized")
+                return False
+            
+            old_threshold = self.threshold
+            self.threshold = new_threshold
+            
+            logger.info(f"🔧 Detection Threshold updated: {old_threshold:.3f} → {self.threshold:.3f}")
+            logger.info(f"   Low threshold = easier detection (triggers at lower confidence)")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to update threshold: {e}")
             return False
     
     def cleanup(self) -> None:

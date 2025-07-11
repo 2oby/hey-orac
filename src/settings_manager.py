@@ -65,6 +65,8 @@ class SettingsManager:
                 "model": "Hay--compUta_v_lrg",
                 "cooldown": 1.5,
                 "debounce": 0.2,
+                "sensitivity": 0.8,  # Model sensitivity (0.0-1.0) - internal model parameter
+                "threshold": 0.3,     # Detection threshold (0.0-1.0) - confidence level to trigger detection
                 "sensitivities": {
                     "Hay--compUta_v_lrg": 0.95,
                     "Hey_computer": 0.95,

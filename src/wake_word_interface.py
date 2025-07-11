@@ -76,6 +76,19 @@ class WakeWordEngine(ABC):
             bool: True if update successful, False otherwise
         """
         pass
+    
+    @abstractmethod
+    def update_threshold(self, new_threshold: float) -> bool:
+        """
+        Update the detection threshold dynamically without reinitializing the model.
+        
+        Args:
+            new_threshold: New threshold value (0.0-1.0)
+            
+        Returns:
+            bool: True if update successful, False otherwise
+        """
+        pass
 
 class WakeWordDetector:
     """Main wake-word detector that uses pluggable engines."""
@@ -199,6 +212,26 @@ class WakeWordDetector:
             return self.engine.update_sensitivity(new_sensitivity)
         except Exception as e:
             logger.error(f"Error updating sensitivity: {e}")
+            return False
+    
+    def update_threshold(self, new_threshold: float) -> bool:
+        """
+        Update the detection threshold dynamically without reinitializing the model.
+        
+        Args:
+            new_threshold: New threshold value (0.0-1.0)
+            
+        Returns:
+            bool: True if update successful, False otherwise
+        """
+        if not self.is_ready():
+            logger.warning("Wake-word detector not ready")
+            return False
+        
+        try:
+            return self.engine.update_threshold(new_threshold)
+        except Exception as e:
+            logger.error(f"Error updating threshold: {e}")
             return False
     
     def cleanup(self) -> None:
