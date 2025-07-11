@@ -581,4 +581,4 @@ services:
 - **Frame Processing**: Processes audio in 80ms chunks (1280 samples at 16kHz)
 - **Confidence Scoring**: Each model returns scores 0.0-1.0, threshold typically 0.5
 - **Buffer Management**: Uses `prediction_buffer` to store recent predictions per model
-- **Docker Considerations**: Requires proper audio device mounting and permissions# Architecture Update 
+- **Docker Considerations**: Requires proper audio device mounting and permissions
