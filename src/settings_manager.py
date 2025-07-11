@@ -65,12 +65,15 @@ class SettingsManager:
                 "model": "Hay--compUta_v_lrg",
                 "cooldown": 1.5,
                 "debounce": 0.2,
-                "sensitivity": 0.8,  # Model sensitivity (0.0-1.0) - internal model parameter
-                "threshold": 0.3,     # Detection threshold (0.0-1.0) - confidence level to trigger detection
                 "sensitivities": {
-                    "Hay--compUta_v_lrg": 0.95,
-                    "Hey_computer": 0.95,
-                    "hey-CompUter_lrg": 0.95
+                    "Hay--compUta_v_lrg": 0.8,
+                    "Hey_computer": 0.8,
+                    "hey-CompUter_lrg": 0.8
+                },
+                "thresholds": {
+                    "Hay--compUta_v_lrg": 0.3,
+                    "Hey_computer": 0.3,
+                    "hey-CompUter_lrg": 0.3
                 },
                 "api_urls": {
                     "Hay--compUta_v_lrg": "https://api.example.com/webhook",
@@ -340,6 +343,26 @@ class SettingsManager:
                 return self._save_settings()
         except Exception as e:
             logger.error(f"❌ Failed to set model API URL for {model_name}: {e}")
+            return False
+
+    def get_model_threshold(self, model_name: str, default: float = 0.3) -> float:
+        """Get threshold for a specific model."""
+        with self._lock:
+            thresholds = self._settings.get("wake_word", {}).get("thresholds", {})
+            return thresholds.get(model_name, default)
+
+    def set_model_threshold(self, model_name: str, value: float) -> bool:
+        """Set threshold for a specific model."""
+        try:
+            with self._lock:
+                if "wake_word" not in self._settings:
+                    self._settings["wake_word"] = {}
+                if "thresholds" not in self._settings["wake_word"]:
+                    self._settings["wake_word"]["thresholds"] = {}
+                self._settings["wake_word"]["thresholds"][model_name] = value
+                return self._save_settings()
+        except Exception as e:
+            logger.error(f"❌ Failed to set model threshold for {model_name}: {e}")
             return False
 
 # Global settings manager instance

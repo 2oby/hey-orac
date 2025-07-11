@@ -1,131 +1,165 @@
 # Development Log - pi-wakeword-streamer
 
-## 2025-01-XX - Sensitivity and Threshold Separation Implementation
+## 2025-01-XX - Per-Model Sensitivity and Threshold Implementation
 
 ### ✅ COMPLETED TODAY
-- [x] **Separated Sensitivity and Threshold** - Now two distinct parameters with independent control
-- [x] **Updated OpenWakeWord Engine** - Removed complex threshold calculation, now reads both parameters directly
-- [x] **Added Web Interface Controls** - Two new sliders for Model Sensitivity and Detection Threshold
-- [x] **Updated Configuration System** - Both parameters saved to and loaded from config files
-- [x] **Enhanced Settings Manager** - Default settings now include both sensitivity and threshold
-- [x] **Updated Example Configs** - All example configuration files now include both parameters
-- [x] **Added Dynamic Updates** - Both parameters can be updated without restarting the engine
+- [x] **Implemented Per-Model Settings** - Sensitivity and threshold now specific to each model
+- [x] **Updated Settings Manager** - Added `get_model_threshold()` and `set_model_threshold()` methods
+- [x] **Modified Configuration Structure** - Removed global sensitivity/threshold, added per-model arrays
+- [x] **Updated Web Interface** - Model settings modal now includes both sensitivity and threshold controls
+- [x] **Enhanced Monitor System** - Custom model monitor now loads per-model settings
+- [x] **Updated Web Backend** - API endpoints now handle per-model sensitivity and threshold
+- [x] **Updated Example Configs** - All example files now use per-model structure
+- [x] **Deprecated Global Settings** - Global wake_word settings endpoint now returns deprecation warning
 
 ### 🔧 CURRENT STATUS
-- **Sensitivity Control**: ✅ Independent model sensitivity parameter (0.0-1.0)
-- **Threshold Control**: ✅ Independent detection threshold parameter (0.0-1.0)
-- **Web Interface**: ✅ Two separate sliders with real-time updates
-- **Configuration**: ✅ Both parameters persisted in config files
-- **Engine Support**: ✅ OpenWakeWord and Porcupine engines updated
-- **Default Values**: ✅ Sensitivity: 0.8, Threshold: 0.3
+- **Per-Model Sensitivity**: ✅ Each model has its own sensitivity setting
+- **Per-Model Threshold**: ✅ Each model has its own threshold setting
+- **Web Interface**: ✅ Model settings modal with both controls
+- **Configuration**: ✅ Settings stored per-model in arrays
+- **Engine Support**: ✅ All engines updated to use per-model settings
+- **Default Values**: ✅ Sensitivity: 0.8, Threshold: 0.3 per model
 
 ### 🎯 KEY ACHIEVEMENTS
 
-#### 1. Clear Parameter Separation
-```
-Before: Sensitivity → Complex threshold calculation
-After:  Sensitivity (model parameter) + Threshold (detection level)
+#### 1. Per-Model Configuration Structure
+```yaml
+wake_word:
+  sensitivities:
+    "Hay--compUta_v_lrg": 0.8
+    "Hey_computer": 0.8
+    "hey-CompUter_lrg": 0.8
+  thresholds:
+    "Hay--compUta_v_lrg": 0.3
+    "Hey_computer": 0.3
+    "hey-CompUter_lrg": 0.3
 ```
 
-#### 2. Independent Control
-- **Sensitivity**: Affects internal model processing (0.0-1.0)
-- **Threshold**: Affects detection triggering confidence (0.0-1.0)
-- **Web Interface**: Two separate sliders with clear labels
-- **Real-time Updates**: Both parameters update immediately
+#### 2. Enhanced Web Interface
+- **Model Settings Modal**: Each model has its own sensitivity and threshold controls
+- **Per-Model Controls**: Settings are specific to each model
+- **Real-time Updates**: Changes apply immediately to the active model
+- **Clear Labels**: "Model Sensitivity" and "Detection Threshold" with help text
 
-#### 3. Enhanced User Control
-- **High Sensitivity + Low Threshold**: Very sensitive model, triggers easily
-- **Low Sensitivity + High Threshold**: Less sensitive model, requires high confidence
-- **High Sensitivity + High Threshold**: Sensitive model but requires high confidence
-- **Low Sensitivity + Low Threshold**: Less sensitive model but triggers easily
+#### 3. Improved Settings Management
+- **Settings Manager**: Added `get_model_threshold()` and `set_model_threshold()` methods
+- **API Endpoints**: `/api/config/models/<model_name>` handles both parameters
+- **Configuration Loading**: Monitor system loads per-model settings on initialization
+- **Dynamic Updates**: Settings changes trigger immediate engine updates
 
 ### 📋 TECHNICAL IMPLEMENTATION
 
-#### Configuration Updates
-```yaml
-wake_word:
-  sensitivity: 0.8  # Model sensitivity (0.0-1.0) - internal model parameter
-  threshold: 0.3    # Detection threshold (0.0-1.0) - confidence level to trigger detection
+#### Settings Manager Updates
+```python
+def get_model_threshold(self, model_name: str, default: float = 0.3) -> float:
+    """Get threshold for a specific model."""
+    
+def set_model_threshold(self, model_name: str, value: float) -> bool:
+    """Set threshold for a specific model."""
 ```
 
-#### Web Interface Sliders
+#### Web Interface Modal
 ```html
-<div class="slider-group">
-    <label class="slider-label">Model Sensitivity</label>
-    <input type="range" class="slider" id="modelSensitivity" min="0" max="1" step="0.01" value="0.8">
-    <span class="slider-value" id="modelSensitivityValue">0.800</span>
+<div class="form-group">
+    <label class="form-label" for="sensitivityInput">Model Sensitivity</label>
+    <input type="range" class="form-input" id="sensitivityInput" 
+           min="0.00001" max="1.00000" step="0.00050" value="0.8">
+    <span class="slider-value" id="sensitivityValue">0.80000</span>
+    <small class="form-help">Internal model parameter - higher = more sensitive processing</small>
 </div>
-
-<div class="slider-group">
-    <label class="slider-label">Detection Threshold</label>
-    <input type="range" class="slider" id="detectionThreshold" min="0" max="1" step="0.01" value="0.3">
-    <span class="slider-value" id="detectionThresholdValue">0.300</span>
+<div class="form-group">
+    <label class="form-label" for="thresholdInput">Detection Threshold</label>
+    <input type="range" class="form-input" id="thresholdInput" 
+           min="0.00001" max="1.00000" step="0.00050" value="0.3">
+    <span class="slider-value" id="thresholdValue">0.30000</span>
+    <small class="form-help">Confidence level to trigger detection - lower = easier detection</small>
 </div>
 ```
 
-#### Engine Updates
-- **OpenWakeWord Engine**: Reads both parameters directly from config
-- **Porcupine Engine**: Added threshold method (with warning since it uses sensitivity directly)
-- **Interface**: Added `update_threshold()` method to all engines
+#### Monitor System Updates
+```python
+def _initialize_detector(self) -> bool:
+    """Initialize the wake word detector for custom models."""
+    model_name = self.settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
+    sensitivity = self.settings_manager.get_model_sensitivity(model_name, 0.8)
+    threshold = self.settings_manager.get_model_threshold(model_name, 0.3)
+    
+    custom_config['wake_word']['sensitivity'] = sensitivity
+    custom_config['wake_word']['threshold'] = threshold
+```
 
-#### API Endpoints
-- `POST /api/config/wake_word` - Update both sensitivity and threshold
-- `GET /api/config` - Returns both parameters in wake_word section
+#### API Endpoint Updates
+```python
+@app.route('/api/config/models/<model_name>', methods=['GET'])
+def get_model_config(model_name):
+    sensitivity = settings_manager.get_model_sensitivity(model_name, 0.8)
+    threshold = settings_manager.get_model_threshold(model_name, 0.3)
+    return jsonify({
+        "sensitivity": sensitivity,
+        "threshold": threshold,
+        "api_url": api_url,
+        "model": model_name
+    })
+```
 
 ### 🚨 IMMEDIATE NEXT STEPS
 
-#### 1. Test Parameter Separation
-- [ ] Verify sensitivity affects model processing independently
-- [ ] Verify threshold affects detection triggering independently
-- [ ] Test various sensitivity/threshold combinations
+#### 1. Test Per-Model Settings
+- [ ] Verify each model maintains its own sensitivity and threshold
+- [ ] Test switching between models with different settings
+- [ ] Verify settings persist correctly for each model
 
 #### 2. Web Interface Testing
-- [ ] Test both sliders update settings correctly
-- [ ] Verify settings persist across restarts
-- [ ] Test real-time parameter updates
+- [ ] Test model settings modal loads correct per-model values
+- [ ] Verify settings save correctly for each model
+- [ ] Test switching between models updates the modal
 
-#### 3. Documentation Updates
-- [ ] Update user documentation with new parameter explanations
-- [ ] Add examples of different sensitivity/threshold combinations
-- [ ] Document the difference between the two parameters
+#### 3. Engine Integration Testing
+- [ ] Verify engines load correct per-model settings
+- [ ] Test dynamic updates when switching models
+- [ ] Verify settings changes apply immediately
 
 ### 📊 VERIFICATION TESTS
 
-#### Parameter Independence Test
+#### Per-Model Settings Test
 ```bash
-# Test different sensitivity/threshold combinations
-curl -X POST http://192.168.8.99:7171/api/config/wake_word \
+# Test setting different values for different models
+curl -X POST http://192.168.8.99:7171/api/config/models/Hay--compUta_v_lrg \
   -H "Content-Type: application/json" \
-  -d '{"sensitivity": 0.9, "threshold": 0.1}'
+  -d '{"sensitivity": 0.9, "threshold": 0.2}'
 
-# Verify both parameters updated
-curl -s http://192.168.8.99:7171/api/config | jq '.wake_word'
+curl -X POST http://192.168.8.99:7171/api/config/models/Hey_computer \
+  -H "Content-Type: application/json" \
+  -d '{"sensitivity": 0.7, "threshold": 0.4}'
+
+# Verify different settings for different models
+curl -s http://192.168.8.99:7171/api/config | jq '.models'
 ```
 
 #### Web Interface Test
 ```bash
-# Check web interface loads both sliders
-curl -s http://192.168.8.99:7171/ | grep -A 10 "Model Sensitivity"
+# Check web interface loads per-model settings
+curl -s http://192.168.8.99:7171/ | grep -A 20 "Model Settings"
 ```
 
 ### 🎯 SUCCESS CRITERIA MET
-1. **✅ Parameter separation** - Sensitivity and threshold are now independent
-2. **✅ Web interface controls** - Two separate sliders with real-time updates
-3. **✅ Configuration persistence** - Both parameters saved to config files
-4. **✅ Engine support** - All engines updated to handle both parameters
-5. **✅ Default values** - Sensible defaults provided (sensitivity: 0.8, threshold: 0.3)
-6. **✅ Dynamic updates** - Parameters update without engine restart
+1. **✅ Per-model settings** - Each model has independent sensitivity and threshold
+2. **✅ Web interface controls** - Model settings modal with both parameters
+3. **✅ Configuration persistence** - Settings saved per-model in arrays
+4. **✅ Engine support** - All engines updated to use per-model settings
+5. **✅ Default values** - Sensible defaults provided per model
+6. **✅ Dynamic updates** - Settings changes apply immediately
 
 ### 🚫 KNOWN ISSUES TO RESOLVE
-- [ ] Need to test various sensitivity/threshold combinations
-- [ ] Verify Porcupine engine behavior with threshold parameter
-- [ ] Test web interface slider functionality
+- [ ] Need to test per-model settings persistence
+- [ ] Verify model switching updates settings correctly
+- [ ] Test web interface modal functionality
 
 ### 📈 PERFORMANCE IMPACT
-- **Configuration Complexity**: Increased (two parameters instead of one)
-- **User Control**: Dramatically improved (independent control)
-- **Detection Accuracy**: Expected improvement with fine-tuned control
-- **Web Interface**: Enhanced with two sliders
+- **Configuration Complexity**: Increased (per-model settings instead of global)
+- **User Control**: Dramatically improved (independent control per model)
+- **Detection Accuracy**: Expected improvement with model-specific tuning
+- **Web Interface**: Enhanced with per-model settings modal
 
 ## 2025-07-11 - Real-Time Settings Manager with TMPFS IPC Implementation
 

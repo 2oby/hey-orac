@@ -100,6 +100,7 @@ def get_config():
     """Get full configuration for web interface"""
     # Return the structure expected by the web interface
     sensitivities = settings_manager.get("wake_word.sensitivities", {})
+    thresholds = settings_manager.get("wake_word.thresholds", {})
     api_urls = settings_manager.get("wake_word.api_urls", {})
     return jsonify({
         "global": {
@@ -107,22 +108,21 @@ def get_config():
             "debounce_ms": settings_manager.get("wake_word.debounce", 200),
             "cooldown_s": settings_manager.get("wake_word.cooldown", 1.5)
         },
-        "wake_word": {
-            "sensitivity": settings_manager.get("wake_word.sensitivity", 0.95),
-            "threshold": settings_manager.get("wake_word.threshold", 0.13)
-        },
         "models": {
             "Hay--compUta_v_lrg": {
-                "sensitivity": sensitivities.get("Hay--compUta_v_lrg", 0.4),
+                "sensitivity": sensitivities.get("Hay--compUta_v_lrg", 0.8),
+                "threshold": thresholds.get("Hay--compUta_v_lrg", 0.3),
                 "api_url": api_urls.get("Hay--compUta_v_lrg", "https://api.example.com/webhook")
             },
             "Hey_computer": {
-                "sensitivity": sensitivities.get("Hey_computer", 0.4),
+                "sensitivity": sensitivities.get("Hey_computer", 0.8),
+                "threshold": thresholds.get("Hey_computer", 0.3),
                 "api_url": api_urls.get("Hey_computer", "https://api.example.com/webhook")
             },
             "hey-CompUter_lrg": {
-                "sensitivity": sensitivities.get("hey-CompUta_v_lrg", 0.4),
-                "api_url": api_urls.get("hey-CompUta_v_lrg", "https://api.example.com/webhook")
+                "sensitivity": sensitivities.get("hey-CompUter_lrg", 0.8),
+                "threshold": thresholds.get("hey-CompUter_lrg", 0.3),
+                "api_url": api_urls.get("hey-CompUter_lrg", "https://api.example.com/webhook")
             }
         }
     })
@@ -176,22 +176,26 @@ def get_models():
 
 @app.route('/api/config/models/<model_name>', methods=['GET'])
 def get_model_config(model_name):
-    """Get specific model settings (per-model sensitivity and API URL)"""
-    sensitivity = settings_manager.get_model_sensitivity(model_name, 0.4)
+    """Get specific model settings (per-model sensitivity, threshold and API URL)"""
+    sensitivity = settings_manager.get_model_sensitivity(model_name, 0.8)
+    threshold = settings_manager.get_model_threshold(model_name, 0.3)
     api_url = settings_manager.get_model_api_url(model_name, "https://api.example.com/webhook")
     return jsonify({
         "sensitivity": sensitivity,
+        "threshold": threshold,
         "api_url": api_url,
         "model": model_name
     })
 
 @app.route('/api/config/models/<model_name>', methods=['POST'])
 def set_model_config(model_name):
-    """Update specific model settings (per-model sensitivity and API URL)"""
+    """Update specific model settings (per-model sensitivity, threshold and API URL)"""
     try:
         settings = request.json
         if "sensitivity" in settings:
             settings_manager.set_model_sensitivity(model_name, settings["sensitivity"])
+        if "threshold" in settings:
+            settings_manager.set_model_threshold(model_name, settings["threshold"])
         if "api_url" in settings:
             settings_manager.set_model_api_url(model_name, settings["api_url"])
         # Optionally update model selection
@@ -203,14 +207,11 @@ def set_model_config(model_name):
 
 @app.route('/api/config/wake_word', methods=['POST'])
 def set_wake_word_config():
-    """Update wake word detection settings (sensitivity and threshold)"""
+    """Update wake word detection settings (sensitivity and threshold) - DEPRECATED: Use per-model settings instead"""
     try:
         settings = request.json
-        if "sensitivity" in settings:
-            settings_manager.set("wake_word.sensitivity", settings["sensitivity"])
-        if "threshold" in settings:
-            settings_manager.set("wake_word.threshold", settings["threshold"])
-        return jsonify({"status": "success"})
+        logger.warning("⚠️ Global wake_word settings are deprecated. Use per-model settings instead.")
+        return jsonify({"status": "deprecated", "message": "Use per-model settings instead"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 

@@ -4,8 +4,10 @@
 wake_word:
   engine: "porcupine"
   keyword: "hey_orac"                    # Your custom wake word name
-  sensitivity: 0.6                       # Model sensitivity (0.0-1.0) - internal model parameter
-  threshold: 0.5                         # Detection threshold (0.0-1.0) - confidence level to trigger detection
+  sensitivities:
+    "hey_orac": 0.6                     # Model sensitivity (0.0-1.0) - internal model parameter
+  thresholds:
+    "hey_orac": 0.5                     # Detection threshold (0.0-1.0) - confidence level to trigger detection
   model_path: "/app/third_party/porcupine/custom_models/hey_orac.ppn"
   access_key: "your_picovoice_access_key_here"
 

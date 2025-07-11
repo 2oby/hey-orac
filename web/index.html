@@ -779,15 +779,21 @@
             
             <div class="sliders-container">
                 <div class="slider-group">
-                    <label class="slider-label">Model Sensitivity</label>
-                    <input type="range" class="slider" id="modelSensitivity" min="0" max="1" step="0.01" value="0.95">
-                    <span class="slider-value" id="modelSensitivityValue">0.95</span>
+                    <label class="slider-label">RMS Filter</label>
+                    <input type="range" class="slider" id="rmsFilter" min="0" max="100" value="50">
+                    <span class="slider-value" id="rmsFilterValue">50</span>
                 </div>
                 
                 <div class="slider-group">
-                    <label class="slider-label">Detection Threshold</label>
-                    <input type="range" class="slider" id="detectionThreshold" min="0" max="1" step="0.01" value="0.13">
-                    <span class="slider-value" id="detectionThresholdValue">0.13</span>
+                    <label class="slider-label">Debounce (ms)</label>
+                    <input type="range" class="slider" id="debounce" min="0" max="1000" value="200">
+                    <span class="slider-value" id="debounceValue">200ms</span>
+                </div>
+                
+                <div class="slider-group">
+                    <label class="slider-label">Cooldown (s)</label>
+                    <input type="range" class="slider" id="cooldown" min="0" max="5" step="0.1" value="1.5">
+                    <span class="slider-value" id="cooldownValue">1.5s</span>
                 </div>
             </div>
 
@@ -839,10 +845,18 @@
                 </div>
                 <form class="modal-form" id="settingsForm">
                     <div class="form-group">
-                        <label class="form-label" for="sensitivityInput">Sensitivity</label>
+                        <label class="form-label" for="sensitivityInput">Model Sensitivity</label>
                         <input type="range" class="form-input" id="sensitivityInput" 
                                min="0.00001" max="1.00000" step="0.00050" value="0.05">
                         <span class="slider-value" id="sensitivityValue">0.95</span>
+                        <small class="form-help">Internal model parameter - higher = more sensitive processing</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="thresholdInput">Detection Threshold</label>
+                        <input type="range" class="form-input" id="thresholdInput" 
+                               min="0.00001" max="1.00000" step="0.00050" value="0.3">
+                        <span class="slider-value" id="thresholdValue">0.3</span>
+                        <small class="form-help">Confidence level to trigger detection - lower = easier detection</small>
                     </div>
                     <div class="form-group">
                         <label class="form-label" for="apiUrlInput">API URL</label>
@@ -877,6 +891,7 @@
                     name: name,
                     active: false, // We'll need to add active state to config later
                     sensitivity: config.models[name].sensitivity,
+                    threshold: config.models[name].threshold,
                     apiUrl: config.models[name].api_url
                 }));
                 
@@ -893,22 +908,17 @@
                     document.getElementById('cooldownValue').textContent = config.global.cooldown_s + 's';
                 }
                 
-                // Set detection sliders from config
-                if (config.wake_word) {
-                    document.getElementById('modelSensitivity').value = config.wake_word.sensitivity || 0.95;
-                    document.getElementById('modelSensitivityValue').textContent = (config.wake_word.sensitivity || 0.95).toFixed(3);
-                    document.getElementById('detectionThreshold').value = config.wake_word.threshold || 0.13;
-                    document.getElementById('detectionThresholdValue').textContent = (config.wake_word.threshold || 0.13).toFixed(3);
-                }
+                // Per-model sensitivity and threshold are now handled in model cards
+                // Global settings are only for system-wide parameters
                 
                 updateFilterIndicator();
             } catch (error) {
                 console.error('Failed to load config:', error);
                 // Fallback to demo data
                 sampleModels = [
-                    { name: 'Hay--compUta_v_lrg', active: true, sensitivity: 0.05, apiUrl: 'https://api.example.com/webhook' },
-                    { name: 'Hey_computer', active: false, sensitivity: 0.1, apiUrl: 'https://api.example.com/webhook' },
-                    { name: 'hey-CompUter_lrg', active: false, sensitivity: 0.08, apiUrl: 'https://api.example.com/webhook' }
+                    { name: 'Hay--compUta_v_lrg', active: true, sensitivity: 0.8, threshold: 0.3, apiUrl: 'https://api.example.com/webhook' },
+                    { name: 'Hey_computer', active: false, sensitivity: 0.8, threshold: 0.3, apiUrl: 'https://api.example.com/webhook' },
+                    { name: 'hey-CompUter_lrg', active: false, sensitivity: 0.8, threshold: 0.3, apiUrl: 'https://api.example.com/webhook' }
                 ];
                 generateModelCards();
             }
@@ -932,22 +942,8 @@
             }
         }
         
-        async function saveDetectionSettings() {
-            const settings = {
-                sensitivity: parseFloat(document.getElementById('modelSensitivity').value),
-                threshold: parseFloat(document.getElementById('detectionThreshold').value)
-            };
-            
-            try {
-                await fetch(`${API_BASE}/config/wake_word`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(settings)
-                });
-            } catch (error) {
-                console.error('Failed to save detection settings:', error);
-            }
-        }
+        // Per-model settings are now handled in the model card settings modal
+        // This function is deprecated in favor of per-model controls
 
         async function saveModelSettingsToAPI(modelName, settings) {
             try {
@@ -956,6 +952,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         sensitivity: settings.sensitivity,
+                        threshold: settings.threshold,
                         api_url: settings.apiUrl
                     })
                 });
@@ -1174,23 +1171,8 @@
                 });
             });
             
-            // Setup wake word detection sliders
-            const detectionSliders = [
-                { id: 'modelSensitivity', valueId: 'modelSensitivityValue', format: (v) => parseFloat(v).toFixed(3) },
-                { id: 'detectionThreshold', valueId: 'detectionThresholdValue', format: (v) => parseFloat(v).toFixed(3) }
-            ];
-
-            detectionSliders.forEach(slider => {
-                const sliderElement = document.getElementById(slider.id);
-                const valueElement = document.getElementById(slider.valueId);
-                
-                sliderElement.addEventListener('input', (e) => {
-                    valueElement.textContent = slider.format(e.target.value);
-                    
-                    // Save detection settings when sliders change
-                    saveDetectionSettings();
-                });
-            });
+            // Note: Per-model sensitivity and threshold are now handled in the model cards
+            // Global sliders are only for system-wide settings
         }
 
         // Update status bar
@@ -1242,9 +1224,11 @@
             
             document.getElementById('modalTitle').textContent = `${modelName} Settings`;
             
-            // Use sensitivity directly - high sensitivity = easier detection
+            // Load per-model settings
             document.getElementById('sensitivityInput').value = model.sensitivity;
             document.getElementById('sensitivityValue').textContent = model.sensitivity.toFixed(5);
+            document.getElementById('thresholdInput').value = model.threshold || 0.3;
+            document.getElementById('thresholdValue').textContent = (model.threshold || 0.3).toFixed(5);
             document.getElementById('apiUrlInput').value = model.apiUrl;
             
             document.getElementById('settingsModal').classList.add('active');
@@ -1260,14 +1244,17 @@
             
             const model = sampleModels.find(m => m.name === currentEditingModel);
             if (model) {
-                // Use sensitivity directly - high sensitivity = easier detection
+                // Save per-model settings
                 const sensitivity = parseFloat(document.getElementById('sensitivityInput').value);
+                const threshold = parseFloat(document.getElementById('thresholdInput').value);
                 model.sensitivity = sensitivity;
+                model.threshold = threshold;
                 model.apiUrl = document.getElementById('apiUrlInput').value;
                 
                 // Save to API
                 saveModelSettingsToAPI(currentEditingModel, {
                     sensitivity: model.sensitivity,
+                    threshold: model.threshold,
                     apiUrl: model.apiUrl
                 });
             }
@@ -1294,6 +1281,11 @@
             // Sensitivity slider in modal
             document.getElementById('sensitivityInput').addEventListener('input', (e) => {
                 document.getElementById('sensitivityValue').textContent = parseFloat(e.target.value).toFixed(5);
+            });
+            
+            // Threshold slider in modal
+            document.getElementById('thresholdInput').addEventListener('input', (e) => {
+                document.getElementById('thresholdValue').textContent = parseFloat(e.target.value).toFixed(5);
             });
             
             // API URL input in modal

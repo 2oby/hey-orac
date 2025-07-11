@@ -4,8 +4,10 @@
 wake_word:
   engine: "openwakeword"
   keyword: "hey_orac"                    # Your custom wake word name
-  sensitivity: 0.8                       # Model sensitivity (0.0-1.0) - internal model parameter
-  threshold: 0.3                         # Detection threshold (0.0-1.0) - confidence level to trigger detection
+  sensitivities:
+    "hey_orac": 0.8                     # Model sensitivity (0.0-1.0) - internal model parameter
+  thresholds:
+    "hey_orac": 0.3                     # Detection threshold (0.0-1.0) - confidence level to trigger detection
   custom_model_path: "/app/third_party/openwakeword/custom_models/hey_orac.onnx"
 
 # Alternative: Use TFLite model

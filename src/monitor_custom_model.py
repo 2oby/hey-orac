@@ -56,11 +56,12 @@ class CustomModelMonitor(BaseWakeWordMonitor):
     
     def _initialize_detector(self) -> bool:
         """Initialize the wake word detector for custom models."""
-        # Get selected model and its sensitivity
+        # Get selected model and its per-model settings
         model_name = self.settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
-        sensitivity = self.settings_manager.get_model_sensitivity(model_name, 0.4)
+        sensitivity = self.settings_manager.get_model_sensitivity(model_name, 0.8)
+        threshold = self.settings_manager.get_model_threshold(model_name, 0.3)
         
-        logger.info(f"🔧 DEBUG: Model: {model_name}, Sensitivity: {sensitivity:.6f}")
+        logger.info(f"🔧 DEBUG: Model: {model_name}, Sensitivity: {sensitivity:.6f}, Threshold: {threshold:.6f}")
 
         # Create custom config for custom models
         custom_config = self.config.copy()
@@ -68,12 +69,14 @@ class CustomModelMonitor(BaseWakeWordMonitor):
             custom_config['wake_word']['custom_model_path'] = self.custom_model_path
             logger.info(f"📁 Using custom model: {self.custom_model_path}")
         
-        # Inject per-model sensitivity
+        # Inject per-model sensitivity and threshold
         if 'wake_word' not in custom_config:
             custom_config['wake_word'] = {}
         custom_config['wake_word']['sensitivity'] = sensitivity
+        custom_config['wake_word']['threshold'] = threshold
         
         logger.info(f"🔧 DEBUG: Config sensitivity: {custom_config['wake_word'].get('sensitivity', 'NOT SET')}")
+        logger.info(f"🔧 DEBUG: Config threshold: {custom_config['wake_word'].get('threshold', 'NOT SET')}")
         
         # Initialize timing controls
         self._update_timing_controls()
@@ -100,9 +103,11 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         self.rms_filter_value = new_settings.get('detection', {}).get('rms_filter', 50)
         self.silence_threshold = (self.rms_filter_value / 100.0) * 0.99 + 0.01
         
-        # Check if sensitivity changed for the current model
+        # Check if sensitivity or threshold changed for the current model
         current_model = new_settings.get('wake_word', {}).get('model', 'Hay--compUta_v_lrg')
         sensitivities = new_settings.get('wake_word', {}).get('sensitivities', {})
+        thresholds = new_settings.get('wake_word', {}).get('thresholds', {})
+        
         if current_model in sensitivities:
             new_sensitivity = sensitivities[current_model]
             logger.info(f"🔄 Sensitivity changed for active model {current_model}: {new_sensitivity:.6f}")
@@ -110,6 +115,14 @@ class CustomModelMonitor(BaseWakeWordMonitor):
                 logger.info(f"✅ Sensitivity updated to {new_sensitivity:.6f}")
             else:
                 logger.warning(f"⚠️ Failed to update sensitivity to {new_sensitivity:.6f}")
+        
+        if current_model in thresholds:
+            new_threshold = thresholds[current_model]
+            logger.info(f"🔄 Threshold changed for active model {current_model}: {new_threshold:.6f}")
+            if self.wake_detector.update_threshold(new_threshold):
+                logger.info(f"✅ Threshold updated to {new_threshold:.6f}")
+            else:
+                logger.warning(f"⚠️ Failed to update threshold to {new_threshold:.6f}")
         
         logger.info(f"🔄 Settings updated - Cooldown: {self.detection_cooldown_seconds}s, Debounce: {self.debounce_seconds}s, RMS Filter: {self.rms_filter_value}")
     
