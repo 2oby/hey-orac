@@ -18,9 +18,8 @@ from audio_buffer import AudioBuffer
 from audio_feedback import create_audio_feedback
 import pyaudio
 
-# Import the new monitor modules
+# Import the monitor modules
 from monitor_default_model import monitor_default_models
-from monitor_custom_model import monitor_custom_models, test_custom_model_with_speech
 from audio_pipeline import run_audio_pipeline
 
 # Configure logging
@@ -301,47 +300,19 @@ def main():
         return monitor_default_models(config, usb_device, audio_manager)
     
     elif args.monitor_custom:
-        logger.info("🎯 Starting custom model monitoring...")
-        custom_model_path = config['wake_word'].get('custom_model_path', '')
-        return monitor_custom_models(config, usb_device, audio_manager, custom_model_path)
+        logger.error("❌ Custom model monitoring not available - use --pipeline instead")
+        return 1
     
     elif args.test_custom_model:
-        logger.info(f"🧪 Testing custom model: {args.test_custom_model}")
-        return test_custom_model_with_speech(
-            config, 
-            usb_device, 
-            audio_manager, 
-            args.test_custom_model, 
-            args.test_duration
-        )
+        logger.error("❌ Custom model testing not available - use --pipeline instead")
+        return 1
     
 
     
     # Check for startup model testing
     if args.startup_test_model:
-        logger.info(f"🧪 STARTUP TEST: Testing custom model at startup: {args.startup_test_model}")
-        logger.info(f"⏱️  Test duration: {args.startup_test_duration} seconds")
-        
-        # Test the custom model first
-        test_result = test_custom_model_with_speech(
-            config, 
-            usb_device, 
-            audio_manager, 
-            args.startup_test_model, 
-            args.startup_test_duration
-        )
-        
-        if test_result == 0:
-            logger.info("✅ Startup test successful - custom model detected speech!")
-        else:
-            logger.warning("⚠️ Startup test completed - no detections, but continuing...")
-        
-        logger.info("🔄 Starting main monitoring loop...")
-        
-        # Now start custom model monitoring with the tested model
-        custom_config = config.copy()
-        custom_config['wake_word']['custom_model_path'] = args.startup_test_model
-        return monitor_custom_models(custom_config, usb_device, audio_manager, args.startup_test_model)
+        logger.error("❌ Startup model testing not available - use --pipeline instead")
+        return 1
     
     # Handle pipeline mode
     if args.pipeline:
