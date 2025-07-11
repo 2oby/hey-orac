@@ -212,15 +212,15 @@ class CustomModelMonitor(BaseWakeWordMonitor):
     
     def _handle_detection(self, audio_data: np.ndarray) -> bool:
         """Handle detection with custom model specific logic."""
-        # Update timing controls
-        current_time = time.time()
-        self.last_detection_time = current_time
-        self.last_detection_chunk = self.chunk_count
-        
         # Call parent method for standard detection handling
         result = super()._handle_detection(audio_data)
         
         if result:
+            # Update timing controls AFTER successful detection
+            current_time = time.time()
+            self.last_detection_time = current_time
+            self.last_detection_chunk = self.chunk_count
+            
             # Log custom model specific details
             logger.info(f"⏱️ Time since last detection: {current_time - self.last_detection_time:.2f}s")
             logger.info(f"📦 Chunks since last detection: {self.chunk_count - self.last_detection_chunk}")
