@@ -1,5 +1,8 @@
 # INSTRUCTIONS - pi-wakeword-streamer
 
+------ MOST IMPORTANT UNDERSTAND SSH PI and DEPLOY AND TEST
+
+
 ## Project Overview
 This is Phase 1a of the ORAC Voice-Control Architecture - a wake-word detection and audio streaming service designed to run on a Raspberry Pi and stream audio clips to a Jetson Orin Nano for processing.
 
@@ -28,10 +31,37 @@ pi-wakeword-streamer/
 │   └── INSTRUCTIONS.txt  # This file
 └── README.md             # Project overview
 ```
+### Access to Machine
+```bash
+# SSH into your Pi (see LOCAL_ENVIRONMENT.md for your specific IP)
+ssh pi <command to run>
 
-## Prerequisites
+## Deployment Process
+
+### Using deploy_and_test.sh
+```bash
+# Make the script executable
+chmod +x scripts/deploy_and_test.sh
+
+# Run deployment (updates Pi with latest code)
+# IMPORTANT: Always include a descriptive commit message
+./scripts/deploy_and_test.sh "Your descriptive commit message here"
+
+# The script will:
+# 1. Commit and push changes to GitHub
+# 2. SSH to Pi and pull latest code
+# 3. Build and start Docker containers
+# 4. Run automated tests
+# 5. Report results
+```
+
+
+--------------------
+
+
 
 ### Development Machine
+- Mac
 - Python 3.12+
 - Docker and Docker Compose
 - Git
@@ -61,9 +91,6 @@ python -m pytest tests/
 ```
 
 ### 2. Raspberry Pi Setup
-```bash
-# SSH into your Pi (see LOCAL_ENVIRONMENT.md for your specific IP)
-ssh pi
 
 # Install Docker (if not already installed)
 curl -fsSL https://get.docker.com -o get-docker.sh
@@ -126,24 +153,6 @@ JETSON_ENDPOINT=http://jetson-orin:8000/speech
 LOG_LEVEL=INFO
 ```
 
-## Deployment Process
-
-### Using deploy_and_test.sh
-```bash
-# Make the script executable
-chmod +x scripts/deploy_and_test.sh
-
-# Run deployment (updates Pi with latest code)
-# IMPORTANT: Always include a descriptive commit message
-./scripts/deploy_and_test.sh "Your descriptive commit message here"
-
-# The script will:
-# 1. Commit and push changes to GitHub
-# 2. SSH to Pi and pull latest code
-# 3. Build and start Docker containers
-# 4. Run automated tests
-# 5. Report results
-```
 
 ### Manual Deployment
 ```bash

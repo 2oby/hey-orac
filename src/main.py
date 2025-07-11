@@ -198,24 +198,9 @@ def main():
         help="List available audio devices"
     )
     parser.add_argument(
-        "--test-recording",
-        action="store_true",
-        help="Test recording from USB microphone"
-    )
-    parser.add_argument(
         "--audio-diagnostics",
         action="store_true",
         help="Run comprehensive audio system diagnostics"
-    )
-    parser.add_argument(
-        "--test-pyaudio",
-        action="store_true",
-        help="Test PyAudio ALSA support"
-    )
-    parser.add_argument(
-        "--run-tests",
-        action="store_true",
-        help="Run test scripts with initialized microphone and wake word engine"
     )
     parser.add_argument(
         "--monitor-default",
@@ -274,47 +259,11 @@ def main():
             logger.warning("⚠️ No audio input devices found")
         return 0
     
-    if args.test_recording:
-        logger.info("🎤 Testing USB microphone recording...")
-        audio_manager = AudioManager()
-        devices = audio_manager.list_input_devices()
-        
-        usb_device = None
-        for device in devices:
-            if device.is_usb:
-                usb_device = device
-                break
-        
-        if not usb_device:
-            logger.error("❌ No USB microphone found")
-            return 1
-        
-        logger.info(f"🎤 Testing recording from {usb_device.name}")
-        
-        # Test recording for 5 seconds
-        if audio_manager.record_to_file(
-            device_index=usb_device.index,
-            duration=5.0,
-            output_file="/tmp/test_recording.wav"
-        ):
-            logger.info("✅ Recording test successful")
-            return 0
-        else:
-            logger.error("❌ Recording test failed")
-            return 1
-    
     if args.audio_diagnostics:
         logger.info("🔧 Running comprehensive audio system diagnostics...")
         # This will be handled by the existing audio diagnostics code
         # For now, just indicate that this mode is available
         logger.info("📋 Audio diagnostics mode selected")
-        return 0
-    
-    if args.test_pyaudio:
-        logger.info("🧪 Testing PyAudio ALSA support...")
-        # This will be handled by the existing PyAudio test code
-        # For now, just indicate that this mode is available
-        logger.info("📋 PyAudio test mode selected")
         return 0
     
     # Initialize audio manager
@@ -366,57 +315,7 @@ def main():
             args.test_duration
         )
     
-    elif args.run_tests:
-        logger.info("🧪 Running test scripts with initialized microphone and wake word engine...")
-        
-        # Test 1: Custom Model Loading Test
-        logger.info("\n" + "="*60)
-        logger.info("🧪 TEST 1: Custom Model Loading")
-        logger.info("="*60)
-        try:
-            # Use the already initialized wake word engine
-            logger.info("✅ Using already initialized wake word engine")
-            logger.info(f"   Engine: {wake_detector.get_engine_name()}")
-            logger.info(f"   Wake word: {wake_detector.get_wake_word_name()}")
-            logger.info(f"   Threshold: {wake_detector.get_threshold()}")
-            logger.info("✅ Custom model test completed")
-        except Exception as e:
-            logger.error(f"❌ Custom model test failed: {e}")
-        
-        # Test 2: Audio Feedback Test
-        logger.info("\n" + "="*60)
-        logger.info("🧪 TEST 2: Audio Feedback System")
-        logger.info("="*60)
-        try:
-            audio_feedback = create_audio_feedback()
-            if audio_feedback:
-                logger.info("✅ Audio feedback system is available")
-                logger.info("✅ Audio feedback test completed")
-            else:
-                logger.warning("⚠️ Audio feedback system not available")
-        except Exception as e:
-            logger.error(f"❌ Audio feedback test failed: {e}")
-        
-        # Test 3: Microphone Test
-        logger.info("\n" + "="*60)
-        logger.info("🧪 TEST 3: Microphone System")
-        logger.info("="*60)
-        try:
-            logger.info(f"✅ Microphone initialized: {usb_device.name}")
-            logger.info(f"   Device index: {usb_device.index}")
-            logger.info(f"   Sample rate: {wake_detector.get_sample_rate()}")
-            logger.info(f"   Frame length: {wake_detector.get_frame_length()}")
-            logger.info("✅ Microphone test completed")
-        except Exception as e:
-            logger.error(f"❌ Microphone test failed: {e}")
-        
-        logger.info("\n" + "="*60)
-        logger.info("🧪 ALL TESTS COMPLETED")
-        logger.info("="*60)
-        
-        # Exit after tests if --run-tests was specified
-        logger.info("✅ Tests completed successfully. Exiting.")
-        return 0
+
     
     # Check for startup model testing
     if args.startup_test_model:
