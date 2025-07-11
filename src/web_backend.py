@@ -7,37 +7,27 @@ from settings_manager import get_settings_manager, get_setting, set_setting
 from rms_monitor import rms_monitor
 
 # Configure Flask logging to reduce verbosity for frequent polling endpoints only
-logging.getLogger('werkzeug').setLevel(logging.INFO)  # Keep INFO level for other endpoints
+logging.getLogger('werkzeug').setLevel(logging.ERROR)  # Set to ERROR to suppress most requests
 logging.getLogger('flask').setLevel(logging.INFO)
 logging.getLogger('urllib3').setLevel(logging.ERROR)
 
-# Custom logging filter to suppress only the frequently-polled endpoints
-class SuppressFrequentEndpoints(logging.Filter):
-    def filter(self, record):
-        # Only suppress logging for the specific endpoints that are polled frequently
-        if hasattr(record, 'msg') and isinstance(record.msg, str):
-            # Suppress GET requests to these endpoints (polling)
-            if ('GET /api/detections' in record.msg or 
-                'GET /api/audio/rms' in record.msg):
-                return False
-            # But allow POST/PUT/DELETE requests to these endpoints (actual operations)
-            if ('POST /api/detections' in record.msg or 
-                'PUT /api/detections' in record.msg or
-                'DELETE /api/detections' in record.msg or
-                'POST /api/audio/rms' in record.msg or
-                'PUT /api/audio/rms' in record.msg or
-                'DELETE /api/audio/rms' in record.msg):
-                return True
-        return True
-
-# Apply the filter to werkzeug logger
-werkzeug_logger = logging.getLogger('werkzeug')
-werkzeug_logger.addFilter(SuppressFrequentEndpoints())
-
+# Disable Flask's default request logging completely
 app = Flask(__name__)
-# Disable Flask's default request logging for less noise
 app.logger.disabled = True
 CORS(app)
+
+# Configure WSGI server logging to suppress request logs
+import logging
+from werkzeug.serving import WSGIRequestHandler
+
+# Disable werkzeug's request logging
+class QuietWSGIRequestHandler(WSGIRequestHandler):
+    def log_request(self, *args, **kwargs):
+        # Suppress all request logging
+        pass
+
+# Set the custom request handler
+WSGIRequestHandler.log_request = QuietWSGIRequestHandler.log_request
 
 # Initialize settings manager
 settings_manager = get_settings_manager()
