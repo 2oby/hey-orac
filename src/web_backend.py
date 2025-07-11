@@ -5,6 +5,7 @@ import json
 import logging
 from settings_manager import get_settings_manager, get_setting, set_setting
 from rms_monitor import rms_monitor
+import glob
 
 # Configure Flask logging to reduce verbosity for frequent polling endpoints only
 logging.getLogger('werkzeug').setLevel(logging.ERROR)  # Set to ERROR to suppress most requests
@@ -31,6 +32,58 @@ WSGIRequestHandler.log_request = QuietWSGIRequestHandler.log_request
 
 # Initialize settings manager
 settings_manager = get_settings_manager()
+
+# Model discovery paths
+OPENWAKEWORD_MODELS_DIR = os.path.join('/app', 'third_party', 'openwakeword', 'custom_models')
+PORCUPINE_MODELS_DIR = os.path.join('/app', 'third_party', 'porcupine', 'custom_models')
+
+def discover_available_models():
+    """
+    Discover all available wake word models from the filesystem.
+    Returns a list of model names found in the model directories.
+    """
+    models = set()
+    
+    # OpenWakeWord: .onnx files only
+    if os.path.exists(OPENWAKEWORD_MODELS_DIR):
+        oww_models = glob.glob(os.path.join(OPENWAKEWORD_MODELS_DIR, '*.onnx'))
+        models.update([os.path.splitext(os.path.basename(f))[0] for f in oww_models])
+    
+    # Porcupine models (for future use)
+    if os.path.exists(PORCUPINE_MODELS_DIR):
+        porcupine_models = glob.glob(os.path.join(PORCUPINE_MODELS_DIR, '*.ppn'))
+        models.update([os.path.splitext(os.path.basename(f))[0] for f in porcupine_models])
+    
+    return sorted(list(models))
+
+def get_model_info(model_name):
+    """
+    Get detailed information about a specific model.
+    Returns a dictionary with model details.
+    """
+    # Check OpenWakeWord models first
+    onnx_path = os.path.join(OPENWAKEWORD_MODELS_DIR, f'{model_name}.onnx')
+    if os.path.exists(onnx_path):
+        return {
+            'name': model_name,
+            'file': f'{model_name}.onnx',
+            'path': onnx_path,
+            'type': 'openwakeword',
+            'format': 'onnx'
+        }
+    
+    # Check Porcupine models
+    ppn_path = os.path.join(PORCUPINE_MODELS_DIR, f'{model_name}.ppn')
+    if os.path.exists(ppn_path):
+        return {
+            'name': model_name,
+            'file': f'{model_name}.ppn',
+            'path': ppn_path,
+            'type': 'porcupine',
+            'format': 'ppn'
+        }
+    
+    return None
 
 # Serve static files from web directory
 @app.route('/')
@@ -148,8 +201,8 @@ def set_model_config(model_name):
 def discover_models():
     """Get list of available models"""
     return jsonify({
-        "models": ["wake_word"],
-        "count": 1
+        "models": discover_available_models(),
+        "count": len(discover_available_models())
     })
 
 @app.route('/api/audio/rms', methods=['GET'])
@@ -161,21 +214,11 @@ def get_rms_data():
 @app.route('/api/custom-models', methods=['GET'])
 def get_custom_models():
     """Get list of available custom models and current selection"""
-    import os
-    import glob
-    
-    # Discover available custom models
-    models_dir = '/app/third_party/openwakeword/custom_models'
-    onnx_files = glob.glob(os.path.join(models_dir, '*.onnx'))
-    
     available_models = []
-    for file_path in onnx_files:
-        model_name = os.path.splitext(os.path.basename(file_path))[0]
-        available_models.append({
-            'name': model_name,
-            'file': os.path.basename(file_path),
-            'path': file_path
-        })
+    for model_name in discover_available_models():
+        model_info = get_model_info(model_name)
+        if model_info:
+            available_models.append(model_info)
     
     # Get current selection from settings
     current_model = settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
@@ -183,17 +226,15 @@ def get_custom_models():
     return jsonify({
         'available_models': available_models,
         'current_model': current_model,
-        'current_path': f'/app/third_party/openwakeword/custom_models/{current_model}.onnx'
+        'current_path': get_model_info(current_model)['path'] if get_model_info(current_model) else None
     })
 
 @app.route('/api/custom-models/<model_name>', methods=['POST'])
 def set_custom_model(model_name):
     """Set the active custom model"""
-    import os
-    
     # Validate the model exists
-    model_path = f'/app/third_party/openwakeword/custom_models/{model_name}.onnx'
-    if not os.path.exists(model_path):
+    model_info = get_model_info(model_name)
+    if not model_info:
         return jsonify({'error': f'Model {model_name} not found'}), 404
     
     # Update the settings
@@ -202,7 +243,7 @@ def set_custom_model(model_name):
             'status': 'success',
             'message': f'Model {model_name} activated',
             'current_model': model_name,
-            'current_path': model_path
+            'current_path': model_info['path']
         })
     else:
         return jsonify({'error': 'Failed to update model setting'}), 500

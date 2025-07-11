@@ -117,9 +117,7 @@ class WakeWordDetector:
             elif self.engine_name == "pocketsphinx":
                 from wake_word_engines.pocketsphinx_engine import PocketSphinxEngine
                 self.engine = PocketSphinxEngine()
-            elif self.engine_name == "test":
-                from wake_word_engines.test_engine import TestEngine
-                self.engine = TestEngine()
+
             else:
                 logger.error(f"Unknown wake-word engine: {self.engine_name}")
                 return False
