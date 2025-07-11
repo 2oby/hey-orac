@@ -19,7 +19,8 @@ class RMSMonitor:
         }
         self._lock = threading.Lock()
         self._volume_window_size = 50  # Keep last 50 RMS values for averaging
-        self._data_file = '/tmp/rms_monitor_data.json'
+        # Use tmpfs path for RMS data to protect SD card
+        self._data_file = os.environ.get('RMS_DATA_FILE', '/tmp/rms_data/rms_monitor_data.json')
         
     def update_rms(self, rms_level: float):
         """Update RMS level from audio pipeline"""

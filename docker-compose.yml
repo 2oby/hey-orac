@@ -33,8 +33,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Mount models directory
       - ./models:/app/models:ro
-      # Mount logs directory
+      # Mount logs directory (permanent storage)
       - ./logs:/app/logs
+      # TMPFS volumes for temporary data (RAM-based, protects SD card)
+      - rms-data:/tmp/rms_data:rw
+      - temp-cache:/tmp/cache:rw
+      - temp-sessions:/tmp/sessions:rw
+      - temp-uploads:/tmp/uploads:rw
     devices:
       # Access to audio devices
       - /dev/snd:/dev/snd
@@ -55,6 +60,8 @@ services:
       # PulseAudio configuration for audio output
       - PULSE_SERVER=unix:/run/user/1000/pulse/native
       - PULSE_COOKIE=/home/appuser/.config/pulse/cookie
+      # RMS data file path (now in tmpfs)
+      - RMS_DATA_FILE=/tmp/rms_data/rms_monitor_data.json
     deploy:
       resources:
         limits:
@@ -82,10 +89,87 @@ services:
       retries: 3
       start_period: 40s
 
+  # Future Home Assistant service (commented out until needed)
+  # homeassistant:
+  #   container_name: homeassistant
+  #   image: homeassistant/home-assistant:stable
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8123:8123"
+  #   volumes:
+  #     # Permanent storage for Home Assistant configuration
+  #     - ./homeassistant:/config
+  #     # TMPFS volumes for temporary data
+  #     - ha-temp:/tmp:rw
+  #     - ha-cache:/config/.storage:rw
+  #     - ha-sessions:/config/.storage/sessions:rw
+  #     - ha-uploads:/config/www/upload:rw
+  #   environment:
+  #     - TZ=UTC
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 1G
+  #         cpus: '1.0'
+  #       reservations:
+  #         memory: 512M
+  #         cpus: '0.5'
+
 networks:
   hey-orac-network:
     driver: bridge
 
 volumes:
+  # Permanent storage (SD card)
   logs:
-    driver: local 
+    driver: local
+  
+  # TMPFS volumes (RAM-based, protects SD card)
+  rms-data:
+    driver: tmpfs
+    driver_opts:
+      size: 10M
+      mode: 0755
+  
+  temp-cache:
+    driver: tmpfs
+    driver_opts:
+      size: 50M
+      mode: 0755
+  
+  temp-sessions:
+    driver: tmpfs
+    driver_opts:
+      size: 20M
+      mode: 0755
+  
+  temp-uploads:
+    driver: tmpfs
+    driver_opts:
+      size: 30M
+      mode: 0755
+  
+  # Future Home Assistant tmpfs volumes
+  # ha-temp:
+  #   driver: tmpfs
+  #   driver_opts:
+  #     size: 100M
+  #     mode: 0755
+  # 
+  # ha-cache:
+  #   driver: tmpfs
+  #   driver_opts:
+  #     size: 200M
+  #     mode: 0755
+  # 
+  # ha-sessions:
+  #   driver: tmpfs
+  #   driver_opts:
+  #     size: 50M
+  #     mode: 0755
+  # 
+  # ha-uploads:
+  #   driver: tmpfs
+  #   driver_opts:
+  #     size: 100M
+  #     mode: 0755 
