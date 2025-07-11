@@ -291,6 +291,26 @@ class SettingsManager:
             self._file_watcher_thread.join(timeout=1)
         logger.info("✅ Settings manager stopped")
 
+    def get_model_sensitivity(self, model_name: str, default: float = 0.4) -> float:
+        """Get sensitivity for a specific model."""
+        with self._lock:
+            sensitivities = self._settings.get("wake_word", {}).get("sensitivities", {})
+            return sensitivities.get(model_name, default)
+
+    def set_model_sensitivity(self, model_name: str, value: float) -> bool:
+        """Set sensitivity for a specific model."""
+        try:
+            with self._lock:
+                if "wake_word" not in self._settings:
+                    self._settings["wake_word"] = {}
+                if "sensitivities" not in self._settings["wake_word"]:
+                    self._settings["wake_word"]["sensitivities"] = {}
+                self._settings["wake_word"]["sensitivities"][model_name] = value
+                return self._save_settings()
+        except Exception as e:
+            logger.error(f"❌ Failed to set model sensitivity for {model_name}: {e}")
+            return False
+
 # Global settings manager instance
 _settings_manager = None
 

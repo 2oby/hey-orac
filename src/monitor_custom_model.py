@@ -37,12 +37,20 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     
     # Initialize settings manager
     settings_manager = get_settings_manager()
-    
+
+    # Get selected model and its sensitivity
+    model_name = settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
+    sensitivity = settings_manager.get_model_sensitivity(model_name, 0.4)
+
     # Create custom config for custom models
     custom_config = config.copy()
     if custom_model_path:
         custom_config['wake_word']['custom_model_path'] = custom_model_path
         logger.info(f"📁 Using custom model: {custom_model_path}")
+    # Inject per-model sensitivity
+    if 'wake_word' not in custom_config:
+        custom_config['wake_word'] = {}
+    custom_config['wake_word']['sensitivity'] = sensitivity
     
     # Initialize wake word detector for custom models
     wake_detector = WakeWordDetector()

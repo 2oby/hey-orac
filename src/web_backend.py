@@ -2,10 +2,31 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import json
+import logging
 from settings_manager import get_settings_manager, get_setting, set_setting
 from rms_monitor import rms_monitor
 
+# Configure Flask logging to reduce verbosity
+logging.getLogger('werkzeug').setLevel(logging.ERROR)
+logging.getLogger('flask').setLevel(logging.ERROR)
+logging.getLogger('urllib3').setLevel(logging.ERROR)
+
+# Custom logging filter to suppress frequent endpoint calls
+class SuppressFrequentEndpoints(logging.Filter):
+    def filter(self, record):
+        # Suppress logging for frequently-polled endpoints
+        if hasattr(record, 'msg') and isinstance(record.msg, str):
+            if '/api/detections' in record.msg or '/api/audio/rms' in record.msg:
+                return False
+        return True
+
+# Apply the filter to werkzeug logger
+werkzeug_logger = logging.getLogger('werkzeug')
+werkzeug_logger.addFilter(SuppressFrequentEndpoints())
+
 app = Flask(__name__)
+# Disable Flask's default request logging for less noise
+app.logger.disabled = True
 CORS(app)
 
 # Initialize settings manager
@@ -25,6 +46,7 @@ def static_files(filename):
 def get_config():
     """Get full configuration for web interface"""
     # Return the structure expected by the web interface
+    sensitivities = settings_manager.get("wake_word.sensitivities", {})
     return jsonify({
         "global": {
             "rms_filter": settings_manager.get("detection.rms_filter", 50),
@@ -33,15 +55,15 @@ def get_config():
         },
         "models": {
             "Hay--compUta_v_lrg": {
-                "sensitivity": settings_manager.get("wake_word.threshold", 0.4),
+                "sensitivity": sensitivities.get("Hay--compUta_v_lrg", 0.4),
                 "api_url": "https://api.example.com/webhook"
             },
             "Hey_computer": {
-                "sensitivity": settings_manager.get("wake_word.threshold", 0.4),
+                "sensitivity": sensitivities.get("Hey_computer", 0.4),
                 "api_url": "https://api.example.com/webhook"
             },
             "hey-CompUter_lrg": {
-                "sensitivity": settings_manager.get("wake_word.threshold", 0.4),
+                "sensitivity": sensitivities.get("hey-CompUter_lrg", 0.4),
                 "api_url": "https://api.example.com/webhook"
             }
         }
@@ -97,28 +119,24 @@ def get_models():
 
 @app.route('/api/config/models/<model_name>', methods=['GET'])
 def get_model_config(model_name):
-    """Get specific model settings"""
-    if model_name == "wake_word":
-        return jsonify({
-            "threshold": settings_manager.get("wake_word.threshold"),
-            "model": settings_manager.get("wake_word.model"),
-            "cooldown": settings_manager.get("wake_word.cooldown"),
-            "debounce": settings_manager.get("wake_word.debounce")
-        })
-    else:
-        return jsonify({"error": "Model not found"}), 404
+    """Get specific model settings (per-model sensitivity)"""
+    sensitivity = settings_manager.get_model_sensitivity(model_name, 0.4)
+    return jsonify({
+        "sensitivity": sensitivity,
+        "model": model_name
+    })
 
 @app.route('/api/config/models/<model_name>', methods=['POST'])
 def set_model_config(model_name):
-    """Update specific model settings"""
+    """Update specific model settings (per-model sensitivity)"""
     try:
         settings = request.json
-        if model_name == "wake_word":
-            for key, value in settings.items():
-                settings_manager.set(f"wake_word.{key}", value)
-            return jsonify({"status": "success"})
-        else:
-            return jsonify({"error": "Model not found"}), 404
+        if "sensitivity" in settings:
+            settings_manager.set_model_sensitivity(model_name, settings["sensitivity"])
+        # Optionally update model selection
+        if settings.get("activate", False):
+            settings_manager.set("wake_word.model", model_name)
+        return jsonify({"status": "success"})
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -239,5 +257,5 @@ def reset_settings():
         return jsonify({"status": "error", "message": "Failed to reset settings"}), 500
 
 if __name__ == '__main__':
-    # Run in production mode for service deployment
-    app.run(host='0.0.0.0', port=7171, debug=False, threaded=True) 
+    # Run in production mode for service deployment with reduced logging
+    app.run(host='0.0.0.0', port=7171, debug=False, threaded=True, use_reloader=False) 
