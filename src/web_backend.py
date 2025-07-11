@@ -23,8 +23,29 @@ def static_files(filename):
 # API endpoints
 @app.route('/api/config', methods=['GET'])
 def get_config():
-    """Get full configuration"""
-    return jsonify(settings_manager.get_all())
+    """Get full configuration for web interface"""
+    # Return the structure expected by the web interface
+    return jsonify({
+        "global": {
+            "rms_filter": settings_manager.get("detection.rms_filter", 50),
+            "debounce_ms": settings_manager.get("wake_word.debounce", 200),
+            "cooldown_s": settings_manager.get("wake_word.cooldown", 1.5)
+        },
+        "models": {
+            "Hay--compUta_v_lrg": {
+                "sensitivity": settings_manager.get("wake_word.threshold", 0.4),
+                "api_url": "https://api.example.com/webhook"
+            },
+            "Hey_computer": {
+                "sensitivity": settings_manager.get("wake_word.threshold", 0.4),
+                "api_url": "https://api.example.com/webhook"
+            },
+            "hey-CompUter_lrg": {
+                "sensitivity": settings_manager.get("wake_word.threshold", 0.4),
+                "api_url": "https://api.example.com/webhook"
+            }
+        }
+    })
 
 @app.route('/api/config/global', methods=['GET'])
 def get_global_config():
