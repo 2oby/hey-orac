@@ -43,7 +43,16 @@ class OpenWakeWordEngine(WakeWordEngine):
             # Use sensitivity directly - high sensitivity = easier detection (lower threshold)
             # Low sensitivity = harder detection (higher threshold)
             self.sensitivity = config.get('sensitivity', 0.5)
-            self.threshold = 1.0 - self.sensitivity  # Convert sensitivity to threshold
+            
+            # FIXED: The threshold calculation was wrong for this model
+            # Based on testing, confidence scores range from ~0.0008 to ~0.8
+            # So we need to map sensitivity (0.0-1.0) to threshold (0.0-0.8)
+            # High sensitivity (0.8) should give low threshold (0.1)
+            # Low sensitivity (0.2) should give high threshold (0.6)
+            self.threshold = 0.8 - (self.sensitivity * 0.7)  # Map sensitivity to reasonable threshold range
+            
+            logger.info(f"🔧 FIXED: Sensitivity {self.sensitivity:.6f} mapped to threshold {self.threshold:.6f}")
+            logger.info(f"   Threshold range: 0.1 (high sensitivity) to 0.8 (low sensitivity)")
             
             # Check if custom model is specified
             custom_model_path = config.get('custom_model_path')
@@ -203,11 +212,13 @@ class OpenWakeWordEngine(WakeWordEngine):
                 logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
                 return True
             else:
-                # Only log every 100th chunk to reduce verbosity (about every 8 seconds)
+                # Log every 50th chunk to see what's happening with confidence scores
                 self.debug_counter += 1
-                if self.debug_counter % 100 == 0:
-                    logger.debug(f"🎯 Wake word confidence: {max_confidence:.6f} (threshold: {self.threshold:.6f}) - Source: best available model '{best_model}'")
-                    logger.debug(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
+                if self.debug_counter % 50 == 0:
+                    logger.info(f"🔍 DEBUG: Wake word confidence: {max_confidence:.6f} (threshold: {self.threshold:.6f}) - Source: {best_model}")
+                    logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
+                    logger.info(f"   Sensitivity setting: {self.sensitivity:.6f}")
+                    logger.info(f"   Threshold calculation: 1.0 - {self.sensitivity:.6f} = {self.threshold:.6f}")
                 
                 return False
                 
