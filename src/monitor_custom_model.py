@@ -41,6 +41,8 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     # Get selected model and its sensitivity
     model_name = settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
     sensitivity = settings_manager.get_model_sensitivity(model_name, 0.4)
+    
+    logger.info(f"🔧 DEBUG: Model: {model_name}, Sensitivity: {sensitivity:.6f}")
 
     # Create custom config for custom models
     custom_config = config.copy()
@@ -51,6 +53,8 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     if 'wake_word' not in custom_config:
         custom_config['wake_word'] = {}
     custom_config['wake_word']['sensitivity'] = sensitivity
+    
+    logger.info(f"🔧 DEBUG: Config sensitivity: {custom_config['wake_word'].get('sensitivity', 'NOT SET')}")
     
     # Initialize wake word detector for custom models
     wake_detector = WakeWordDetector()
