@@ -15,6 +15,7 @@ from wake_word_interface import WakeWordDetector
 from audio_buffer import AudioBuffer
 from audio_feedback import create_audio_feedback
 from rms_monitor import rms_monitor
+from settings_manager import get_settings_manager
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +34,9 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
         Exit code (0 for success, 1 for failure)
     """
     logger.info("🎯 Starting custom model monitoring...")
+    
+    # Initialize settings manager
+    settings_manager = get_settings_manager()
     
     # Create custom config for custom models
     custom_config = config.copy()
@@ -62,15 +66,15 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
         postroll_seconds=config['buffer'].get('postroll_seconds', 2.0)
     )
     
-    # Detection debouncing and cooldown
+    # Detection debouncing and cooldown - use settings from settings manager
     last_detection_time = 0  # Initialize to 0 so first detection can get through
-    detection_cooldown_seconds = config.get('global', {}).get('cooldown_s', 1.5)  # Use config value from web UI
-    debounce_seconds = config.get('global', {}).get('debounce_ms', 200) / 1000.0  # Convert ms to seconds
+    detection_cooldown_seconds = settings_manager.get('wake_word.cooldown', 1.5)
+    debounce_seconds = settings_manager.get('wake_word.debounce', 0.2)
     detection_debounce_chunks = int((wake_detector.get_sample_rate() * debounce_seconds) / wake_detector.get_frame_length())
     last_detection_chunk = -detection_debounce_chunks  # Initialize to negative so first detection can get through
     
-    # Volume filtering for efficiency - use RMS filter from web UI
-    rms_filter_value = config.get('global', {}).get('rms_filter', 50)
+    # Volume filtering for efficiency - use RMS filter from settings
+    rms_filter_value = settings_manager.get('detection.rms_filter', 50)
     # Convert RMS filter (0-100) to silence threshold (0.01-1.0)
     silence_threshold = (rms_filter_value / 100.0) * 0.99 + 0.01  # Map 0-100 to 0.01-1.0
     volume_window_size = 10  # Number of chunks to average for volume calculation
@@ -80,7 +84,24 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
     logger.info(f"🎤 Starting audio stream on device {usb_device.index} ({usb_device.name})")
     logger.info(f"⚙️ Stream parameters: {wake_detector.get_sample_rate()}Hz, 1 channel, {wake_detector.get_frame_length()} samples/chunk")
     logger.info(f"🛡️ Detection cooldown: {detection_cooldown_seconds}s, Debounce: {detection_debounce_chunks} chunks")
-    logger.info(f"🔧 Using config values - Cooldown: {detection_cooldown_seconds}s, Debounce: {debounce_seconds}s, RMS Filter: {rms_filter_value}")
+    logger.info(f"🔧 Using settings values - Cooldown: {detection_cooldown_seconds}s, Debounce: {debounce_seconds}s, RMS Filter: {rms_filter_value}")
+    
+    # Settings change callback function
+    def on_settings_changed(new_settings):
+        nonlocal detection_cooldown_seconds, debounce_seconds, detection_debounce_chunks, silence_threshold, rms_filter_value
+        
+        # Update detection parameters from new settings
+        detection_cooldown_seconds = new_settings.get('wake_word', {}).get('cooldown', 1.5)
+        debounce_seconds = new_settings.get('wake_word', {}).get('debounce', 0.2)
+        detection_debounce_chunks = int((wake_detector.get_sample_rate() * debounce_seconds) / wake_detector.get_frame_length())
+        
+        rms_filter_value = new_settings.get('detection', {}).get('rms_filter', 50)
+        silence_threshold = (rms_filter_value / 100.0) * 0.99 + 0.01
+        
+        logger.info(f"🔄 Settings updated - Cooldown: {detection_cooldown_seconds}s, Debounce: {debounce_seconds}s, RMS Filter: {rms_filter_value}")
+    
+    # Register settings watcher
+    settings_manager.add_watcher(on_settings_changed)
     
     stream = audio_manager.start_stream(
         device_index=usb_device.index,

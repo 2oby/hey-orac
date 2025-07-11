@@ -2,11 +2,14 @@ from flask import Flask, render_template, request, jsonify, send_from_directory
 from flask_cors import CORS
 import os
 import json
-from config_handler import ConfigHandler
+from settings_manager import get_settings_manager, get_setting, set_setting
 from rms_monitor import rms_monitor
 
 app = Flask(__name__)
 CORS(app)
+
+# Initialize settings manager
+settings_manager = get_settings_manager()
 
 # Serve static files from web directory
 @app.route('/')
@@ -21,53 +24,89 @@ def static_files(filename):
 @app.route('/api/config', methods=['GET'])
 def get_config():
     """Get full configuration"""
-    config_handler = ConfigHandler()
-    return jsonify(config_handler.get_config())
+    return jsonify(settings_manager.get_all())
 
 @app.route('/api/config/global', methods=['GET'])
 def get_global_config():
     """Get global settings"""
-    config_handler = ConfigHandler()
-    return jsonify(config_handler.get_global())
+    return jsonify(settings_manager.get_all())
 
 @app.route('/api/config/global', methods=['POST'])
 def set_global_config():
     """Update global settings"""
-    config_handler = ConfigHandler()
-    settings = request.json
-    config_handler.set_global(settings)
-    return jsonify({"status": "success"})
+    try:
+        settings = request.json
+        if settings_manager.update(settings):
+            return jsonify({"status": "success", "message": "Settings updated"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to update settings"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/config/settings/<path:key>', methods=['GET'])
+def get_setting_value(key):
+    """Get a specific setting value"""
+    value = settings_manager.get(key)
+    return jsonify({"key": key, "value": value})
+
+@app.route('/api/config/settings/<path:key>', methods=['POST'])
+def set_setting_value(key):
+    """Set a specific setting value"""
+    try:
+        value = request.json.get('value')
+        if settings_manager.set(key, value):
+            return jsonify({"status": "success", "key": key, "value": value})
+        else:
+            return jsonify({"status": "error", "message": "Failed to update setting"}), 500
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/config/models', methods=['GET'])
 def get_models():
     """Get all models with their settings"""
-    config_handler = ConfigHandler()
-    models = {}
-    for model_name in config_handler.get_all_models():
-        models[model_name] = config_handler.get_model(model_name)
-    return jsonify(models)
+    # For now, return wake word settings
+    return jsonify({
+        "wake_word": {
+            "threshold": settings_manager.get("wake_word.threshold"),
+            "model": settings_manager.get("wake_word.model"),
+            "cooldown": settings_manager.get("wake_word.cooldown"),
+            "debounce": settings_manager.get("wake_word.debounce")
+        }
+    })
 
 @app.route('/api/config/models/<model_name>', methods=['GET'])
 def get_model_config(model_name):
     """Get specific model settings"""
-    config_handler = ConfigHandler()
-    return jsonify(config_handler.get_model(model_name))
+    if model_name == "wake_word":
+        return jsonify({
+            "threshold": settings_manager.get("wake_word.threshold"),
+            "model": settings_manager.get("wake_word.model"),
+            "cooldown": settings_manager.get("wake_word.cooldown"),
+            "debounce": settings_manager.get("wake_word.debounce")
+        })
+    else:
+        return jsonify({"error": "Model not found"}), 404
 
 @app.route('/api/config/models/<model_name>', methods=['POST'])
 def set_model_config(model_name):
     """Update specific model settings"""
-    config_handler = ConfigHandler()
-    settings = request.json
-    config_handler.set_model(model_name, settings)
-    return jsonify({"status": "success"})
+    try:
+        settings = request.json
+        if model_name == "wake_word":
+            for key, value in settings.items():
+                settings_manager.set(f"wake_word.{key}", value)
+            return jsonify({"status": "success"})
+        else:
+            return jsonify({"error": "Model not found"}), 404
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 @app.route('/api/models/discover', methods=['GET'])
 def discover_models():
     """Get list of available models"""
-    config_handler = ConfigHandler()
     return jsonify({
-        "models": config_handler.get_all_models(),
-        "count": len(config_handler.get_all_models())
+        "models": ["wake_word"],
+        "count": 1
     })
 
 @app.route('/api/audio/rms', methods=['GET'])
@@ -95,25 +134,13 @@ def get_custom_models():
             'path': file_path
         })
     
-    # Get current selection from config
-    config_handler = ConfigHandler()
-    config = config_handler.get_config()
-    current_model_path = config.get('wake_word', {}).get('custom_model_path', '')
-    
-    # Find which model is currently active
-    current_model = None
-    for model in available_models:
-        # Compare both the full path and the relative path
-        if (model['path'] == current_model_path or 
-            model['path'].replace('/app/', '') == current_model_path or
-            f"/app/{current_model_path}" == model['path']):
-            current_model = model['name']
-            break
+    # Get current selection from settings
+    current_model = settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
     
     return jsonify({
         'available_models': available_models,
         'current_model': current_model,
-        'current_path': current_model_path
+        'current_path': f'/app/third_party/openwakeword/custom_models/{current_model}.onnx'
     })
 
 @app.route('/api/custom-models/<model_name>', methods=['POST'])
@@ -126,23 +153,16 @@ def set_custom_model(model_name):
     if not os.path.exists(model_path):
         return jsonify({'error': f'Model {model_name} not found'}), 404
     
-    # Update the config
-    config_handler = ConfigHandler()
-    config = config_handler.get_config()
-    
-    if 'wake_word' not in config:
-        config['wake_word'] = {}
-    
-    config['wake_word']['custom_model_path'] = model_path
-    config_handler.config = config
-    config_handler.save()
-    
-    return jsonify({
-        'status': 'success',
-        'message': f'Model {model_name} activated',
-        'current_model': model_name,
-        'current_path': model_path
-    })
+    # Update the settings
+    if settings_manager.set("wake_word.model", model_name):
+        return jsonify({
+            'status': 'success',
+            'message': f'Model {model_name} activated',
+            'current_model': model_name,
+            'current_path': model_path
+        })
+    else:
+        return jsonify({'error': 'Failed to update model setting'}), 500
 
 @app.route('/api/detections', methods=['GET'])
 def get_detections():
@@ -172,6 +192,30 @@ def get_detections():
     
     # Return all detections (no time filtering since file is cleared after reading)
     return jsonify(detections)
+
+@app.route('/api/settings/backup', methods=['POST'])
+def backup_settings():
+    """Manually backup settings to permanent storage"""
+    if settings_manager.backup():
+        return jsonify({"status": "success", "message": "Settings backed up"})
+    else:
+        return jsonify({"status": "error", "message": "Failed to backup settings"}), 500
+
+@app.route('/api/settings/restore', methods=['POST'])
+def restore_settings():
+    """Restore settings from backup"""
+    if settings_manager.restore():
+        return jsonify({"status": "success", "message": "Settings restored from backup"})
+    else:
+        return jsonify({"status": "error", "message": "Failed to restore settings"}), 500
+
+@app.route('/api/settings/reset', methods=['POST'])
+def reset_settings():
+    """Reset settings to defaults"""
+    if settings_manager.reset_to_defaults():
+        return jsonify({"status": "success", "message": "Settings reset to defaults"})
+    else:
+        return jsonify({"status": "error", "message": "Failed to reset settings"}), 500
 
 if __name__ == '__main__':
     # Run in production mode for service deployment

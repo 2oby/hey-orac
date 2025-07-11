@@ -37,6 +37,7 @@ services:
       - ./logs:/app/logs
       # TMPFS volumes for temporary data (RAM-based, protects SD card)
       - rms-data:/tmp/rms_data:rw
+      - settings-data:/tmp/settings:rw
       - temp-cache:/tmp/cache:rw
       - temp-sessions:/tmp/sessions:rw
       - temp-uploads:/tmp/uploads:rw
@@ -131,6 +132,13 @@ volumes:
       type: tmpfs
       device: tmpfs
       o: size=10M,mode=0777
+  
+  settings-data:
+    driver: local
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=5M,mode=0777
   
   temp-cache:
     driver: local
