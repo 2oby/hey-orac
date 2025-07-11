@@ -218,7 +218,7 @@ class OpenWakeWordEngine(WakeWordEngine):
                     logger.info(f"🔍 DEBUG: Wake word confidence: {max_confidence:.6f} (threshold: {self.threshold:.6f}) - Source: {best_model}")
                     logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
                     logger.info(f"   Sensitivity setting: {self.sensitivity:.6f}")
-                    logger.info(f"   Threshold calculation: 1.0 - {self.sensitivity:.6f} = {self.threshold:.6f}")
+                    logger.info(f"   Threshold calculation: 0.8 - ({self.sensitivity:.6f} * 0.7) = {self.threshold:.6f}")
                 
                 return False
                 
