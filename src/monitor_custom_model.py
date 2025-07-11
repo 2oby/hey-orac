@@ -253,9 +253,17 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                         except Exception as e:
                             logger.warning(f"⚠️ Could not write to detection log: {e}")
                         
-                        # Log detection details
+                        # Log detection details with enhanced parameters
                         logger.info(f"📊 Detection details:")
+                        logger.info(f"   Model: {wake_detector.get_wake_word_name()}")
+                        logger.info(f"   Sensitivity: {sensitivity:.6f}")
+                        logger.info(f"   Confidence: {wake_detector.engine.get_latest_confidence():.6f}" if hasattr(wake_detector, 'engine') else "   Confidence: N/A")
                         logger.info(f"   Chunk number: {chunk_count}")
+                        logger.info(f"   Time since last detection: {time_since_last_detection:.2f}s")
+                        logger.info(f"   Chunks since last detection: {chunks_since_last_detection}")
+                        logger.info(f"   Cooldown setting: {detection_cooldown_seconds}s")
+                        logger.info(f"   Debounce setting: {debounce_seconds}s ({detection_debounce_chunks} chunks)")
+                        logger.info(f"   RMS filter setting: {rms_filter_value}")
                         logger.info(f"   Audio RMS level: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
                         logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
                         logger.info(f"   Buffer status: {audio_buffer.get_buffer_status()}")
@@ -356,9 +364,16 @@ def monitor_custom_models(config: dict, usb_device, audio_manager: AudioManager,
                         logger.info("🔄 Resuming custom model monitoring...")
                         logger.info(f"🛡️ Cooldown active for {detection_cooldown_seconds}s...")
                     else:
-                        # Log that detection was blocked by cooldown/debounce
-                        logger.info(f"🛡️ Detection blocked: time_since={time_since_last_detection:.2f}s, chunks_since={chunks_since_last_detection}, cooldown={detection_cooldown_seconds}s, debounce={detection_debounce_chunks}")
-                        logger.info(f"🔍 Debug: cooldown_ok={cooldown_ok}, debounce_ok={debounce_ok}, not_postrolling={not_postrolling}")
+                        # Log that detection was blocked by cooldown/debounce with enhanced details
+                        logger.info(f"🛡️ Detection blocked by timing controls:")
+                        logger.info(f"   Model: {wake_detector.get_wake_word_name()}")
+                        logger.info(f"   Time since last detection: {time_since_last_detection:.2f}s")
+                        logger.info(f"   Chunks since last detection: {chunks_since_last_detection}")
+                        logger.info(f"   Cooldown setting: {detection_cooldown_seconds}s")
+                        logger.info(f"   Debounce setting: {debounce_seconds}s ({detection_debounce_chunks} chunks)")
+                        logger.info(f"   Cooldown OK: {cooldown_ok}")
+                        logger.info(f"   Debounce OK: {debounce_ok}")
+                        logger.info(f"   Not postrolling: {not_postrolling}")
                         if not cooldown_ok:
                             logger.info(f"   Reason: Cooldown period active (need {detection_cooldown_seconds - time_since_last_detection:.1f}s more)")
                         elif not debounce_ok:

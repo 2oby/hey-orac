@@ -6,18 +6,28 @@ import logging
 from settings_manager import get_settings_manager, get_setting, set_setting
 from rms_monitor import rms_monitor
 
-# Configure Flask logging to reduce verbosity
-logging.getLogger('werkzeug').setLevel(logging.ERROR)
-logging.getLogger('flask').setLevel(logging.ERROR)
+# Configure Flask logging to reduce verbosity for frequent polling endpoints only
+logging.getLogger('werkzeug').setLevel(logging.INFO)  # Keep INFO level for other endpoints
+logging.getLogger('flask').setLevel(logging.INFO)
 logging.getLogger('urllib3').setLevel(logging.ERROR)
 
-# Custom logging filter to suppress frequent endpoint calls
+# Custom logging filter to suppress only the frequently-polled endpoints
 class SuppressFrequentEndpoints(logging.Filter):
     def filter(self, record):
-        # Suppress logging for frequently-polled endpoints
+        # Only suppress logging for the specific endpoints that are polled frequently
         if hasattr(record, 'msg') and isinstance(record.msg, str):
-            if '/api/detections' in record.msg or '/api/audio/rms' in record.msg:
+            # Suppress GET requests to these endpoints (polling)
+            if ('GET /api/detections' in record.msg or 
+                'GET /api/audio/rms' in record.msg):
                 return False
+            # But allow POST/PUT/DELETE requests to these endpoints (actual operations)
+            if ('POST /api/detections' in record.msg or 
+                'PUT /api/detections' in record.msg or
+                'DELETE /api/detections' in record.msg or
+                'POST /api/audio/rms' in record.msg or
+                'PUT /api/audio/rms' in record.msg or
+                'DELETE /api/audio/rms' in record.msg):
+                return True
         return True
 
 # Apply the filter to werkzeug logger
