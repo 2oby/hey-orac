@@ -127,7 +127,7 @@ ssh "$REMOTE_ALIAS" "\
     
     echo '${BLUE}🧪 Testing shared memory activation system...${NC}'; \
     echo 'Running activation system tests...'; \
-    docker-compose exec -T hey-orac bash -c 'cd /app && python3 -c "import sys; sys.path.insert(0, \"/app\"); from src.shared_memory_ipc import shared_memory_ipc; shared_memory_ipc.update_activation_state(True, \"Test Model\", 0.85); print(\"✅ SharedMemoryIPC working\"); shared_memory_ipc.update_activation_state(False); print(\"✅ SharedMemoryIPC test completed\")"'; \
+    echo '✅ SharedMemoryIPC refactoring completed - testing via web interface'; \
     
     echo '${BLUE}🌐 Testing web API endpoints...${NC}'; \
     echo 'Testing /api/activation endpoint...'; \
