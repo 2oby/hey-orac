@@ -51,6 +51,7 @@ class BaseWakeWordMonitor(ABC):
         logger.info("🎯 Initializing base monitor...")
         
         # Initialize wake word detector
+        logger.info("🔍 DEBUG: Initializing wake word detector...")
         self.wake_detector = WakeWordDetector()
         if not self._initialize_detector():
             logger.error("❌ Failed to initialize wake word detector")
@@ -59,6 +60,7 @@ class BaseWakeWordMonitor(ABC):
         logger.info(f"✅ Wake word detector initialized: {self.wake_detector.get_wake_word_name()}")
         
         # Initialize audio feedback
+        logger.info("🔍 DEBUG: Initializing audio feedback...")
         self.audio_feedback = create_audio_feedback()
         if self.audio_feedback:
             logger.info("✅ Audio feedback system initialized")
@@ -66,6 +68,7 @@ class BaseWakeWordMonitor(ABC):
             logger.warning("⚠️ Audio feedback system not available")
         
         # Initialize audio buffer
+        logger.info("🔍 DEBUG: Initializing audio buffer...")
         self.audio_buffer = AudioBuffer(
             sample_rate=self.wake_detector.get_sample_rate(),
             preroll_seconds=self.config['buffer'].get('preroll_seconds', 1.0),
@@ -73,6 +76,7 @@ class BaseWakeWordMonitor(ABC):
         )
         
         # Start audio stream
+        logger.info("🔍 DEBUG: About to start audio stream...")
         if not self._start_audio_stream():
             return False
         
@@ -100,6 +104,7 @@ class BaseWakeWordMonitor(ABC):
         logger.info(f"🎤 Starting audio stream on device {self.usb_device.index} ({self.usb_device.name})")
         logger.info(f"⚙️ Stream parameters: {self.wake_detector.get_sample_rate()}Hz, 1 channel, {self.wake_detector.get_frame_length()} samples/chunk")
         
+        logger.info("🔍 DEBUG: About to call audio_manager.start_stream()...")
         self.stream = self.audio_manager.start_stream(
             device_index=self.usb_device.index,
             sample_rate=self.wake_detector.get_sample_rate(),
@@ -112,6 +117,7 @@ class BaseWakeWordMonitor(ABC):
             return False
         
         logger.info("✅ Audio stream started successfully")
+        logger.info("🔍 DEBUG: Audio stream object created successfully")
         return True
     
     def _process_audio_chunk(self, audio_data: np.ndarray) -> bool:
@@ -317,12 +323,24 @@ class BaseWakeWordMonitor(ABC):
         try:
             while True:
                 try:
+                    # DEBUG: Log every 25 chunks to track if we're reading audio
+                    if self.chunk_count % 25 == 0:
+                        logger.info(f"🔍 DEBUG: About to read chunk {self.chunk_count + 1}...")
+                    
                     # Read audio chunk
                     audio_chunk = self.stream.read(self.wake_detector.get_frame_length(), exception_on_overflow=False)
                     self.chunk_count += 1
                     
+                    # DEBUG: Log every 25 chunks to track audio data
+                    if self.chunk_count % 25 == 0:
+                        logger.info(f"🔍 DEBUG: Read chunk {self.chunk_count} - Audio chunk length: {len(audio_chunk)}")
+                    
                     # Convert to numpy array
                     audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+                    
+                    # DEBUG: Log every 25 chunks to track numpy conversion
+                    if self.chunk_count % 25 == 0:
+                        logger.info(f"🔍 DEBUG: Converted chunk {self.chunk_count} - Numpy array length: {len(audio_data)}")
                     
                     # Log audio levels
                     self._log_audio_levels(audio_data)

@@ -125,6 +125,10 @@ class CustomModelMonitor(BaseWakeWordMonitor):
     
     def _process_audio_chunk(self, audio_data: np.ndarray) -> bool:
         """Process a single audio chunk for wake word detection with custom model features."""
+        # DEBUG: Log every 50 chunks to track progress
+        if self.chunk_count % 50 == 0:
+            logger.info(f"🔍 DEBUG: Processing chunk {self.chunk_count} - Audio data length: {len(audio_data)}")
+        
         # Update volume history for RMS filtering
         rms_level = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
         self.volume_history.append(rms_level)
@@ -134,6 +138,9 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         # Update shared memory with RMS data for web interface
         try:
             shared_memory_ipc.update_audio_state(rms_level)
+            # DEBUG: Log shared memory updates every 100 chunks
+            if self.chunk_count % 100 == 0:
+                logger.info(f"🔗 DEBUG: Updated shared memory - RMS: {rms_level:.4f}, Chunk: {self.chunk_count}")
         except Exception as e:
             logger.warning(f"⚠️ Could not update audio state: {e}")
         
@@ -245,6 +252,9 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         # Initialize activation state to not listening
         self._update_activation_state(False)
         
+        # DEBUG: Log that we're about to start the main loop
+        logger.info("🔍 DEBUG: About to start main monitoring loop...")
+        
         return super().run()
 
 
@@ -263,11 +273,18 @@ def monitor_custom_models(config: dict, usb_device, audio_manager, custom_model_
     """
     logger.info("🎯 Starting custom model monitoring...")
     
+    # DEBUG: Log initialization steps
+    logger.info("🔍 DEBUG: Creating CustomModelMonitor instance...")
+    
     # Create and initialize the monitor
     monitor = CustomModelMonitor(config, usb_device, audio_manager, custom_model_path)
+    
+    logger.info("🔍 DEBUG: About to initialize monitor...")
     if not monitor.initialize():
         logger.error("❌ Failed to initialize custom model monitor")
         return 1
+    
+    logger.info("🔍 DEBUG: Monitor initialized successfully, about to start run()...")
     
     # Run the monitoring loop
     return monitor.run()
