@@ -299,6 +299,24 @@ class AudioManager:
                     channels: int = 1, chunk_size: int = 512):
         """Start audio stream and return the stream object for real-time processing."""
         try:
+            logger.info(f"🔍 DEBUG: Creating audio stream with parameters:")
+            logger.info(f"   Device index: {device_index}")
+            logger.info(f"   Sample rate: {sample_rate}")
+            logger.info(f"   Channels: {channels}")
+            logger.info(f"   Chunk size: {chunk_size}")
+            
+            # Get device info for debugging
+            try:
+                device_info = self.pyaudio.get_device_info_by_index(device_index)
+                logger.info(f"🔍 DEBUG: Device info for index {device_index}:")
+                logger.info(f"   Name: {device_info['name']}")
+                logger.info(f"   Max Input Channels: {device_info['maxInputChannels']}")
+                logger.info(f"   Default Sample Rate: {device_info['defaultSampleRate']}")
+                logger.info(f"   Host API: {device_info['hostApi']}")
+            except Exception as e:
+                logger.error(f"❌ Error getting device info for index {device_index}: {e}")
+            
+            logger.info(f"🔍 DEBUG: About to call pyaudio.open()...")
             stream = self.pyaudio.open(
                 format=pyaudio.paInt16,
                 channels=channels,
@@ -308,11 +326,16 @@ class AudioManager:
                 frames_per_buffer=chunk_size
             )
             
-            logger.info(f"Started audio stream from device {device_index}")
+            logger.info(f"✅ Audio stream created successfully from device {device_index}")
+            logger.info(f"🔍 DEBUG: Stream object created: {stream}")
+            logger.info(f"🔍 DEBUG: Stream active: {stream.is_active()}")
+            
             return stream
             
         except Exception as e:
-            logger.error(f"Error starting audio stream from device {device_index}: {e}")
+            logger.error(f"❌ Error starting audio stream from device {device_index}: {e}")
+            logger.error(f"   Exception type: {type(e).__name__}")
+            logger.error(f"   Exception details: {str(e)}")
             return None
     
     def read_audio_chunk(self) -> Optional[bytes]:

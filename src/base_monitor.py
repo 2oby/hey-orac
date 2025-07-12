@@ -118,6 +118,16 @@ class BaseWakeWordMonitor(ABC):
         
         logger.info("✅ Audio stream started successfully")
         logger.info("🔍 DEBUG: Audio stream object created successfully")
+        
+        # Test read to see if stream is working
+        logger.info("🔍 DEBUG: Testing stream read...")
+        try:
+            test_chunk = self.stream.read(self.wake_detector.get_frame_length(), exception_on_overflow=False)
+            logger.info(f"✅ Test read successful - chunk size: {len(test_chunk)}")
+        except Exception as e:
+            logger.error(f"❌ Test read failed: {e}")
+            return False
+        
         return True
     
     def _process_audio_chunk(self, audio_data: np.ndarray) -> bool:
@@ -327,7 +337,8 @@ class BaseWakeWordMonitor(ABC):
                     if self.chunk_count % 25 == 0:
                         logger.info(f"🔍 DEBUG: About to read chunk {self.chunk_count + 1}...")
                     
-                    # Read audio chunk
+                    # Read audio chunk with timeout
+                    logger.debug(f"🔍 DEBUG: Calling stream.read() for chunk {self.chunk_count + 1}...")
                     audio_chunk = self.stream.read(self.wake_detector.get_frame_length(), exception_on_overflow=False)
                     self.chunk_count += 1
                     
