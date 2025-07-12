@@ -136,25 +136,9 @@ ssh "$REMOTE_ALIAS" "\
     echo 'Testing /api/detections endpoint...'; \
     curl -s http://localhost:7171/api/detections | python3 -m json.tool || echo '❌ Detections endpoint test failed'; \
     \
-    echo '${BLUE}👀 Monitoring for 10 seconds to check for activation updates...${NC}'; \
-    timeout 10 bash -c '
-    while true; do
-        data=$(curl -s http://localhost:7171/api/activation 2>/dev/null)
-        if [ $? -eq 0 ]; then
-            is_listening=$(echo "$data" | python3 -c "import sys, json; print(json.load(sys.stdin).get(\"is_listening\", False))")
-            rms=$(echo "$data" | python3 -c "import sys, json; print(json.load(sys.stdin).get(\"current_rms\", 0))")
-            timestamp=$(date "+%H:%M:%S")
-            if [ "$is_listening" = "True" ]; then
-                echo "🎯 [$timestamp] ACTIVATION: Listening for wake word (RMS: $rms)"
-            else
-                echo "🔇 [$timestamp] Not listening (RMS: $rms)"
-            fi
-        else
-            echo "❌ [$timestamp] Failed to get activation data"
-        fi
-        sleep 1
-    done
-    ' || echo 'Monitoring completed'; \
+    echo '${BLUE}👀 Testing web interface...${NC}'; \
+    echo 'Testing web interface at http://localhost:7171'; \
+    curl -s http://localhost:7171/api/activation > /dev/null && echo '✅ Web interface responding' || echo '❌ Web interface not responding'; \
     
     echo '${GREEN}✓ Shared memory activation system tests completed${NC}'; \
     
