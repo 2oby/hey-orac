@@ -131,6 +131,12 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         if len(self.volume_history) > self.volume_window_size:
             self.volume_history.pop(0)
         
+        # Update shared memory with RMS data for web interface
+        try:
+            shared_memory_ipc.update_audio_state(rms_level)
+        except Exception as e:
+            logger.warning(f"⚠️ Could not update audio state: {e}")
+        
         # Log confidence scores periodically
         self.confidence_log_count += 1
         if self.confidence_log_count % 50 == 0:
