@@ -342,6 +342,12 @@ class BaseWakeWordMonitor(ABC):
                     
                     # Simple timeout approach - just log before and after
                     logger.info(f"🔍 DEBUG: About to call stream.read() for chunk {self.chunk_count + 1}...")
+                    
+                    # Check if stream is still active before reading
+                    if not self.stream.is_active():
+                        logger.warning("⚠️ Stream is not active, restarting...")
+                        self._restart_audio_stream()
+                    
                     audio_chunk = self.stream.read(self.wake_detector.get_frame_length(), exception_on_overflow=False)
                     logger.info(f"🔍 DEBUG: Successfully read chunk {self.chunk_count + 1} - size: {len(audio_chunk)}")
                     
@@ -371,6 +377,10 @@ class BaseWakeWordMonitor(ABC):
                     logger.error(f"❌ Error processing audio chunk {self.chunk_count}: {e}")
                     logger.error(f"   Audio data length: {len(audio_data) if 'audio_data' in locals() else 'N/A'}")
                     logger.error(f"   Stream active: {self.stream.is_active() if self.stream else False}")
+                    
+                    # Try to restart stream on error
+                    logger.info("🔄 Attempting to restart audio stream...")
+                    self._restart_audio_stream()
                     continue
                     
         except KeyboardInterrupt:
@@ -383,6 +393,31 @@ class BaseWakeWordMonitor(ABC):
             self._cleanup()
         
         return 0
+    
+    def _restart_audio_stream(self):
+        """Restart the audio stream if it gets stuck."""
+        logger.info("🔄 Restarting audio stream...")
+        try:
+            if self.stream:
+                self.stream.stop_stream()
+                self.stream.close()
+                logger.info("✅ Old stream closed")
+            
+            # Wait a moment before restarting
+            import time
+            time.sleep(1)
+            
+            # Restart the stream
+            if not self._start_audio_stream():
+                logger.error("❌ Failed to restart audio stream")
+                return False
+            
+            logger.info("✅ Audio stream restarted successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Error restarting audio stream: {e}")
+            return False
     
     def _cleanup(self):
         """Clean up resources."""
