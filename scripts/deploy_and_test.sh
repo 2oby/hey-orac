@@ -127,9 +127,9 @@ ssh "$REMOTE_ALIAS" "\
     
     echo '${BLUE}🧪 Testing shared memory activation system...${NC}'; \
     echo 'Running activation system tests...'; \
-    docker-compose exec -T hey-orac python3 -c "
+    docker-compose exec -T hey-orac bash -c "cd /app && python3 -c \"
 import sys
-sys.path.append('/app')
+sys.path.insert(0, '/app')
 from src.shared_memory_ipc import shared_memory_ipc
 import time
 
@@ -155,7 +155,7 @@ try:
 except Exception as e:
     print(f'❌ Shared memory test failed: {e}')
     exit(1)
-"; \
+\""; \
     
     echo '${BLUE}🌐 Testing web API endpoints...${NC}'; \
     echo 'Testing /api/activation endpoint...'; \
