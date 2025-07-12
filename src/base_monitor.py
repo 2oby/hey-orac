@@ -339,8 +339,38 @@ class BaseWakeWordMonitor(ABC):
                     
                     # Read audio chunk with timeout
                     logger.debug(f"🔍 DEBUG: Calling stream.read() for chunk {self.chunk_count + 1}...")
-                    audio_chunk = self.stream.read(self.wake_detector.get_frame_length(), exception_on_overflow=False)
-                    self.chunk_count += 1
+                    
+                    # Add timeout to prevent blocking
+                    import threading
+                    import queue
+                    
+                    # Create a queue to hold the result
+                    result_queue = queue.Queue()
+                    
+                    def read_audio():
+                        try:
+                            audio_chunk = self.stream.read(self.wake_detector.get_frame_length(), exception_on_overflow=False)
+                            result_queue.put(('success', audio_chunk))
+                        except Exception as e:
+                            result_queue.put(('error', e))
+                    
+                    # Start reading in a separate thread
+                    read_thread = threading.Thread(target=read_audio)
+                    read_thread.daemon = True
+                    read_thread.start()
+                    
+                    # Wait for result with timeout (5 seconds)
+                    try:
+                        result_type, result_data = result_queue.get(timeout=5.0)
+                        if result_type == 'success':
+                            audio_chunk = result_data
+                            self.chunk_count += 1
+                        else:
+                            raise result_data
+                    except queue.Empty:
+                        logger.error(f"❌ Timeout waiting for audio chunk {self.chunk_count + 1}")
+                        logger.error(f"   Stream active: {self.stream.is_active() if self.stream else False}")
+                        continue
                     
                     # DEBUG: Log every 25 chunks to track audio data
                     if self.chunk_count % 25 == 0:
