@@ -45,17 +45,19 @@ class RMSMonitor:
         
     def _pack_rms_data(self, rms_level: float, is_active: bool) -> bytes:
         """Pack RMS data into bytes for shared memory"""
-        # Pack: rms_level (8 bytes) + is_active (1 byte) + timestamp (8 bytes) = 17 bytes
+        # Pack: rms_level (8 bytes) + is_active (1 byte) + timestamp (8 bytes)
         # Use 'd' for double (8 bytes), 'B' for unsigned char (1 byte), 'd' for double (8 bytes)
         packed = struct.pack('dBd', rms_level, 1 if is_active else 0, time.time())
         return packed
     
     def _unpack_rms_data(self, data: bytes) -> tuple:
         """Unpack RMS data from bytes"""
-        # Unpack: rms_level (8 bytes) + is_active (1 byte) + timestamp (8 bytes) = 17 bytes
-        if len(data) < 17:
-            raise ValueError(f"Expected at least 17 bytes, got {len(data)}")
-        rms_level, is_active_int, timestamp = struct.unpack('dBd', data[:17])
+        # Calculate exact size needed for the struct
+        struct_size = struct.calcsize('dBd')
+        if len(data) < struct_size:
+            raise ValueError(f"Expected at least {struct_size} bytes, got {len(data)}")
+        
+        rms_level, is_active_int, timestamp = struct.unpack('dBd', data[:struct_size])
         is_active = bool(is_active_int)
         return rms_level, is_active, timestamp
         
@@ -96,7 +98,8 @@ class RMSMonitor:
         with self._lock:
             try:
                 # Read from shared memory
-                data = bytes(self._shm.buf[:17])  # Read packed data
+                struct_size = struct.calcsize('dBd')
+                data = bytes(self._shm.buf[:struct_size])  # Read packed data
                 rms_level, is_active, timestamp = self._unpack_rms_data(data)
                 
                 current_time = time.time()
