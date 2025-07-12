@@ -198,8 +198,8 @@ class CustomModelMonitor(BaseWakeWordMonitor):
             logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
             logger.info(f"   Buffer status: {self.audio_buffer.get_buffer_status()}")
             
-            # Update activation state in shared memory
-            self._update_activation_state(True)
+            # Don't update activation state here - let the system stay in normal monitoring mode
+            # The activation state should only be set when actually listening for commands
             
             logger.info(f"🛡️ Cooldown active for {self.detection_cooldown_seconds}s...")
         
