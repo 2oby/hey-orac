@@ -103,7 +103,7 @@ class SharedMemoryIPC:
                 logger.error(f"❌ Failed to write to shared memory: {e}")
     
     def update_activation_state(self, is_listening: bool, model_name: str = None, confidence: float = 0.0):
-        """Update activation state in shared memory"""
+        """Update activation state in shared memory with enhanced debugging"""
         with self._lock:
             try:
                 # Read current audio data directly from shared memory without recursive lock
@@ -111,24 +111,41 @@ class SharedMemoryIPC:
                 data = bytes(self._shm.buf[:struct_size])
                 rms_level, is_active_old, is_listening_old, timestamp_old = self._unpack_state_data(data)
                 
+                # ENHANCED DEBUGGING: Log state transition
+                import logging
+                logger = logging.getLogger(__name__)
+                
+                if is_listening != is_listening_old:
+                    logger.info(f"🔄 ACTIVATION STATE CHANGE: {is_listening_old} → {is_listening}")
+                    logger.info(f"   Model: {model_name}, Confidence: {confidence:.3f}")
+                    logger.info(f"   RMS Level: {rms_level:.4f}")
+                    logger.info(f"   Timestamp: {time.time()}")
+                else:
+                    logger.debug(f"🔍 ACTIVATION: No state change - Listening: {is_listening}")
+                
                 # Write updated data with new activation state
                 packed_data = self._pack_state_data(rms_level, is_active_old, is_listening)
                 self._shm.buf[:len(packed_data)] = packed_data
                 
-                import logging
-                logger = logging.getLogger(__name__)
-                if is_listening:
-                    logger.info(f"🎯 ACTIVATION: Listening for wake word - Model: {model_name}, Confidence: {confidence:.3f}")
+                # Verify the write was successful
+                verification_data = bytes(self._shm.buf[:struct_size])
+                verification_rms, verification_active, verification_listening, verification_timestamp = self._unpack_state_data(verification_data)
+                
+                if verification_listening == is_listening:
+                    logger.info(f"✅ ACTIVATION: Shared memory updated successfully - Listening: {is_listening}")
                 else:
-                    logger.info(f"🔇 ACTIVATION: Not listening for wake word")
+                    logger.error(f"❌ ACTIVATION: Shared memory write verification failed!")
+                    logger.error(f"   Expected: {is_listening}, Got: {verification_listening}")
                 
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"❌ Failed to update activation state: {e}")
+                logger.error(f"   Attempted to set is_listening: {is_listening}")
+                logger.error(f"   Model: {model_name}, Confidence: {confidence}")
     
     def get_system_state(self) -> Dict[str, Any]:
-        """Get current system state (audio + activation) from shared memory"""
+        """Get current system state (audio + activation) from shared memory with enhanced debugging"""
         with self._lock:
             try:
                 # Read from shared memory
@@ -139,12 +156,25 @@ class SharedMemoryIPC:
                 current_time = time.time()
                 time_diff = current_time - timestamp
                 
+                # ENHANCED DEBUGGING: Log state reads
+                import logging
+                logger = logging.getLogger(__name__)
+                
+                # Log every 100th read to avoid spam
+                if hasattr(self, '_read_count'):
+                    self._read_count += 1
+                else:
+                    self._read_count = 1
+                
+                if self._read_count % 100 == 0:
+                    logger.info(f"📖 SHARED MEMORY READ #{self._read_count}:")
+                    logger.info(f"   RMS: {rms_level:.4f}, Active: {is_active}, Listening: {is_listening}")
+                    logger.info(f"   Timestamp: {timestamp:.2f}, Age: {time_diff:.2f}s")
+                
                 # Check if data is stale (older than 5 seconds)
                 if time_diff > 5.0:
                     is_active = False
                     is_listening = False
-                    import logging
-                    logger = logging.getLogger(__name__)
                     logger.warning(f"⚠️ Shared memory data is stale ({time_diff:.2f}s), setting is_active=False, is_listening=False")
                 
                 return {

@@ -276,9 +276,25 @@ def get_detections():
 
 @app.route('/api/activation', methods=['GET'])
 def get_activation():
-    """Get current activation state from shared memory"""
+    """Get current activation state from shared memory with enhanced debugging"""
     try:
+        # ENHANCED DEBUGGING: Track API calls
+        if not hasattr(get_activation, '_call_count'):
+            get_activation._call_count = 0
+        get_activation._call_count += 1
+        
+        # Log every 50th call to avoid spam
+        if get_activation._call_count % 50 == 0:
+            logger.info(f"🌐 ACTIVATION API CALL #{get_activation._call_count}")
+        
         activation_data = shared_memory_ipc.get_activation_state()
+        
+        # ENHANCED DEBUGGING: Log activation state
+        if activation_data.get('is_listening', False):
+            logger.info(f"🎯 ACTIVATION API: Returning listening state - RMS: {activation_data.get('current_rms', 0):.4f}")
+        elif get_activation._call_count % 100 == 0:  # Log non-listening state less frequently
+            logger.debug(f"🔇 ACTIVATION API: Returning not listening state - RMS: {activation_data.get('current_rms', 0):.4f}")
+        
         return jsonify(activation_data)
         
     except Exception as e:

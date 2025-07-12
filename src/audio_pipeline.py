@@ -1,74 +1,77 @@
 #!/usr/bin/env python3
 """
-Optimized Audio Pipeline with Volume Monitoring
-USB Mic → Volume Check (RMS) → Wake Word → Stream to Orin
+Audio Pipeline Module
+Handles continuous audio processing and wake word detection
 """
 
 import logging
 import time
 import numpy as np
 from datetime import datetime
-from audio_utils import AudioManager
-from wake_word_interface import WakeWordDetector
 from audio_buffer import AudioBuffer
-from audio_feedback import create_audio_feedback
+from audio_feedback import AudioFeedback
 from shared_memory_ipc import shared_memory_ipc
+from wake_word_interface import WakeWordDetector
 
 logger = logging.getLogger(__name__)
 
+def initialize_wake_detector(config: dict) -> WakeWordDetector:
+    """Initialize wake word detector with error handling."""
+    try:
+        wake_detector = WakeWordDetector()
+        if wake_detector.initialize(config):
+            logger.info(f"✅ Wake word detector initialized: {wake_detector.get_wake_word_name()}")
+            return wake_detector
+        else:
+            logger.error("❌ Failed to initialize wake word detector")
+            return None
+    except Exception as e:
+        logger.error(f"❌ Error initializing wake word detector: {e}")
+        return None
 
-def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) -> int:
-    """
-    Run optimized audio pipeline with volume monitoring.
+
+def run_audio_pipeline(config: dict, usb_device, audio_manager) -> int:
+    """Run the main audio processing pipeline with enhanced debugging."""
+    logger.info("🎯 Starting audio pipeline with enhanced debugging...")
     
-    Args:
-        config: Configuration dictionary
-        usb_device: USB audio device to use
-        audio_manager: Initialized audio manager
-    
-    Returns:
-        Exit code (0 for success, 1 for failure)
-    """
-    logger.info("🚀 Starting optimized audio pipeline...")
-    logger.info("📊 Pipeline: USB Mic → Volume Check (RMS) → Wake Word → Stream to Orin")
-    
-    # Initialize wake word detector
-    wake_detector = WakeWordDetector()
-    if not wake_detector.initialize(config):
-        logger.error("❌ Failed to initialize wake word detector")
+    # Initialize components
+    wake_detector = initialize_wake_detector(config)
+    if not wake_detector:
+        logger.error("❌ Failed to initialize wake detector")
         return 1
     
-    logger.info(f"✅ Wake word detector initialized: {wake_detector.get_wake_word_name()}")
-    
-    # Initialize audio feedback
-    audio_feedback = create_audio_feedback()
-    if audio_feedback:
-        logger.info("✅ Audio feedback system initialized")
-    else:
-        logger.warning("⚠️ Audio feedback system not available")
-    
-    # Initialize audio buffer
     audio_buffer = AudioBuffer(
         sample_rate=wake_detector.get_sample_rate(),
-        preroll_seconds=config['buffer'].get('preroll_seconds', 1.0),
-        postroll_seconds=config['buffer'].get('postroll_seconds', 2.0)
+        preroll_seconds=config.get('buffer', {}).get('preroll_seconds', 1.0),
+        postroll_seconds=config.get('buffer', {}).get('postroll_seconds', 2.0)
     )
     
-    # Volume monitoring parameters
-    silence_threshold = config['volume_monitoring'].get('silence_threshold', 100.0)
-    volume_window_size = config['volume_monitoring'].get('window_size', 10)
+    audio_feedback = AudioFeedback()
+    
+    # Audio processing parameters
+    silence_threshold = config.get('volume_monitoring', {}).get('silence_threshold', 0.5)
+    volume_window_size = config.get('volume_monitoring', {}).get('volume_window_size', 10)
     volume_history = []
     
-    # Audio pipeline doesn't need cooldown/debounce - let wake word engine handle timing
+    # Enhanced debugging variables
+    detection_debug_count = 0
+    last_detection_time = 0
+    last_detection_chunk = 0
+    detection_cooldown_seconds = 1.5
+    debounce_seconds = 0.2
+    detection_debounce_chunks = int(debounce_seconds * wake_detector.get_sample_rate() / wake_detector.get_frame_length())
     
-    logger.info(f"🔊 Volume monitoring: threshold={silence_threshold}, window={volume_window_size}")
-    logger.info("🛡️ Audio pipeline - no cooldown/debounce (handled by wake word engine)")
+    logger.info(f"🔧 DEBUG: Detection timing controls:")
+    logger.info(f"   Cooldown: {detection_cooldown_seconds}s")
+    logger.info(f"   Debounce: {debounce_seconds}s ({detection_debounce_chunks} chunks)")
+    logger.info(f"   Silence threshold: {silence_threshold}")
+    logger.info(f"   Volume window size: {volume_window_size}")
     
     # Start audio stream
     stream = audio_manager.start_stream(
         device_index=usb_device.index,
         sample_rate=wake_detector.get_sample_rate(),
-        channels=1,
+        channels=wake_detector.get_channels(),
         chunk_size=wake_detector.get_frame_length()
     )
     
@@ -85,7 +88,7 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
         silent_chunks = 0
         active_chunks = 0
         
-        logger.info("🎯 Starting audio pipeline monitoring...")
+        logger.info("🎯 Starting audio pipeline monitoring with enhanced debugging...")
         
         while True:
             try:
@@ -123,21 +126,60 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                 # Add to audio buffer
                 audio_buffer.add_audio(audio_data)
                 
-                # Process audio for wake-word detection (ALWAYS process for detector state)
+                # ENHANCED DEBUGGING: Check timing controls before processing
+                current_time = time.time()
+                time_since_last = current_time - last_detection_time
+                chunks_since_last = chunk_count - last_detection_chunk
+                
+                # Log timing status every 50 chunks
+                if chunk_count % 50 == 0:
+                    logger.info(f"🔍 DEBUG: Timing status at chunk {chunk_count}:")
+                    logger.info(f"   Time since last detection: {time_since_last:.2f}s (cooldown: {detection_cooldown_seconds}s)")
+                    logger.info(f"   Chunks since last detection: {chunks_since_last} (debounce: {detection_debounce_chunks})")
+                    logger.info(f"   Cooldown active: {time_since_last < detection_cooldown_seconds}")
+                    logger.info(f"   Debounce active: {chunks_since_last < detection_debounce_chunks}")
+                    logger.info(f"   Audio RMS: {rms_level:.4f}, Avg: {avg_volume:.4f}")
+                    logger.info(f"   Buffer capturing postroll: {audio_buffer.is_capturing_postroll()}")
+                
+                # Process audio for wake-word detection
                 detection_result = wake_detector.process_audio(audio_data)
                 
                 if detection_result:
-                    # Always allow detection - let wake word engine handle timing
-                    should_allow = (not audio_buffer.is_capturing_postroll() and
-                                  avg_volume >= silence_threshold)
+                    detection_debug_count += 1
+                    logger.info(f"🎯🎯🎯 WAKE WORD DETECTED! (Debug #{detection_debug_count}) 🎯🎯🎯")
+                    logger.info(f"🎯 DETECTION #{detection_count + 1} - {wake_detector.get_wake_word_name()} detected!")
+                    logger.info(f"🔊 Audio volume: {avg_volume:.2f} (threshold: {silence_threshold})")
+                    
+                    # ENHANCED DEBUGGING: Check all blocking conditions
+                    cooldown_blocked = time_since_last < detection_cooldown_seconds
+                    debounce_blocked = chunks_since_last < detection_debounce_chunks
+                    buffer_blocked = audio_buffer.is_capturing_postroll()
+                    volume_blocked = avg_volume < silence_threshold
+                    
+                    logger.info(f"🔍 DEBUG: Detection blocking analysis:")
+                    logger.info(f"   Cooldown blocked: {cooldown_blocked} ({time_since_last:.2f}s < {detection_cooldown_seconds}s)")
+                    logger.info(f"   Debounce blocked: {debounce_blocked} ({chunks_since_last} < {detection_debounce_chunks})")
+                    logger.info(f"   Buffer blocked: {buffer_blocked}")
+                    logger.info(f"   Volume blocked: {volume_blocked} ({avg_volume:.4f} < {silence_threshold})")
+                    
+                    # Check if detection should be allowed
+                    should_allow = (not cooldown_blocked and 
+                                  not debounce_blocked and 
+                                  not buffer_blocked and 
+                                  not volume_blocked)
+                    
+                    logger.info(f"🔍 DEBUG: Should allow detection: {should_allow}")
                     
                     if should_allow:
                         detection_count += 1
                         
-                        # PROMINENT DETECTION LOG
-                        logger.info("🎯🎯🎯 WAKE WORD DETECTED! 🎯🎯🎯")
-                        logger.info(f"🎯 DETECTION #{detection_count} - {wake_detector.get_wake_word_name()} detected!")
-                        logger.info(f"🔊 Audio volume: {avg_volume:.2f} (threshold: {silence_threshold})")
+                        # Update timing controls
+                        last_detection_time = current_time
+                        last_detection_chunk = chunk_count
+                        
+                        logger.info(f"✅ DETECTION ALLOWED - Updating timing controls:")
+                        logger.info(f"   Last detection time: {last_detection_time}")
+                        logger.info(f"   Last detection chunk: {last_detection_chunk}")
                         
                         # Update activation state in shared memory
                         try:
@@ -227,6 +269,16 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                         # TODO: Stream audio to Jetson Orin
                         logger.info("📡 Audio capture completed - ready for streaming to Jetson")
                         logger.info("🔄 Resuming audio pipeline monitoring...")
+                    else:
+                        logger.info(f"🚫 DETECTION BLOCKED - Reason:")
+                        if cooldown_blocked:
+                            logger.info(f"   Cooldown period active ({detection_cooldown_seconds - time_since_last:.2f}s remaining)")
+                        if debounce_blocked:
+                            logger.info(f"   Debounce period active ({detection_debounce_chunks - chunks_since_last} chunks remaining)")
+                        if buffer_blocked:
+                            logger.info(f"   Audio buffer capturing post-roll")
+                        if volume_blocked:
+                            logger.info(f"   Audio volume too low ({avg_volume:.4f} < {silence_threshold})")
                 
                 # Progress logging
                 if chunk_count % 1000 == 0:
@@ -236,6 +288,7 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                     logger.info(f"   Active chunks: {active_chunks}")
                     logger.info(f"   Silent chunks: {silent_chunks}")
                     logger.info(f"   Detections: {detection_count}")
+                    logger.info(f"   Detection attempts: {detection_debug_count}")
                     logger.info(f"   Current volume: {avg_volume:.2f} (threshold: {silence_threshold})")
                     logger.info(f"   Buffer pre-roll samples: {buffer_status['preroll_samples']}")
                     logger.info(f"   Buffer post-roll samples: {buffer_status['postroll_samples']}")
