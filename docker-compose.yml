@@ -2,190 +2,79 @@ version: '3.8'
 
 services:
   hey-orac:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      cache_from:
-        - hey-orac_hey-orac:latest
+    build: .
     container_name: hey-orac
-    restart: unless-stopped
+    privileged: true
+    devices:
+      - /dev/snd:/dev/snd
     ports:
       - "7171:7171"
     volumes:
-      # Mount audio devices
-      - /dev/snd:/dev/snd:rw
-      # Mount ALSA configuration files
-      - ./.asoundrc:/home/appuser/.asoundrc:ro
-      - /usr/share/alsa:/usr/share/alsa:ro
-      - /etc/alsa:/etc/alsa:ro
-      # Mount ALSA libraries
-      - /usr/lib/aarch64-linux-gnu/libasound.so.2:/usr/lib/aarch64-linux-gnu/libasound.so.2:ro
-      - /usr/lib/aarch64-linux-gnu/libasound.so.2.0.0:/usr/lib/aarch64-linux-gnu/libasound.so.2.0.0:ro
-      # Mount PulseAudio socket for audio output
-      - /run/user/1000/pulse:/run/user/1000/pulse:rw
-      - /home/pi/.config/pulse:/home/appuser/.config/pulse:ro
-      - /tmp/.X11-unix:/tmp/.X11-unix:rw
-      # Mount configuration for easy updates
-      - ./src/config.yaml:/app/config.yaml:ro
-      - /dev:/dev
-      - /proc:/proc
-      - /sys:/sys
-      - /var/run/docker.sock:/var/run/docker.sock
-      # Mount models directory
-      - ./models:/app/models:ro
-      # Mount logs directory (permanent storage)
-      - ./logs:/app/logs
+      - logs:/app/logs:rw
+      - models:/app/models:rw
+      - third_party:/app/third_party:rw
+      - web:/app/web:rw
+      - assets:/app/assets:rw
       # TMPFS volumes for temporary data (RAM-based, protects SD card)
-      - rms-data:/tmp/rms_data:rw
       - settings-data:/tmp/settings:rw
       - temp-cache:/tmp/cache:rw
       - temp-sessions:/tmp/sessions:rw
       - temp-uploads:/tmp/uploads:rw
-    devices:
-      # Access to audio devices
-      - /dev/snd:/dev/snd
-      - /dev/bus/usb:/dev/bus/usb
-    group_add:
-      - audio
-    user: "1000:29"  # Map to pi user and audio group
     environment:
       - PYTHONUNBUFFERED=1
-      - DISPLAY=:0
-      # ALSA configuration for SH-04 USB microphone
       - ALSA_CARD=0
       - ALSA_DEVICE=hw:0,0
       - ALSA_PCM_CARD=0
       - ALSA_PCM_DEVICE=0
-      - AUDIODEV=hw:0,0
-      - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu
-      # PulseAudio configuration for audio output
-      - PULSE_SERVER=unix:/run/user/1000/pulse/native
-      - PULSE_COOKIE=/home/appuser/.config/pulse/cookie
-      # RMS data file path (now in tmpfs)
-      - RMS_DATA_FILE=/tmp/rms_data/rms_monitor_data.json
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '1.0'
-        reservations:
-          memory: 256M
-          cpus: '0.5'
-    ulimits:
-      memlock: -1
-      stack: 67108864
-    privileged: true
-    security_opt:
-      - no-new-privileges:false
-      - seccomp:unconfined
-    cap_drop:
-      - ALL
-    cap_add:
-      - SYS_RAWIO
-      - SYS_ADMIN
+      - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "python", "-c", "import sys; sys.exit(0)"]
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
-
-  # Future Home Assistant service (commented out until needed)
-  # homeassistant:
-  #   container_name: homeassistant
-  #   image: homeassistant/home-assistant:stable
-  #   restart: unless-stopped
-  #   ports:
-  #     - "8123:8123"
-  #   volumes:
-  #     # Permanent storage for Home Assistant configuration
-  #     - ./homeassistant:/config
-  #     # TMPFS volumes for temporary data
-  #     - ha-temp:/tmp:rw
-  #     - ha-cache:/config/.storage:rw
-  #     - ha-sessions:/config/.storage/sessions:rw
-  #     - ha-uploads:/config/www/upload:rw
-  #   environment:
-  #     - TZ=UTC
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 1G
-  #         cpus: '1.0'
-  #       reservations:
-  #         memory: 512M
-  #         cpus: '0.5'
-
-networks:
-  hey-orac-network:
-    driver: bridge
+      start_period: 5s
+    deploy:
+      resources:
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+        limits:
+          memory: 1G
 
 volumes:
-  # Permanent storage (SD card)
   logs:
     driver: local
-  
-  # TMPFS volumes (RAM-based, protects SD card)
-  rms-data:
+  models:
     driver: local
-    driver_opts:
-      type: tmpfs
-      device: tmpfs
-      o: size=10M,mode=0777
-  
+  third_party:
+    driver: local
+  web:
+    driver: local
+  assets:
+    driver: local
+  # TMPFS volumes (RAM-based, protects SD card)
   settings-data:
     driver: local
     driver_opts:
       type: tmpfs
       device: tmpfs
       o: size=5M,mode=0777
-  
   temp-cache:
     driver: local
     driver_opts:
       type: tmpfs
       device: tmpfs
       o: size=50M,mode=0777
-  
   temp-sessions:
     driver: local
     driver_opts:
       type: tmpfs
       device: tmpfs
       o: size=20M,mode=0777
-  
   temp-uploads:
     driver: local
     driver_opts:
       type: tmpfs
       device: tmpfs
-      o: size=30M,mode=0777
-  
-  # Future Home Assistant tmpfs volumes
-  # ha-temp:
-  #   driver: local
-  #   driver_opts:
-  #     type: tmpfs
-  #     device: tmpfs
-  #     o: size=100M,mode=0755
-  # 
-  # ha-cache:
-  #   driver: local
-  #   driver_opts:
-  #     type: tmpfs
-  #     device: tmpfs
-  #     o: size=200M,mode=0755
-  # 
-  # ha-sessions:
-  #   driver: local
-  #   driver_opts:
-  #     type: tmpfs
-  #     device: tmpfs
-  #     o: size=50M,mode=0755
-  # 
-  # ha-uploads:
-  #   driver: local
-  #   driver_opts:
-  #     type: tmpfs
-  #     device: tmpfs
-  #     o: size=100M,mode=0755 
+      o: size=30M,mode=0777 
