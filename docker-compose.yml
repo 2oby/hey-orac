@@ -12,11 +12,11 @@ services:
     ports:
       - "7171:7171"
     volumes:
-      - logs:/app/logs:rw
-      - models:/app/models:rw
-      - third_party:/app/third_party:rw
-      - web:/app/web:rw
-      - assets:/app/assets:rw
+      - ./logs:/app/logs
+      - ./models:/app/models
+      - ./third_party:/app/third_party
+      - ./web:/app/web
+      - ./assets:/app/assets
       # TMPFS volumes for temporary data (RAM-based, protects SD card)
       - settings-data:/tmp/settings:rw
       - temp-cache:/tmp/cache:rw
@@ -24,9 +24,9 @@ services:
       - temp-uploads:/tmp/uploads:rw
     environment:
       - PYTHONUNBUFFERED=1
-      - ALSA_CARD=0
-      - ALSA_DEVICE=hw:0,0
-      - ALSA_PCM_CARD=0
+      - ALSA_CARD=2
+      - ALSA_DEVICE=hw:2,0
+      - ALSA_PCM_CARD=2
       - ALSA_PCM_DEVICE=0
       - LD_LIBRARY_PATH=/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH
     restart: unless-stopped

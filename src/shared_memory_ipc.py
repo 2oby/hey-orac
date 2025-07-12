@@ -81,9 +81,13 @@ class SharedMemoryIPC:
             
             # Write to shared memory (preserve existing activation state)
             try:
-                # Read current activation state to preserve it
-                current_state = self.get_system_state()
-                is_listening = current_state.get('is_listening', False)
+                # Read current activation state directly from shared memory without recursive lock
+                struct_size = struct.calcsize('dBdd')
+                data = bytes(self._shm.buf[:struct_size])
+                rms_level_old, is_active_old, is_listening_old, timestamp_old = self._unpack_state_data(data)
+                
+                # Keep the existing is_listening state
+                is_listening = bool(is_listening_old)
                 
                 packed_data = self._pack_state_data(rms_level, True, is_listening)
                 self._shm.buf[:len(packed_data)] = packed_data
@@ -102,13 +106,13 @@ class SharedMemoryIPC:
         """Update activation state in shared memory"""
         with self._lock:
             try:
-                # Read current audio data to preserve it
-                current_state = self.get_system_state()
-                rms_level = current_state.get('current_rms', 0.0)
-                is_active = current_state.get('is_active', False)
+                # Read current audio data directly from shared memory without recursive lock
+                struct_size = struct.calcsize('dBdd')
+                data = bytes(self._shm.buf[:struct_size])
+                rms_level, is_active_old, is_listening_old, timestamp_old = self._unpack_state_data(data)
                 
                 # Write updated data with new activation state
-                packed_data = self._pack_state_data(rms_level, is_active, is_listening)
+                packed_data = self._pack_state_data(rms_level, is_active_old, is_listening)
                 self._shm.buf[:len(packed_data)] = packed_data
                 
                 import logging

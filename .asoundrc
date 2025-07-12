@@ -4,14 +4,14 @@
 # Default PCM device - direct hardware access to SH-04
 pcm.!default {
     type hw
-    card 0
+    card 2
     device 0
 }
 
 # Default control device
 ctl.!default {
     type hw
-    card 0
+    card 2
 }
 
 
