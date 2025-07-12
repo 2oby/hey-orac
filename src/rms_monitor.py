@@ -45,13 +45,16 @@ class RMSMonitor:
         
     def _pack_rms_data(self, rms_level: float, is_active: bool) -> bytes:
         """Pack RMS data into bytes for shared memory"""
-        # Pack: rms_level (8 bytes) + is_active (1 byte) + timestamp (8 bytes)
+        # Pack: rms_level (8 bytes) + is_active (1 byte) + timestamp (8 bytes) = 17 bytes
+        # Use 'd' for double (8 bytes), '?' for bool (1 byte), 'd' for double (8 bytes)
         packed = struct.pack('d?d', rms_level, is_active, time.time())
         return packed
     
     def _unpack_rms_data(self, data: bytes) -> tuple:
         """Unpack RMS data from bytes"""
-        # Unpack: rms_level (8 bytes) + is_active (1 byte) + timestamp (8 bytes)
+        # Unpack: rms_level (8 bytes) + is_active (1 byte) + timestamp (8 bytes) = 17 bytes
+        if len(data) < 17:
+            raise ValueError(f"Expected at least 17 bytes, got {len(data)}")
         rms_level, is_active, timestamp = struct.unpack('d?d', data[:17])
         return rms_level, is_active, timestamp
         
