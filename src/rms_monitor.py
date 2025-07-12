@@ -60,31 +60,39 @@ class RMSMonitor:
 
     
     def get_rms_data(self) -> Dict[str, Any]:
-        """Get current RMS data for web interface"""
+        """Get current RMS data for web interface - PRIORITIZE MEMORY OVER FILE"""
         with self._lock:
-            # Try to load from file first (for cross-process sharing)
-            try:
-                if os.path.exists(self._data_file):
-                    with open(self._data_file, 'r') as f:
-                        file_data = json.load(f)
-                        # Update local data from file
-                        self._rms_data.update(file_data)
-            except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"⚠️ Failed to load RMS data from file: {e}")
-            
             current_time = time.time()
             time_diff = current_time - self._rms_data['last_update']
             
-            # Check if data is stale (older than 30 seconds) - increased from 5s
+            # Check if data is stale (older than 30 seconds)
             if time_diff > 30.0:
                 self._rms_data['is_active'] = False
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.warning(f"⚠️ RMS data is stale ({time_diff:.2f}s), setting is_active=False")
             
-            return self._rms_data.copy()
+            # Return in-memory data directly (prioritize memory over file)
+            # Only fall back to file if memory data is completely empty
+            if self._rms_data['current_rms'] == 0.0 and os.path.exists(self._data_file):
+                try:
+                    with open(self._data_file, 'r') as f:
+                        file_data = json.load(f)
+                        # Update local data from file only if memory is empty
+                        self._rms_data.update(file_data)
+                        logger = logging.getLogger(__name__)
+                        logger.info(f"📁 Loaded RMS data from file: {file_data.get('current_rms', 0.0):.2f}")
+                except Exception as e:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"⚠️ Failed to load RMS data from file: {e}")
+            
+            # Return simplified data structure for testing
+            return {
+                'current_rms': float(self._rms_data['current_rms']),
+                'is_active': self._rms_data['is_active'],
+                'last_update': self._rms_data['last_update']
+            }
     
     def reset(self):
         """Reset RMS monitor"""

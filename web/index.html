@@ -1387,7 +1387,7 @@
         }
 
         function startVolumeSimulation() {
-            // Fetch real RMS data from API
+            // Fetch real RMS data from API - TESTING MEMORY-BASED COMMUNICATION
             setInterval(async () => {
                 try {
                     const response = await fetch('/api/audio/rms');
@@ -1395,23 +1395,16 @@
                         const rmsData = await response.json();
                         
                         // Convert RMS to volume level (0-1) using enhanced logarithmic scale
-                        // This provides much better sensitivity at low volumes for fine control
                         let volume = 0;
                         if (rmsData.is_active && rmsData.current_rms > 0) {
-                            // Use enhanced logarithmic scaling for maximum low-end sensitivity
-                            // RMS values typically range from 0-1000
                             const rms = rmsData.current_rms;
-                            
-                            // Enhanced logarithmic scale: log(1 + rms/5) / log(1 + 200)
-                            // This provides much more granular control at low volumes
-                            // Lower divisor (5 instead of 10) and higher range (200 instead of 100)
                             volume = Math.log(1 + rms / 5) / Math.log(1 + 200);
                             volume = Math.min(1, volume); // Clamp to 0-1
                         }
                         
-                        // Debug logging (remove in production)
+                        // Enhanced debug logging for testing memory-based communication
                         if (rmsData.current_rms > 0) {
-                            console.log(`🔊 RMS: ${rmsData.current_rms.toFixed(2)}, Log Volume: ${volume.toFixed(3)}, Active: ${rmsData.is_active}`);
+                            console.log(`🔊 MEMORY TEST - RMS: ${rmsData.current_rms.toFixed(2)}, Log Volume: ${volume.toFixed(3)}, Active: ${rmsData.is_active}, Time: ${new Date().toLocaleTimeString()}`);
                         }
                         
                         updateVolumeMeter(volume);
@@ -1422,7 +1415,7 @@
                         
                         if (rmsData.is_active) {
                             audioStatus.classList.remove('error');
-                            audioText.textContent = `Audio: Active (RMS: ${rmsData.current_rms.toFixed(2)})`;
+                            audioText.textContent = `Audio: Active (RMS: ${rmsData.current_rms.toFixed(2)}) - MEMORY TEST`;
                         } else {
                             audioStatus.classList.add('error');
                             audioText.textContent = 'Audio: Inactive';
@@ -1434,7 +1427,7 @@
                     const demoVolume = Math.random() * 0.3;
                     updateVolumeMeter(demoVolume);
                 }
-            }, 200); // Update every 200ms (5 FPS)
+            }, 100); // Update every 100ms (10 FPS) - INCREASED FOR TESTING
         }
 
         // Demo: Simulate detections every few seconds
