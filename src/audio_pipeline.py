@@ -12,7 +12,7 @@ from audio_utils import AudioManager
 from wake_word_interface import WakeWordDetector
 from audio_buffer import AudioBuffer
 from audio_feedback import create_audio_feedback
-from rms_monitor import rms_monitor
+from shared_memory_ipc import shared_memory_ipc
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
     # Audio pipeline doesn't need cooldown/debounce - let wake word engine handle timing
     
     logger.info(f"🔊 Volume monitoring: threshold={silence_threshold}, window={volume_window_size}")
-    logger.info(f"🛡️ Detection cooldown: {detection_cooldown_seconds}s, Debounce: {detection_debounce_samples} samples")
+    logger.info("🛡️ Audio pipeline - no cooldown/debounce (handled by wake word engine)")
     
     # Start audio stream
     stream = audio_manager.start_stream(
@@ -100,8 +100,8 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                 rms_level = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
                 volume_history.append(rms_level)
                 
-                # Update RMS monitor for web interface
-                rms_monitor.update_rms(rms_level)
+                # Update shared memory IPC for web interface
+                shared_memory_ipc.update_audio_state(rms_level)
                 
                 # Keep only recent volume history
                 if len(volume_history) > volume_window_size:
@@ -138,6 +138,15 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                         logger.info("🎯🎯🎯 WAKE WORD DETECTED! 🎯🎯🎯")
                         logger.info(f"🎯 DETECTION #{detection_count} - {wake_detector.get_wake_word_name()} detected!")
                         logger.info(f"🔊 Audio volume: {avg_volume:.2f} (threshold: {silence_threshold})")
+                        
+                        # Update activation state in shared memory
+                        try:
+                            model_name = wake_detector.get_wake_word_name()
+                            confidence = wake_detector.engine.get_latest_confidence() if hasattr(wake_detector, 'engine') else 0.0
+                            shared_memory_ipc.update_activation_state(True, model_name, confidence)
+                            logger.info(f"🌐 ACTIVATION: Updated shared memory - Listening: True, Model: {model_name}, Confidence: {confidence:.3f}")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Could not update activation state: {e}")
                         
                         # Detection log with timestamp
                         detection_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -207,6 +216,13 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager: AudioManager) ->
                                 logger.error("❌ Failed to save audio clip")
                         else:
                             logger.warning("⚠️ No complete audio clip available")
+                        
+                        # Reset activation state after processing
+                        try:
+                            shared_memory_ipc.update_activation_state(False)
+                            logger.info("🌐 ACTIVATION: Reset to not listening after processing")
+                        except Exception as e:
+                            logger.warning(f"⚠️ Could not reset activation state: {e}")
                         
                         # TODO: Stream audio to Jetson Orin
                         logger.info("📡 Audio capture completed - ready for streaming to Jetson")

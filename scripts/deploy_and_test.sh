@@ -125,6 +125,65 @@ ssh "$REMOTE_ALIAS" "\
     echo '${BLUE}🔍 Checking container health...${NC}'; \
     docker-compose ps; \
     
+    echo '${BLUE}🧪 Testing shared memory activation system...${NC}'; \
+    echo 'Running activation system tests...'; \
+    docker-compose exec -T hey-orac python3 -c "
+from src.shared_memory_ipc import shared_memory_ipc
+import time
+
+print('🧪 Testing shared memory activation system...')
+
+# Test 1: Basic functionality
+try:
+    # Test activation state updates
+    shared_memory_ipc.update_activation_state(True, 'Test Model', 0.85)
+    print('✅ Set activation to True')
+    
+    data = shared_memory_ipc.get_activation_state()
+    print(f'📊 Current state: {data}')
+    
+    shared_memory_ipc.update_activation_state(False)
+    print('✅ Set activation to False')
+    
+    data = shared_memory_ipc.get_activation_state()
+    print(f'📊 Final state: {data}')
+    
+    print('✅ Shared memory activation system working correctly')
+    
+except Exception as e:
+    print(f'❌ Shared memory test failed: {e}')
+    exit(1)
+"; \
+    
+    echo '${BLUE}🌐 Testing web API endpoints...${NC}'; \
+    echo 'Testing /api/activation endpoint...'; \
+    curl -s http://localhost:7171/api/activation | python3 -m json.tool || echo '❌ Activation endpoint test failed'; \
+    \
+    echo 'Testing /api/detections endpoint...'; \
+    curl -s http://localhost:7171/api/detections | python3 -m json.tool || echo '❌ Detections endpoint test failed'; \
+    \
+    echo '${BLUE}👀 Monitoring for 10 seconds to check for activation updates...${NC}'; \
+    timeout 10 bash -c '
+    while true; do
+        data=$(curl -s http://localhost:7171/api/activation 2>/dev/null)
+        if [ $? -eq 0 ]; then
+            is_listening=$(echo "$data" | python3 -c "import sys, json; print(json.load(sys.stdin).get(\"is_listening\", False))")
+            rms=$(echo "$data" | python3 -c "import sys, json; print(json.load(sys.stdin).get(\"current_rms\", 0))")
+            timestamp=$(date "+%H:%M:%S")
+            if [ "$is_listening" = "True" ]; then
+                echo "🎯 [$timestamp] ACTIVATION: Listening for wake word (RMS: $rms)"
+            else
+                echo "🔇 [$timestamp] Not listening (RMS: $rms)"
+            fi
+        else
+            echo "❌ [$timestamp] Failed to get activation data"
+        fi
+        sleep 1
+    done
+    ' || echo 'Monitoring completed'; \
+    
+    echo '${GREEN}✓ Shared memory activation system tests completed${NC}'; \
+    
     echo '${GREEN}✓ Deployment completed successfully${NC}'; \
 "
 

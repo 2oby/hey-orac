@@ -812,6 +812,10 @@
                 <span id="audioText">Audio: Inactive</span>
             </div>
             <div class="status-item">
+                <div class="status-indicator" id="activationStatus"></div>
+                <span id="activationText">Not listening for wake word</span>
+            </div>
+            <div class="status-item">
                 <span id="lastDetection">Last Detection: Never</span>
             </div>
         </div>
@@ -1278,10 +1282,55 @@
         document.addEventListener('DOMContentLoaded', () => {
             initializeInterface();
             setupModalListeners();
-            startDetectionPolling();
+            startActivationMonitoring();
         });
         
-        // Poll for wake word detections
+        // Monitor activation state from shared memory
+        function startActivationMonitoring() {
+            setInterval(async () => {
+                try {
+                    // Get activation data from shared memory
+                    const response = await fetch(`${API_BASE}/activation`);
+                    if (response.ok) {
+                        const activationData = await response.json();
+                        
+                        // Update UI based on activation state
+                        updateActivationStatus(activationData);
+                        
+                        // Check for recent detections (when is_listening becomes true)
+                        if (activationData.is_listening) {
+                            console.log(`🎯 ACTIVATION: Listening for wake word detected!`);
+                            showNotification('Listening for wake word...', 'info');
+                            
+                            // Update last detection time
+                            document.getElementById('lastDetection').textContent = 
+                                `Last Detection: ${new Date().toLocaleTimeString()}`;
+                        }
+                    }
+                } catch (error) {
+                    // Silently handle errors - activation monitoring is optional
+                    console.debug('Activation monitoring error:', error);
+                }
+            }, 100); // Update every 100ms (10 FPS) for real-time responsiveness
+        }
+        
+        // Update activation status in UI
+        function updateActivationStatus(activationData) {
+            const statusElement = document.getElementById('activationStatus');
+            const statusText = document.getElementById('activationText');
+            
+            if (activationData.is_listening) {
+                statusElement.classList.remove('error');
+                statusElement.classList.add('success');
+                statusText.textContent = `Listening for wake word... (RMS: ${activationData.current_rms.toFixed(2)})`;
+            } else {
+                statusElement.classList.remove('success');
+                statusElement.classList.add('error');
+                statusText.textContent = 'Not listening for wake word';
+            }
+        }
+        
+        // Legacy detection polling (kept for backward compatibility)
         function startDetectionPolling() {
             setInterval(async () => {
                 try {

@@ -1,130 +1,113 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
-from flask_cors import CORS
-import os
-import json
-import logging
-from settings_manager import get_settings_manager, get_setting, set_setting
-from rms_monitor import rms_monitor
+#!/usr/bin/env python3
+"""
+Hey Orac Web Backend
+Provides REST API for web interface and settings management
+"""
+
+from flask import Flask, jsonify, request, send_from_directory
+from settings_manager import get_settings_manager
+from shared_memory_ipc import shared_memory_ipc
 import glob
+import time
 
 # Configure Flask logging to reduce verbosity for frequent polling endpoints only
-logging.getLogger('werkzeug').setLevel(logging.ERROR)  # Set to ERROR to suppress most requests
-logging.getLogger('flask').setLevel(logging.INFO)
-logging.getLogger('urllib3').setLevel(logging.ERROR)
-
-# Disable Flask's default request logging completely
-app = Flask(__name__)
-app.logger.disabled = True
-CORS(app)
-
-# Configure WSGI server logging to suppress request logs
 import logging
 from werkzeug.serving import WSGIRequestHandler
 
-# Disable werkzeug's request logging
 class QuietWSGIRequestHandler(WSGIRequestHandler):
     def log_request(self, *args, **kwargs):
         # Suppress all request logging
         pass
 
-# Set the custom request handler
-WSGIRequestHandler.log_request = QuietWSGIRequestHandler.log_request
+# Create Flask app
+app = Flask(__name__)
 
-# Initialize settings manager
+# Get settings manager instance
 settings_manager = get_settings_manager()
 
-# Model discovery paths
-OPENWAKEWORD_MODELS_DIR = os.path.join('/app', 'third_party', 'openwakeword', 'custom_models')
-PORCUPINE_MODELS_DIR = os.path.join('/app', 'third_party', 'porcupine', 'custom_models')
-
+# Helper functions
 def discover_available_models():
-    """
-    Discover all available wake word models from the filesystem.
-    Returns a list of model names found in the model directories.
-    """
-    models = set()
+    """Discover available custom models in the third_party directory"""
+    models = []
     
-    # OpenWakeWord: .onnx files only
-    if os.path.exists(OPENWAKEWORD_MODELS_DIR):
-        oww_models = glob.glob(os.path.join(OPENWAKEWORD_MODELS_DIR, '*.onnx'))
-        models.update([os.path.splitext(os.path.basename(f))[0] for f in oww_models])
+    # Look for ONNX models
+    onnx_pattern = "third_party/openwakeword/custom_models/*.onnx"
+    onnx_files = glob.glob(onnx_pattern)
     
-    # Porcupine models (for future use)
-    if os.path.exists(PORCUPINE_MODELS_DIR):
-        porcupine_models = glob.glob(os.path.join(PORCUPINE_MODELS_DIR, '*.ppn'))
-        models.update([os.path.splitext(os.path.basename(f))[0] for f in porcupine_models])
+    for file_path in onnx_files:
+        model_name = file_path.split('/')[-1].replace('.onnx', '')
+        models.append(model_name)
     
-    return sorted(list(models))
+    # Look for TFLite models
+    tflite_pattern = "third_party/openwakeword/custom_models/*.tflite"
+    tflite_files = glob.glob(tflite_pattern)
+    
+    for file_path in tflite_files:
+        model_name = file_path.split('/')[-1].replace('.tflite', '')
+        if model_name not in models:  # Avoid duplicates
+            models.append(model_name)
+    
+    return models
 
 def get_model_info(model_name):
-    """
-    Get detailed information about a specific model.
-    Returns a dictionary with model details.
-    """
-    # Check OpenWakeWord models first
-    onnx_path = os.path.join(OPENWAKEWORD_MODELS_DIR, f'{model_name}.onnx')
-    if os.path.exists(onnx_path):
+    """Get information about a specific model"""
+    # Check for ONNX model
+    onnx_path = f"third_party/openwakeword/custom_models/{model_name}.onnx"
+    if glob.glob(onnx_path):
         return {
             'name': model_name,
-            'file': f'{model_name}.onnx',
             'path': onnx_path,
-            'type': 'openwakeword',
-            'format': 'onnx'
+            'type': 'onnx'
         }
     
-    # Check Porcupine models
-    ppn_path = os.path.join(PORCUPINE_MODELS_DIR, f'{model_name}.ppn')
-    if os.path.exists(ppn_path):
+    # Check for TFLite model
+    tflite_path = f"third_party/openwakeword/custom_models/{model_name}.tflite"
+    if glob.glob(tflite_path):
         return {
             'name': model_name,
-            'file': f'{model_name}.ppn',
-            'path': ppn_path,
-            'type': 'porcupine',
-            'format': 'ppn'
+            'path': tflite_path,
+            'type': 'tflite'
         }
     
     return None
 
-# Serve static files from web directory
+# Routes
 @app.route('/')
 def index():
-    return send_from_directory('/app/web', 'index.html')
+    """Serve the main web interface"""
+    return send_from_directory('web', 'index.html')
 
 @app.route('/<path:filename>')
 def static_files(filename):
-    return send_from_directory('/app/web', filename)
+    """Serve static files from the web directory"""
+    return send_from_directory('web', filename)
 
-# API endpoints
 @app.route('/api/config', methods=['GET'])
 def get_config():
-    """Get full configuration for web interface"""
-    # Return the structure expected by the web interface
-    sensitivities = settings_manager.get("wake_word.sensitivities", {})
-    thresholds = settings_manager.get("wake_word.thresholds", {})
-    api_urls = settings_manager.get("wake_word.api_urls", {})
-    return jsonify({
-        "global": {
-            "rms_filter": settings_manager.get("detection.rms_filter", 50),
-            "debounce_ms": settings_manager.get("wake_word.debounce", 200),
-            "cooldown_s": settings_manager.get("wake_word.cooldown", 1.5)
-        },
-        "models": {
-            "Hay--compUta_v_lrg": {
-                "sensitivity": sensitivities.get("Hay--compUta_v_lrg", 0.8),
-                "threshold": thresholds.get("Hay--compUta_v_lrg", 0.3),
-                "api_url": api_urls.get("Hay--compUta_v_lrg", "https://api.example.com/webhook")
-            },
-            "Hey_computer": {
-                "sensitivity": sensitivities.get("Hey_computer", 0.8),
-                "threshold": thresholds.get("Hey_computer", 0.3),
-                "api_url": api_urls.get("Hey_computer", "https://api.example.com/webhook")
-            },
-            "hey-CompUter_lrg": {
-                "sensitivity": sensitivities.get("hey-CompUter_lrg", 0.8),
-                "threshold": thresholds.get("hey-CompUter_lrg", 0.3),
-                "api_url": api_urls.get("hey-CompUter_lrg", "https://api.example.com/webhook")
-            }
+    """Get current configuration"""
+    # Get all models with their settings
+    models = {}
+    for model_name in discover_available_models():
+        sensitivity = settings_manager.get_model_sensitivity(model_name, 0.8)
+        threshold = settings_manager.get_model_threshold(model_name, 0.3)
+        api_urls = settings_manager.get("wake_word.api_urls", {})
+        
+        models[model_name] = {
+            "sensitivity": sensitivity,
+            "threshold": threshold,
+            "api_url": api_urls.get(model_name, "https://api.example.com/webhook")
         }
+    
+    # Get global settings
+    global_settings = {
+        "rms_filter": settings_manager.get("volume_monitoring.rms_filter", 50),
+        "debounce_ms": int(settings_manager.get("wake_word.debounce", 0.2) * 1000),
+        "cooldown_s": settings_manager.get("wake_word.cooldown", 1.5)
+    }
+    
+    return jsonify({
+        "models": models,
+        "global": global_settings
     })
 
 @app.route('/api/config/global', methods=['GET'])
@@ -226,7 +209,7 @@ def discover_models():
 @app.route('/api/audio/rms', methods=['GET'])
 def get_rms_data():
     """Get current RMS audio levels for volume meter"""
-    rms_data = rms_monitor.get_rms_data()
+    rms_data = shared_memory_ipc.get_audio_state()
     return jsonify(rms_data)
 
 @app.route('/api/custom-models', methods=['GET'])
@@ -268,32 +251,44 @@ def set_custom_model(model_name):
 
 @app.route('/api/detections', methods=['GET'])
 def get_detections():
-    """Get recent wake word detections (ephemeral - clears file after reading)"""
-    import json
-    import time
-    import os
-    
-    # Read detections from file
-    detection_file = '/tmp/recent_detections.json'
-    detections = []
-    
-    if os.path.exists(detection_file):
-        try:
-            with open(detection_file, 'r') as f:
-                detections = json.load(f)
-            # Clear the file after reading (ephemeral behavior)
-            os.remove(detection_file)
-        except Exception as e:
-            # If file is corrupted, return empty list and try to remove the file
-            detections = []
-            try:
-                if os.path.exists(detection_file):
-                    os.remove(detection_file)
-            except Exception:
-                pass
-    
-    # Return all detections (no time filtering since file is cleared after reading)
-    return jsonify(detections)
+    """Get recent wake word detections from shared memory (replaces file-based system)"""
+    try:
+        # Get activation data from shared memory
+        activation_data = shared_memory_ipc.get_activation_state()
+        
+        # Convert to detection format for backward compatibility
+        detections = []
+        if activation_data.get('is_listening', False):
+            # Create a detection entry if currently listening
+            detection = {
+                'model_name': 'Custom Model',  # Will be updated when we add model name to shared memory
+                'confidence': 0.0,  # Will be updated when we add confidence to shared memory
+                'timestamp': int(activation_data.get('last_update', time.time()) * 1000),  # Convert to milliseconds
+                'is_listening': True
+            }
+            detections.append(detection)
+        
+        return jsonify(detections)
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get detections from shared memory: {e}")
+        return jsonify([])
+
+@app.route('/api/activation', methods=['GET'])
+def get_activation():
+    """Get current activation state from shared memory"""
+    try:
+        activation_data = shared_memory_ipc.get_activation_state()
+        return jsonify(activation_data)
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get activation data: {e}")
+        return jsonify({
+            'current_rms': 0.0,
+            'is_active': False,
+            'is_listening': False,
+            'last_update': time.time()
+        })
 
 @app.route('/api/settings/backup', methods=['POST'])
 def backup_settings():
