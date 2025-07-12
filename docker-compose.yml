@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   hey-orac:
-    build: .
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
     container_name: hey-orac
     privileged: true
     devices:
