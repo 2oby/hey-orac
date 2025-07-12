@@ -75,12 +75,12 @@ def get_model_info(model_name):
 @app.route('/')
 def index():
     """Serve the main web interface"""
-    return send_from_directory('web', 'index.html')
+    return send_from_directory('/app/web', 'index.html')
 
 @app.route('/<path:filename>')
 def static_files(filename):
     """Serve static files from the web directory"""
-    return send_from_directory('web', filename)
+    return send_from_directory('/app/web', filename)
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
