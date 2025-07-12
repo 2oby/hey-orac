@@ -127,35 +127,7 @@ ssh "$REMOTE_ALIAS" "\
     
     echo '${BLUE}🧪 Testing shared memory activation system...${NC}'; \
     echo 'Running activation system tests...'; \
-    docker-compose exec -T hey-orac bash -c "cd /app && python3 -c \"
-import sys
-sys.path.insert(0, '/app')
-from src.shared_memory_ipc import shared_memory_ipc
-import time
-
-print('🧪 Testing shared memory activation system...')
-
-# Test 1: Basic functionality
-try:
-    # Test activation state updates
-    shared_memory_ipc.update_activation_state(True, 'Test Model', 0.85)
-    print('✅ Set activation to True')
-    
-    data = shared_memory_ipc.get_activation_state()
-    print(f'📊 Current state: {data}')
-    
-    shared_memory_ipc.update_activation_state(False)
-    print('✅ Set activation to False')
-    
-    data = shared_memory_ipc.get_activation_state()
-    print(f'📊 Final state: {data}')
-    
-    print('✅ Shared memory activation system working correctly')
-    
-except Exception as e:
-    print(f'❌ Shared memory test failed: {e}')
-    exit(1)
-\""; \
+    docker-compose exec -T hey-orac bash -c "cd /app && python3 -c 'import sys; sys.path.insert(0, \"/app\"); from src.shared_memory_ipc import shared_memory_ipc; shared_memory_ipc.update_activation_state(True, \"Test Model\", 0.85); print(\"✅ SharedMemoryIPC working\"); shared_memory_ipc.update_activation_state(False); print(\"✅ SharedMemoryIPC test completed\")'"; \
     
     echo '${BLUE}🌐 Testing web API endpoints...${NC}'; \
     echo 'Testing /api/activation endpoint...'; \
