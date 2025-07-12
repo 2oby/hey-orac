@@ -128,6 +128,8 @@ ssh "$REMOTE_ALIAS" "\
     echo '${BLUE}🧪 Testing shared memory activation system...${NC}'; \
     echo 'Running activation system tests...'; \
     docker-compose exec -T hey-orac python3 -c "
+import sys
+sys.path.append('/app')
 from src.shared_memory_ipc import shared_memory_ipc
 import time
 
