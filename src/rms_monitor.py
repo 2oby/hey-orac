@@ -3,10 +3,12 @@ import time
 import numpy as np
 import json
 import os
+import struct
 from typing import Optional, Dict, Any
+from multiprocessing import shared_memory
 
 class RMSMonitor:
-    """Monitor and share RMS audio levels for web interface"""
+    """Monitor and share RMS audio levels for web interface using shared memory"""
     
     def __init__(self):
         self._rms_data = {
@@ -19,11 +21,42 @@ class RMSMonitor:
         }
         self._lock = threading.Lock()
         self._volume_window_size = 50  # Keep last 50 RMS values for averaging
-        # Use tmpfs path for RMS data to protect SD card
-        self._data_file = os.environ.get('RMS_DATA_FILE', '/tmp/rms_data/rms_monitor_data.json')
+        
+        # Shared memory setup
+        self._shm_name = 'rms_monitor_data'
+        self._shm_size = 1024  # Enough for RMS data
+        self._shm = None
+        self._setup_shared_memory()
+        
+    def _setup_shared_memory(self):
+        """Setup shared memory for cross-process communication"""
+        try:
+            # Try to connect to existing shared memory
+            self._shm = shared_memory.SharedMemory(name=self._shm_name, create=False)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"📊 Connected to existing shared memory: {self._shm_name}")
+        except FileNotFoundError:
+            # Create new shared memory
+            self._shm = shared_memory.SharedMemory(name=self._shm_name, create=True, size=self._shm_size)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info(f"📊 Created new shared memory: {self._shm_name}")
+        
+    def _pack_rms_data(self, rms_level: float, is_active: bool) -> bytes:
+        """Pack RMS data into bytes for shared memory"""
+        # Pack: rms_level (8 bytes) + is_active (1 byte) + timestamp (8 bytes)
+        packed = struct.pack('d?d', rms_level, is_active, time.time())
+        return packed
+    
+    def _unpack_rms_data(self, data: bytes) -> tuple:
+        """Unpack RMS data from bytes"""
+        # Unpack: rms_level (8 bytes) + is_active (1 byte) + timestamp (8 bytes)
+        rms_level, is_active, timestamp = struct.unpack('d?d', data[:17])
+        return rms_level, is_active, timestamp
         
     def update_rms(self, rms_level: float):
-        """Update RMS level from audio pipeline"""
+        """Update RMS level from audio pipeline using shared memory"""
         with self._lock:
             self._rms_data['current_rms'] = rms_level
             self._rms_data['last_update'] = time.time()
@@ -39,63 +72,58 @@ class RMSMonitor:
                 self._rms_data['avg_rms'] = np.mean(self._rms_data['volume_history'])
                 self._rms_data['max_rms'] = max(self._rms_data['volume_history'])
             
-            # Save to file for cross-process sharing
+            # Write to shared memory
             try:
-                # Convert numpy types to native Python types for JSON serialization
-                data_to_save = {
-                    'current_rms': float(self._rms_data['current_rms']),
-                    'avg_rms': float(self._rms_data['avg_rms']),
-                    'max_rms': float(self._rms_data['max_rms']),
-                    'volume_history': [float(x) for x in self._rms_data['volume_history']],
-                    'last_update': self._rms_data['last_update'],
-                    'is_active': self._rms_data['is_active']
-                }
-                with open(self._data_file, 'w') as f:
-                    json.dump(data_to_save, f)
+                packed_data = self._pack_rms_data(rms_level, True)
+                self._shm.buf[:len(packed_data)] = packed_data
+                
+                # Debug logging for testing
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info(f"📊 RMS Monitor Updated: {rms_level:.2f}, Active: True (Shared Memory)")
+                
             except Exception as e:
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.warning(f"⚠️ Failed to save RMS data to file: {e}")
-            
-
+                logger.error(f"❌ Failed to write to shared memory: {e}")
     
     def get_rms_data(self) -> Dict[str, Any]:
-        """Get current RMS data for web interface - PRIORITIZE MEMORY OVER FILE"""
+        """Get current RMS data for web interface from shared memory"""
         with self._lock:
-            current_time = time.time()
-            time_diff = current_time - self._rms_data['last_update']
-            
-            # Check if data is stale (older than 30 seconds)
-            if time_diff > 30.0:
-                self._rms_data['is_active'] = False
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.warning(f"⚠️ RMS data is stale ({time_diff:.2f}s), setting is_active=False")
-            
-            # Return in-memory data directly (prioritize memory over file)
-            # Only fall back to file if memory data is completely empty
-            if self._rms_data['current_rms'] == 0.0 and os.path.exists(self._data_file):
-                try:
-                    with open(self._data_file, 'r') as f:
-                        file_data = json.load(f)
-                        # Update local data from file only if memory is empty
-                        self._rms_data.update(file_data)
-                        logger = logging.getLogger(__name__)
-                        logger.info(f"📁 Loaded RMS data from file: {file_data.get('current_rms', 0.0):.2f}")
-                except Exception as e:
+            try:
+                # Read from shared memory
+                data = bytes(self._shm.buf[:17])  # Read packed data
+                rms_level, is_active, timestamp = self._unpack_rms_data(data)
+                
+                current_time = time.time()
+                time_diff = current_time - timestamp
+                
+                # Check if data is stale (older than 5 seconds)
+                if time_diff > 5.0:
+                    is_active = False
                     import logging
                     logger = logging.getLogger(__name__)
-                    logger.warning(f"⚠️ Failed to load RMS data from file: {e}")
-            
-            # Return simplified data structure for testing
-            return {
-                'current_rms': float(self._rms_data['current_rms']),
-                'is_active': self._rms_data['is_active'],
-                'last_update': self._rms_data['last_update']
-            }
+                    logger.warning(f"⚠️ RMS data is stale ({time_diff:.2f}s), setting is_active=False")
+                
+                return {
+                    'current_rms': float(rms_level),
+                    'is_active': bool(is_active),
+                    'last_update': timestamp
+                }
+                
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"❌ Failed to read from shared memory: {e}")
+                # Fallback to local data
+                return {
+                    'current_rms': float(self._rms_data['current_rms']),
+                    'is_active': False,
+                    'last_update': time.time()
+                }
     
     def reset(self):
-        """Reset RMS monitor"""
+        """Reset RMS monitor and cleanup shared memory"""
         with self._lock:
             self._rms_data = {
                 'current_rms': 0.0,
@@ -105,10 +133,12 @@ class RMSMonitor:
                 'last_update': time.time(),
                 'is_active': False
             }
-            # Also clear the file
+            
+            # Cleanup shared memory
             try:
-                if os.path.exists(self._data_file):
-                    os.remove(self._data_file)
+                if self._shm:
+                    self._shm.close()
+                    self._shm.unlink()
             except Exception:
                 pass
 
