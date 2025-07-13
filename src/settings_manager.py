@@ -197,15 +197,21 @@ class SettingsManager:
                         self._settings = json.load(f)
                 logger.info(f"✅ Settings loaded from {self.settings_file}")
             else:
-                # Create with defaults
-                with self._lock:
-                    self._settings = self.default_settings.copy()
-                self._save_settings()
-                logger.info(f"✅ Created new settings file with defaults: {self.settings_file}")
+                # Try to restore from backup first
+                if self._restore_from_backup():
+                    logger.info(f"✅ Settings restored from backup: {self.backup_file}")
+                else:
+                    # Create with defaults
+                    with self._lock:
+                        self._settings = self.default_settings.copy()
+                    self._save_settings()
+                    logger.info(f"✅ Created new settings file with defaults: {self.settings_file}")
         except Exception as e:
             logger.error(f"❌ Failed to load settings: {e}")
-            with self._lock:
-                self._settings = self.default_settings.copy()
+            # Try to restore from backup as fallback
+            if not self._restore_from_backup():
+                with self._lock:
+                    self._settings = self.default_settings.copy()
         
         # Update models from filesystem after loading settings
         self.update_models_from_filesystem()
@@ -234,6 +240,14 @@ class SettingsManager:
                 json.dump(self._settings, f, indent=2)
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
             logger.debug(f"✅ SETTINGS: Settings saved successfully to {self.settings_file}")
+            
+            # Automatically backup settings when they change
+            try:
+                self._backup_settings()
+                logger.debug(f"💾 SETTINGS: Settings backed up to {self.backup_file}")
+            except Exception as e:
+                logger.warning(f"⚠️ SETTINGS: Failed to backup settings: {e}")
+            
             return True
         except Exception as e:
             logger.error(f"❌ SETTINGS: Failed to save settings: {e}")
