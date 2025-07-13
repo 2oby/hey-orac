@@ -6,7 +6,6 @@ Phase 1a of the ORAC Voice-Control Architecture - Minimal Implementation
 
 import logging
 import sys
-import yaml
 from typing import Dict, Any
 
 # Core imports
@@ -14,6 +13,7 @@ from audio_utils import AudioManager
 from wake_word_interface import WakeWordDetector
 from audio_pipeline_new import create_audio_pipeline
 from wake_word_monitor_new import create_wake_word_monitor_new
+from settings_manager import get_settings_manager
 
 # Configure logging
 logging.basicConfig(
@@ -32,25 +32,17 @@ class HeyOracApp:
     Now properly integrates wake_word_monitor_new and audio_pipeline_new.
     """
     
-    def __init__(self, config_path: str = "/app/config.yaml"):
+    def __init__(self):
         """Initialize the Hey Orac application."""
-        self.config_path = config_path
-        self.config = self._load_config()
+        self.settings_manager = get_settings_manager()
         self.audio_manager = None
         self.wake_detector = None
         self.usb_device = None
         self.wake_word_monitor = None
         
-    def _load_config(self) -> Dict[str, Any]:
-        """Load configuration from YAML file."""
-        try:
-            with open(self.config_path, 'r') as f:
-                config = yaml.safe_load(f)
-            logger.info(f"Configuration loaded from {self.config_path}")
-            return config
-        except Exception as e:
-            logger.error(f"Failed to load configuration: {e}")
-            sys.exit(1)
+    def _get_config(self) -> Dict[str, Any]:
+        """Get configuration from settings manager."""
+        return self.settings_manager.get_all()
     
     def initialize(self) -> bool:
         """Initialize the application components."""

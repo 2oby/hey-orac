@@ -55,6 +55,86 @@ class SettingsManager:
     
     def _get_default_settings(self) -> Dict[str, Any]:
         """Get default application settings."""
+        logger.info("✅ Creating default settings (no YAML dependency)")
+        
+        # Create comprehensive defaults that match the original YAML config
+        return {
+            "audio": {
+                "sample_rate": 16000,
+                "chunk_size": 1280,
+                "channels": 1,
+                "device_index": 0
+            },
+            "wake_word": {
+                "engine": "openwakeword",
+                "cooldown": 1.5,
+                "debounce": 0.2,
+                "model_path": "/app/models/porcupine/orac.ppn",
+                "sensitivity": 0.8,
+                "threshold": 0.01,
+                "access_key": "",
+                "custom_model_path": "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx",
+                "models": {
+                    "Hay--compUta_v_lrg": {
+                        "sensitivity": 0.95,
+                        "threshold": 0.3,
+                        "api_url": "https://api.example.com/webhook",
+                        "active": True
+                    },
+                    "Hey_computer": {
+                        "sensitivity": 0.95,
+                        "threshold": 0.3,
+                        "api_url": "https://api.example.com/webhook",
+                        "active": False
+                    },
+                    "hey-CompUter_lrg": {
+                        "sensitivity": 0.95,
+                        "threshold": 0.3,
+                        "api_url": "https://api.example.com/webhook",
+                        "active": False
+                    }
+                }
+            },
+            "detection": {
+                "min_audio_level": 100,
+                "max_audio_level": 32767
+            },
+            "volume_monitoring": {
+                "rms_filter": 50,  # Updated to match YAML default
+                "window_size": 10,
+                "silence_duration_threshold": 2.0,
+                "silence_threshold": 100
+            },
+            "web": {
+                "port": 7171,
+                "host": "0.0.0.0",
+                "debug": False
+            },
+            "system": {
+                "log_level": "INFO",
+                "max_log_size": "10MB",
+                "backup_interval": 300  # 5 minutes
+            },
+            "buffer": {
+                "preroll_seconds": 1.0,
+                "postroll_seconds": 2.0,
+                "max_duration": 4.0
+            },
+            "network": {
+                "jetson_endpoint": "http://jetson-orin:8000/speech",
+                "timeout_seconds": 5.0,
+                "retry_attempts": 3
+            },
+            "logging": {
+                "level": "DEBUG",
+                "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+                "file": "/app/logs/hey-orac.log"
+            },
+            "performance": {
+                "cpu_affinity": None,
+                "memory_limit_mb": 200
+            }
+        }
         return {
             "audio": {
                 "sample_rate": 16000,
