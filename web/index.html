@@ -1346,6 +1346,8 @@
         });
         
         // Monitor activation state from shared memory
+        let lastListeningState = false; // Track previous listening state
+        
         function startActivationMonitoring() {
             setInterval(async () => {
                 try {
@@ -1357,8 +1359,8 @@
                         // Update UI based on activation state
                         updateActivationStatus(activationData);
                         
-                        // Check for recent detections (when is_listening becomes true)
-                        if (activationData.is_listening) {
+                        // Only show notification when listening state changes from false to true
+                        if (activationData.is_listening && !lastListeningState) {
                             console.log(`🎯 ACTIVATION: Listening for wake word detected!`);
                             showNotification('Listening for wake word...', 'info');
                             
@@ -1366,6 +1368,9 @@
                             document.getElementById('lastDetection').textContent = 
                                 `Last Detection: ${new Date().toLocaleTimeString()}`;
                         }
+                        
+                        // Update the tracking state
+                        lastListeningState = activationData.is_listening;
                     }
                 } catch (error) {
                     // Silently handle errors - activation monitoring is optional
