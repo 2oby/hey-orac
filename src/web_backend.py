@@ -25,11 +25,13 @@ logger.setLevel(logging.INFO)  # Set to INFO for normal operation
 import logging
 from werkzeug.serving import WSGIRequestHandler
 
-# Temporarily disable QuietWSGIRequestHandler to see request logs for debugging
-class VerboseWSGIRequestHandler(WSGIRequestHandler):
+# Custom request handler that only logs errors and non-polling endpoints
+class QuietWSGIRequestHandler(WSGIRequestHandler):
     def log_request(self, *args, **kwargs):
-        # Log all requests for debugging
-        logger.debug(f"🌐 HTTP {self.command} {self.path}")
+        # Only log requests that are not frequent polling endpoints
+        path = self.path
+        if not (path.startswith('/api/activation') or path.startswith('/api/audio/rms')):
+            logger.info(f"🌐 HTTP {self.command} {self.path}")
 
 # Create Flask app
 app = Flask(__name__)
@@ -366,17 +368,8 @@ def get_activation():
             get_activation._call_count = 0
         get_activation._call_count += 1
         
-        # Log every 50th call to avoid spam
-        if get_activation._call_count % 50 == 0:
-            logger.info(f"🌐 ACTIVATION API CALL #{get_activation._call_count}")
-        
+        # Removed excessive logging for frequent polling
         activation_data = shared_memory_ipc.get_activation_state()
-        
-        # ENHANCED DEBUGGING: Log activation state
-        if activation_data.get('is_listening', False):
-            logger.info(f"🎯 ACTIVATION API: Returning listening state - RMS: {activation_data.get('current_rms', 0):.4f}")
-        elif get_activation._call_count % 100 == 0:  # Log non-listening state less frequently
-            logger.debug(f"🔇 ACTIVATION API: Returning not listening state - RMS: {activation_data.get('current_rms', 0):.4f}")
         
         return jsonify(activation_data)
         
@@ -424,5 +417,6 @@ def reset_settings():
 
 if __name__ == '__main__':
     # Run in production mode for service deployment with reduced logging
-    logger.info("🚀 Starting web backend with DEBUG logging enabled")
-    app.run(host='0.0.0.0', port=7171, debug=False, threaded=True, use_reloader=False) 
+    logger.info("🚀 Starting web backend")
+    app.run(host='0.0.0.0', port=7171, debug=False, threaded=True, use_reloader=False, 
+            request_handler=QuietWSGIRequestHandler) 
