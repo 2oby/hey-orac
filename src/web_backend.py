@@ -228,7 +228,7 @@ def set_model_config(model_name):
             if settings["active"]:
                 # Set this model as the active model (deactivates others)
                 logger.info(f"🌐 API: Changing active model to '{model_name}' via /api/config/models/{model_name}")
-                success &= settings_manager.set_active_model(model_name)
+                success &= settings_manager.set_model_active(model_name)
             else:
                 # Deactivate this specific model
                 logger.info(f"🌐 API: Deactivating model '{model_name}' via /api/config/models/{model_name}")
