@@ -21,8 +21,9 @@ class OpenWakeWordEngine(WakeWordEngine):
         self.model = None
         self.is_initialized = False
         self.wake_word_name = "Unknown"
-        self.threshold = 0.5
-        self.sample_rate = 16000
+        # Remove hardcoded threshold - will be set from config during initialize()
+        self.threshold = None
+        self.sample_rate = 16000  # This is a constant for OpenWakeWord, not configurable
         self.debug_mode = True  # Set to False in production
         self.detection_history = []  # Track recent predictions for pattern analysis
         
@@ -53,11 +54,15 @@ class OpenWakeWordEngine(WakeWordEngine):
             logger.info(f"   Expected chunk duration: {self.get_frame_length() / self.sample_rate * 1000:.1f}ms ✓")
             
             # Get sensitivity and threshold from config (0.0-1.0)
-            self.sensitivity = config.get('sensitivity', 0.5)
-            self.threshold = config.get('threshold', 0.13)
+            self.sensitivity = config.get('sensitivity', 0.8)  # Use config default, not hardcoded
+            self.threshold = config.get('threshold', 0.001)  # Get from config, no hardcoded fallback
+            
+            # Get audio processing settings from config
+            self.low_audio_threshold = config.get('low_audio_threshold', 1000)
+            self.amplification_factor = config.get('amplification_factor', 10)
             
             logger.info(f"🔧 Model Sensitivity: {self.sensitivity:.3f} (internal model parameter)")
-            logger.info(f"🔧 Detection Threshold: {self.threshold:.3f} (confidence level to trigger)")
+            logger.info(f"🔧 Detection Threshold: {self.threshold:.6f} (confidence level to trigger)")
             logger.info(f"   High sensitivity = more sensitive model processing")
             logger.info(f"   Low threshold = easier detection (triggers at lower confidence)")
             
@@ -101,11 +106,11 @@ class OpenWakeWordEngine(WakeWordEngine):
                     # ISSUE #1: VAD threshold conflict - we were using both OpenWakeWord's VAD and our own RMS filtering
                     # SOLUTION: Disable OpenWakeWord's VAD since we're doing our own audio filtering
                     
-                    # CORRECT: Use class mapping for custom models
+                    # FIX #1: Add class mapping for custom models
                     logger.info(f"🔍 CRITICAL: Loading custom model WITH class mapping")
                     self.model = openwakeword.Model(
                         wakeword_model_paths=[custom_model_path],
-                        class_mapping_dicts=[{0: self.wake_word_name}],  # Maps output class 0 to our wake word name
+                        class_mapping_dicts=[{0: self.wake_word_name}],  # FIX #1: Maps output class 0 to our wake word name
                         vad_threshold=0.0,  # Disabled to prevent conflict with our RMS filtering
                         enable_speex_noise_suppression=False
                     )
@@ -164,6 +169,12 @@ class OpenWakeWordEngine(WakeWordEngine):
                 logger.info(f"   Test prediction content: {test_predictions}")
                 logger.info(f"   Test prediction keys (if dict): {list(test_predictions.keys())}")
                 
+                # FIX #5: Check prediction keys to see what name the model actually uses
+                if isinstance(test_predictions, dict):
+                    logger.info(f"🔍 CRITICAL: Available prediction keys: {list(test_predictions.keys())}")
+                    for key, value in test_predictions.items():
+                        logger.info(f"   Key '{key}': {value} (type: {type(value)})")
+                
                 # Check prediction_buffer after first prediction
                 if hasattr(self.model, 'prediction_buffer'):
                     logger.info(f"   ✅ prediction_buffer available after first prediction")
@@ -215,13 +226,20 @@ class OpenWakeWordEngine(WakeWordEngine):
                 if raw_max < 100:
                     logger.warning(f"⚠️ CRITICAL: Audio levels extremely low! Max value {raw_max} < 100")
                     logger.warning(f"⚠️ CRITICAL: Check microphone gain - should be much higher")
-                elif raw_max < 1000:
-                    logger.warning(f"⚠️ CRITICAL: Audio levels very low! Max value {raw_max} < 1000")
+                elif raw_max < self.low_audio_threshold:
+                    logger.warning(f"⚠️ CRITICAL: Audio levels very low! Max value {raw_max} < {self.low_audio_threshold}")
                     logger.warning(f"⚠️ CRITICAL: Consider increasing microphone gain")
                 
                 # Convert int16 [-32768, 32767] to float32 [-1.0, 1.0]
                 audio_chunk = audio_chunk.astype(np.float32) / 32768.0
                 logger.info(f"🔍 CRITICAL: Audio normalized from int16 to float32, shape: {audio_chunk.shape}, range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
+                
+                # FIX #2: Add microphone gain amplification if levels are too low
+                if raw_max < self.low_audio_threshold:  # If audio levels are very low
+                    audio_chunk = audio_chunk * self.amplification_factor
+                    logger.info(f"🔧 CRITICAL: Applied {self.amplification_factor}x amplification due to low audio levels")
+                    logger.info(f"🔧 CRITICAL: Amplified audio range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
+                    
             elif audio_chunk.dtype != np.float32:
                 # If not int16 or float32, convert to float32
                 audio_chunk = audio_chunk.astype(np.float32)
@@ -234,15 +252,18 @@ class OpenWakeWordEngine(WakeWordEngine):
             # Get predictions from OpenWakeWord model
             predictions = self.model.predict(audio_chunk)
             
-            # ISSUE #3: We were only checking for our specific model name, which might not match
-            # SOLUTION: Log all predictions to understand what the model is actually returning
-            if self.debug_mode:
-                # Log all model predictions to see what names are being used
+            # FIX #5: Log predictions.keys() to see what name the model actually uses
+            if isinstance(predictions, dict):
+                logger.info(f"🔍 CRITICAL: predictions.keys(): {list(predictions.keys())}")
                 logger.info(f"🔍 CRITICAL: All predictions: {predictions}")
-                # Track prediction history for pattern analysis
+            else:
+                logger.info(f"🔍 CRITICAL: predictions is not a dict: {type(predictions)}, content: {predictions}")
+            
+            # Track prediction history for pattern analysis
+            if self.debug_mode:
                 self.detection_history.append({
                     'timestamp': time.time(),
-                    'predictions': predictions.copy()
+                    'predictions': predictions.copy() if isinstance(predictions, dict) else predictions
                 })
                 # Keep only last 50 predictions
                 if len(self.detection_history) > 50:
@@ -264,14 +285,17 @@ class OpenWakeWordEngine(WakeWordEngine):
             logger.info(f"🔍 CRITICAL: Current threshold: {self.threshold:.6f}")
             logger.info(f"🔍 CRITICAL: Checking predictions against threshold:")
             
-            for model_name, confidence in predictions.items():
-                logger.info(f"   Model '{model_name}': {confidence:.6f} {'✓' if confidence > self.threshold else '✗'}")
-                if confidence > self.threshold:
-                    detected = True
-                    detection_model = model_name
-                    detection_confidence = confidence
-                    logger.info(f"🔍 CRITICAL: DETECTION TRIGGERED! Model: {detection_model}, Confidence: {detection_confidence:.6f}")
-                    break
+            if isinstance(predictions, dict):
+                for model_name, confidence in predictions.items():
+                    logger.info(f"   Model '{model_name}': {confidence:.6f} {'✓' if confidence > self.threshold else '✗'}")
+                    if confidence > self.threshold:
+                        detected = True
+                        detection_model = model_name
+                        detection_confidence = confidence
+                        logger.info(f"🔍 CRITICAL: DETECTION TRIGGERED! Model: {detection_model}, Confidence: {detection_confidence:.6f}")
+                        break
+            else:
+                logger.warning(f"⚠️ CRITICAL: predictions is not a dictionary, cannot check individual models")
             
             # ISSUE #5: Single-chunk detection might be too sensitive or not sensitive enough
             # SOLUTION: Implement a simple sliding window check for more robust detection
@@ -452,31 +476,49 @@ class OpenWakeWordEngine(WakeWordEngine):
         try:
             logger.info(f"🔍 CRITICAL: Validating model setup for '{self.wake_word_name}'")
             
-            # Test with silence
-            test_audio = np.zeros(1280, dtype=np.float32)
-            predictions = self.model.predict(test_audio)
+            # FIX #3: Verify model response with different test inputs
+            logger.info(f"🔍 CRITICAL: Running validation test with sine wave, silence, and noise inputs...")
             
-            logger.info(f"✅ Model validation passed")
-            logger.info(f"   Available prediction keys: {list(predictions.keys())}")
-            logger.info(f"   Expected key: '{self.wake_word_name}'")
-            logger.info(f"   Has expected key: {self.wake_word_name in predictions}")
-            logger.info(f"   Silence test predictions: {predictions}")
+            # Test 1: Silence
+            silence_audio = np.zeros(1280, dtype=np.float32)
+            silence_predictions = self.model.predict(silence_audio)
+            logger.info(f"   Silence test predictions: {silence_predictions}")
             
-            # Test with some noise to see if predictions change
-            test_audio = np.random.normal(0, 0.1, 1280).astype(np.float32)
-            noise_predictions = self.model.predict(test_audio)
+            # Test 2: Sine wave (simulates speech-like audio)
+            t = np.linspace(0, 1280/16000, 1280, endpoint=False)
+            sine_audio = np.sin(2 * np.pi * 1000 * t).astype(np.float32) * 0.5  # 1kHz sine wave
+            sine_predictions = self.model.predict(sine_audio)
+            logger.info(f"   Sine wave test predictions: {sine_predictions}")
+            
+            # Test 3: Random noise
+            noise_audio = np.random.normal(0, 0.1, 1280).astype(np.float32)
+            noise_predictions = self.model.predict(noise_audio)
             logger.info(f"   Noise test predictions: {noise_predictions}")
             
-            # Check if predictions are different (model is working)
-            if predictions == noise_predictions:
-                logger.warning(f"⚠️ CRITICAL: Model returns same predictions for silence and noise!")
-                logger.warning(f"   This suggests the model may not be processing audio correctly")
+            # Check if all tests return the same value (indicates model isn't processing correctly)
+            if silence_predictions == sine_predictions == noise_predictions:
+                logger.error(f"❌ CRITICAL: Model returns same predictions for all test inputs!")
+                logger.error(f"   Silence: {silence_predictions}")
+                logger.error(f"   Sine wave: {sine_predictions}")
+                logger.error(f"   Noise: {noise_predictions}")
+                logger.error(f"   This indicates the model isn't processing audio correctly")
+                return False
             else:
-                logger.info(f"✅ Model responds differently to different inputs")
+                logger.info(f"✅ Model responds differently to different inputs - validation passed")
             
             # Log prediction types and ranges
-            for key, value in predictions.items():
-                logger.info(f"   Key '{key}': {value} (type: {type(value)})")
+            if isinstance(silence_predictions, dict):
+                logger.info(f"   Available prediction keys: {list(silence_predictions.keys())}")
+                logger.info(f"   Expected key: '{self.wake_word_name}'")
+                logger.info(f"   Has expected key: {self.wake_word_name in silence_predictions}")
+                
+                for key, value in silence_predictions.items():
+                    logger.info(f"   Key '{key}': {value} (type: {type(value)})")
+            else:
+                logger.warning(f"⚠️ CRITICAL: predictions is not a dictionary: {type(silence_predictions)}")
+            
+            logger.info(f"✅ Model validation completed")
+            return True
             
         except Exception as e:
             logger.error(f"❌ Model validation failed: {e}")

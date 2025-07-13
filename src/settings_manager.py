@@ -70,25 +70,25 @@ class SettingsManager:
                 "cooldown": 1.5,
                 "model_path": "/app/models/porcupine/orac.ppn",
                 "sensitivity": 0.8,
-                "threshold": 0.01,
+                "threshold": 0.001,  # FIX #4: Lowered to 0.001 for debugging
                 "access_key": "",
                 "custom_model_path": "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx",
                 "models": {
                     "Hay--compUta_v_lrg": {
                         "sensitivity": 0.8,
-                        "threshold": 0.3,
+                        "threshold": 0.001,  # FIX #4: Lowered to 0.001 for debugging
                         "api_url": "https://api.example.com/webhook",
                         "active": True
                     },
                     "Hey_computer": {
                         "sensitivity": 0.8,
-                        "threshold": 0.3,
+                        "threshold": 0.001,  # FIX #4: Lowered to 0.001 for debugging
                         "api_url": "https://api.example.com/webhook",
                         "active": False
                     },
                     "hey-CompUter_lrg": {
                         "sensitivity": 0.8,
-                        "threshold": 0.3,
+                        "threshold": 0.001,  # FIX #4: Lowered to 0.001 for debugging
                         "api_url": "https://api.example.com/webhook",
                         "active": False
                     }
@@ -96,7 +96,9 @@ class SettingsManager:
             },
             "detection": {
                 "min_audio_level": 100,
-                "max_audio_level": 32767
+                "max_audio_level": 32767,
+                "low_audio_threshold": 1000,  # Audio level below which to apply amplification
+                "amplification_factor": 10  # Factor to amplify audio when levels are too low
             },
             "volume_monitoring": {
                 "rms_filter": 50,  # Updated to match YAML default
