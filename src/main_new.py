@@ -17,7 +17,7 @@ from wake_word_monitor_new import create_wake_word_monitor_new
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,  # Set to INFO for normal operation
+    level=logging.DEBUG,  # Set to DEBUG to see debug messages
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -116,6 +116,7 @@ class HeyOracApp:
             try:
                 # DEBUG: Add logging to see if callback is being called
                 logger.debug(f"🎯 DEBUG: Audio callback called - Chunk: {chunk_count}, RMS: {rms_level:.4f}")
+                logger.info(f"🎯 INFO: Audio callback called - Chunk: {chunk_count}, RMS: {rms_level:.4f}")
                 
                 # Process audio through the new monitor's detection system
                 detection_result = self.wake_word_monitor.process_audio(audio_data)
