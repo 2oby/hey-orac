@@ -147,17 +147,26 @@ class SettingsManager:
                         if self._validate_settings(loaded_settings):
                             self._settings = loaded_settings
                             logger.info(f"✅ Settings loaded from {self.settings_file}")
+                            # Only update models from filesystem if settings are valid
+                            self.update_models_from_filesystem()
+                            return
                         else:
                             logger.error(f"❌ Settings file corrupted, attempting backup restore")
                             if not self._restore_from_backup():
                                 logger.error(f"❌ Backup restore failed, falling back to default settings")
                                 self._settings = self.default_settings.copy()
                                 self._save_settings()
-                        return
+                                # Don't call update_models_from_filesystem() when falling back to defaults
+                                return
+                            else:
+                                # Backup restore succeeded, update models
+                                self.update_models_from_filesystem()
+                                return
             else:
                 # Try to restore from backup first
                 if self._restore_from_backup():
                     logger.info(f"✅ Settings restored from backup: {self.backup_file}")
+                    self.update_models_from_filesystem()
                     return
                 else:
                     # Create with defaults
@@ -165,6 +174,7 @@ class SettingsManager:
                         self._settings = self.default_settings.copy()
                     self._save_settings()
                     logger.info(f"✅ Created new settings file with defaults: {self.settings_file}")
+                    # Don't call update_models_from_filesystem() when creating defaults
                     return
         except Exception as e:
             logger.error(f"❌ Failed to load settings: {e}")
@@ -173,9 +183,7 @@ class SettingsManager:
                 logger.error(f"❌ Backup restore failed, falling back to default settings")
                 with self._lock:
                     self._settings = self.default_settings.copy()
-        
-        # Update models from filesystem after loading settings
-        self.update_models_from_filesystem()
+                # Don't call update_models_from_filesystem() when falling back to defaults
     
     def _validate_settings(self, settings: Dict[str, Any]) -> bool:
         """Validate that settings have the required structure."""
@@ -532,6 +540,8 @@ class SettingsManager:
                 for model_name in available_models:
                     if model_name not in self._settings["wake_word"]["models"]:
                         self._settings["wake_word"]["models"][model_name] = {
+                            "sensitivity": 0.8,
+                            "threshold": 0.3,
                             "api_url": "https://api.example.com/webhook",
                             "active": False
                         }
