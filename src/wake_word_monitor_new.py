@@ -129,6 +129,8 @@ class WakeWordMonitor_new:
             logger.info(f"   Wake word: {detector.get_wake_word_name()}")
             logger.info(f"   Sample rate: {detector.get_sample_rate()}")
             logger.info(f"   Frame length: {detector.get_frame_length()}")
+            logger.info(f"   Active detectors count: {len(self.active_detectors)}")
+            logger.info(f"   Active detectors keys: {list(self.active_detectors.keys())}")
             
             return True
             
