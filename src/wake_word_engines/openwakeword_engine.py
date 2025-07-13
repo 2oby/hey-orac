@@ -100,10 +100,13 @@ class OpenWakeWordEngine(WakeWordEngine):
                     
                     # ISSUE #1: VAD threshold conflict - we were using both OpenWakeWord's VAD and our own RMS filtering
                     # SOLUTION: Disable OpenWakeWord's VAD since we're doing our own audio filtering
+                    
+                    # CORRECT: Use class mapping for custom models
+                    logger.info(f"🔍 CRITICAL: Loading custom model WITH class mapping")
                     self.model = openwakeword.Model(
                         wakeword_model_paths=[custom_model_path],
-                        class_mapping_dicts=[{0: self.wake_word_name}],
-                        vad_threshold=0.0,  # CHANGED: Disabled to prevent conflict with our RMS filtering
+                        class_mapping_dicts=[{0: self.wake_word_name}],  # Maps output class 0 to our wake word name
+                        vad_threshold=0.0,  # Disabled to prevent conflict with our RMS filtering
                         enable_speex_noise_suppression=False
                     )
                     
@@ -112,7 +115,9 @@ class OpenWakeWordEngine(WakeWordEngine):
                     # Test the custom model immediately
                     test_audio = np.zeros(1280, dtype=np.float32)
                     test_predictions = self.model.predict(test_audio)
-                    logger.info(f"🔍 Custom model test prediction: {test_predictions}")
+                    logger.info(f"🔍 CRITICAL: Custom model test prediction WITH class mapping: {test_predictions}")
+                    logger.info(f"🔍 CRITICAL: Test prediction type: {type(test_predictions)}")
+                    logger.info(f"🔍 CRITICAL: Test prediction keys: {list(test_predictions.keys()) if isinstance(test_predictions, dict) else 'Not a dict'}")
                     
                 except Exception as e:
                     logger.error(f"❌ Failed to load custom model: {e}")
@@ -201,7 +206,23 @@ class OpenWakeWordEngine(WakeWordEngine):
             # ISSUE #2: Audio normalization was missing
             # OpenWakeWord expects float32 audio normalized to [-1, 1] range
             # SOLUTION: Properly normalize int16 audio to float32 [-1, 1]
+            
+            # CRITICAL: Check raw audio levels before normalization
             if audio_chunk.dtype == np.int16:
+                raw_max = np.max(np.abs(audio_chunk))
+                raw_min = np.min(audio_chunk)
+                raw_range = raw_max - raw_min
+                logger.info(f"🔍 CRITICAL: Raw int16 audio - max: {raw_max}, min: {raw_min}, range: {raw_range}")
+                logger.info(f"🔍 CRITICAL: Raw audio uses {raw_max/32768*100:.2f}% of available dynamic range")
+                
+                # Check if audio levels are too low
+                if raw_max < 100:
+                    logger.warning(f"⚠️ CRITICAL: Audio levels extremely low! Max value {raw_max} < 100")
+                    logger.warning(f"⚠️ CRITICAL: Check microphone gain - should be much higher")
+                elif raw_max < 1000:
+                    logger.warning(f"⚠️ CRITICAL: Audio levels very low! Max value {raw_max} < 1000")
+                    logger.warning(f"⚠️ CRITICAL: Consider increasing microphone gain")
+                
                 # Convert int16 [-32768, 32767] to float32 [-1.0, 1.0]
                 audio_chunk = audio_chunk.astype(np.float32) / 32768.0
                 logger.info(f"🔍 CRITICAL: Audio normalized from int16 to float32, shape: {audio_chunk.shape}, range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
