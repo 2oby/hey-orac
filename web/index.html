@@ -303,6 +303,20 @@
             letter-spacing: 1px;
         }
 
+        .volume-info {
+            display: flex;
+            justify-content: space-between;
+            width: 600px;
+            margin-top: 5px;
+            font-size: 0.8em;
+            color: #00ff41;
+        }
+
+        .volume-info span {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+
         .models-section {
             flex: 1;
             display: flex;
@@ -788,6 +802,10 @@
                     <span>Low</span>
                     <span>Medium</span>
                     <span>High</span>
+                </div>
+                <div class="volume-info">
+                    <span id="currentRms">Current RMS: 0</span>
+                    <span id="filterThreshold">Filter: 0</span>
                 </div>
             </div>
 
@@ -1429,9 +1447,9 @@
             const sliderValue = parseInt(document.getElementById('rmsFilter').value);
             const rmsFilterValue = sliderToRms(sliderValue);
             
-            // Convert RMS filter to volume meter scale
-            // Use the same logarithmic scale as the volume meter
-            const filterThreshold = Math.log(1 + rmsFilterValue / 5) / Math.log(1 + 200);
+            // Convert RMS filter to volume meter scale using consistent logarithmic scale
+            // Map RMS filter (0-5000) to volume meter position (0-1)
+            const filterThreshold = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 500);
             
             // Calculate how many segments should be active based on volume
             const activeSegments = Math.floor(volume * 12);
@@ -1466,7 +1484,8 @@
             const rmsFilterValue = sliderToRms(sliderValue);
             
             // Convert RMS filter to volume meter scale for positioning
-            const filterThreshold = Math.log(1 + rmsFilterValue / 5) / Math.log(1 + 200);
+            // Use the same scale as the volume meter for consistency
+            const filterThreshold = Math.log(1 + rmsFilterValue / 10) / Math.log(1 + 500);
             const filterPosition = filterThreshold * 600; // 600px is meter width
             const indicator = document.getElementById('filterIndicator');
             indicator.style.left = `${filterPosition}px`;
@@ -1480,11 +1499,12 @@
                     if (response.ok) {
                         const rmsData = await response.json();
                         
-                        // Convert RMS to volume level (0-1) using enhanced logarithmic scale
+                        // Convert RMS to volume level (0-1) using consistent logarithmic scale
                         let volume = 0;
                         if (rmsData.is_active && rmsData.current_rms > 0) {
                             const rms = rmsData.current_rms;
-                            volume = Math.log(1 + rms / 5) / Math.log(1 + 200);
+                            // Use the same scale as the filter for consistency
+                            volume = Math.log(1 + rms / 10) / Math.log(1 + 500);
                             volume = Math.min(1, volume); // Clamp to 0-1
                         }
                         
@@ -1494,6 +1514,12 @@
                         }
                         
                         updateVolumeMeter(volume);
+                        
+                        // Update volume info display
+                        const sliderValue = parseInt(document.getElementById('rmsFilter').value);
+                        const rmsFilterValue = sliderToRms(sliderValue);
+                        document.getElementById('currentRms').textContent = `Current RMS: ${rmsData.current_rms.toFixed(1)}`;
+                        document.getElementById('filterThreshold').textContent = `Filter: ${rmsFilterValue.toFixed(0)}`;
                         
                         // Update status based on RMS data
                         const audioStatus = document.getElementById('audioStatus');
