@@ -36,6 +36,9 @@ WORKDIR /app
 # Create virtual environment as root (to avoid permission issues)
 RUN python3 -m venv /app/venv
 
+# Change ownership of /app directory to appuser
+RUN chown -R appuser:appuser /app
+
 # Copy requirements and build configuration first for better caching
 # This layer will only rebuild if requirements.txt or pyproject.toml changes
 COPY --chown=appuser:appuser requirements.txt .
@@ -60,6 +63,9 @@ RUN chown -R appuser:appuser /app/venv
 
 # Create logs directory with proper ownership (as root before switching to appuser)
 RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs && chmod 755 /app/logs
+
+# Ensure all /app directories are owned by appuser
+RUN chown -R appuser:appuser /app
 
 # Switch to non-root user after setup
 USER appuser

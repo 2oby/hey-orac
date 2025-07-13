@@ -23,7 +23,7 @@ class SettingsManager:
     
     def __init__(self, 
                  settings_file: str = "/tmp/settings/config.json",
-                 backup_file: str = "/app/settings_backup.json",
+                 backup_file: str = "/app/src/settings_backup.json",
                  default_settings: Optional[Dict[str, Any]] = None):
         """
         Initialize settings manager.
