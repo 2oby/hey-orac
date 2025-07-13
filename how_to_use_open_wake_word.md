@@ -1,5 +1,24 @@
-```python
 # OPENWAKEWORD AUDIO STREAM MONITORING - CORRECTED IMPLEMENTATION
+
+# CLASS MAPPING EXPLAINED
+# The class_mapping_dicts parameter maps the output neurons/classes of your ONNX model to human-readable wake word names.
+# 
+# For a SINGLE wake word model (most common):
+# class_mapping_dicts=[{0: "hey_computer"}]  # Maps output class 0 to name "hey_computer"
+# 
+# For a MULTI-CLASS model (one model, multiple wake words):
+# class_mapping_dicts=[{
+#     0: "hey_computer",
+#     1: "okay_assistant", 
+#     2: "stop_listening"
+# }]
+# 
+# What is the model name?
+# The model name is arbitrary - it's just a label you choose. It:
+# - IS: A human-readable identifier for the wake word
+# - IS NOT: The file path or model filename
+# - USED FOR: The keys in the prediction dictionary
+
 # 1. MODEL INITIALIZATION
 # When a custom model is loaded, we create the OpenWakeWord model like this:
 custom_model_path = "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx"

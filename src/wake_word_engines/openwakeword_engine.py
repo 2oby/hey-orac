@@ -112,12 +112,8 @@ class OpenWakeWordEngine(WakeWordEngine):
                     
                     logger.info(f"✅ Custom model loaded successfully: {custom_model_path}")
                     
-                    # Test the custom model immediately
-                    test_audio = np.zeros(1280, dtype=np.float32)
-                    test_predictions = self.model.predict(test_audio)
-                    logger.info(f"🔍 CRITICAL: Custom model test prediction WITH class mapping: {test_predictions}")
-                    logger.info(f"🔍 CRITICAL: Test prediction type: {type(test_predictions)}")
-                    logger.info(f"🔍 CRITICAL: Test prediction keys: {list(test_predictions.keys()) if isinstance(test_predictions, dict) else 'Not a dict'}")
+                    # Validate the custom model setup
+                    self._validate_model_setup()
                     
                 except Exception as e:
                     logger.error(f"❌ Failed to load custom model: {e}")
@@ -449,4 +445,39 @@ class OpenWakeWordEngine(WakeWordEngine):
     def cleanup(self) -> None:
         """Clean up resources."""
         self.model = None
-        self.is_initialized = False 
+        self.is_initialized = False
+    
+    def _validate_model_setup(self):
+        """Validate that the model is properly loaded and working."""
+        try:
+            logger.info(f"🔍 CRITICAL: Validating model setup for '{self.wake_word_name}'")
+            
+            # Test with silence
+            test_audio = np.zeros(1280, dtype=np.float32)
+            predictions = self.model.predict(test_audio)
+            
+            logger.info(f"✅ Model validation passed")
+            logger.info(f"   Available prediction keys: {list(predictions.keys())}")
+            logger.info(f"   Expected key: '{self.wake_word_name}'")
+            logger.info(f"   Has expected key: {self.wake_word_name in predictions}")
+            logger.info(f"   Silence test predictions: {predictions}")
+            
+            # Test with some noise to see if predictions change
+            test_audio = np.random.normal(0, 0.1, 1280).astype(np.float32)
+            noise_predictions = self.model.predict(test_audio)
+            logger.info(f"   Noise test predictions: {noise_predictions}")
+            
+            # Check if predictions are different (model is working)
+            if predictions == noise_predictions:
+                logger.warning(f"⚠️ CRITICAL: Model returns same predictions for silence and noise!")
+                logger.warning(f"   This suggests the model may not be processing audio correctly")
+            else:
+                logger.info(f"✅ Model responds differently to different inputs")
+            
+            # Log prediction types and ranges
+            for key, value in predictions.items():
+                logger.info(f"   Key '{key}': {value} (type: {type(value)})")
+            
+        except Exception as e:
+            logger.error(f"❌ Model validation failed: {e}")
+            raise 
