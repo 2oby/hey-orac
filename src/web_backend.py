@@ -210,19 +210,22 @@ def get_model_config(model_name):
 @app.route('/api/config/models/<model_name>', methods=['POST'])
 def set_model_config(model_name):
     """Update specific model settings (per-model sensitivity, threshold, API URL, and active state)"""
-    logger.debug(f"🌐 API: POST /api/config/models/{model_name} called with data: {request.json}")
+    logger.info(f"🌐 API: POST /api/config/models/{model_name} called with data: {request.json}")
     try:
         settings = request.json
         success = True
         
+        # Log current settings before changes
+        logger.info(f"🌐 API: Current settings before update: {settings_manager.get_all()}")
+        
         if "sensitivity" in settings:
-            logger.debug(f"🌐 API: Setting sensitivity for {model_name} to {settings['sensitivity']}")
+            logger.info(f"🌐 API: Setting sensitivity for {model_name} to {settings['sensitivity']}")
             success &= settings_manager.set_model_sensitivity(model_name, settings["sensitivity"])
         if "threshold" in settings:
-            logger.debug(f"🌐 API: Setting threshold for {model_name} to {settings['threshold']}")
+            logger.info(f"🌐 API: Setting threshold for {model_name} to {settings['threshold']}")
             success &= settings_manager.set_model_threshold(model_name, settings["threshold"])
         if "api_url" in settings:
-            logger.debug(f"🌐 API: Setting API URL for {model_name} to {settings['api_url']}")
+            logger.info(f"🌐 API: Setting API URL for {model_name} to {settings['api_url']}")
             success &= settings_manager.set_model_api_url(model_name, settings["api_url"])
         if "active" in settings:
             if settings["active"]:
@@ -233,6 +236,9 @@ def set_model_config(model_name):
                 # Deactivate this specific model
                 logger.info(f"🌐 API: Deactivating model '{model_name}' via /api/config/models/{model_name}")
                 success &= settings_manager.set_model_active_state(model_name, False)
+        
+        # Log settings after changes
+        logger.info(f"🌐 API: Settings after update: {settings_manager.get_all()}")
         
         if success:
             logger.info(f"🌐 API: Model {model_name} settings updated successfully")

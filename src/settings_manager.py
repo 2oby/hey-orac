@@ -241,13 +241,19 @@ class SettingsManager:
             
             # Only save if settings have actually changed
             if current_settings == self._settings:
+                logger.debug(f"💾 SETTINGS: No changes detected, skipping save")
                 return True
+            
+            logger.info(f"💾 SETTINGS: Saving settings to {self.settings_file}")
+            logger.info(f"💾 SETTINGS: Settings to save: {self._settings}")
             
             with open(self.settings_file, 'w') as f:
                 # Use file locking to prevent corruption
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)
                 json.dump(self._settings, f, indent=2)
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            
+            logger.info(f"💾 SETTINGS: Settings saved successfully")
             
             # Automatically backup settings when they change
             try:
