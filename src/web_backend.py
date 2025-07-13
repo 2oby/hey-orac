@@ -76,7 +76,8 @@ def get_config():
             models[model_name] = {
                 "sensitivity": model_config['sensitivity'],
                 "threshold": model_config['threshold'],
-                "api_url": model_config['api_url']
+                "api_url": model_config['api_url'],
+                "active": model_config['active']
             }
     
     # Get global settings
@@ -146,24 +147,33 @@ def set_setting_value(key):
 @app.route('/api/config/models', methods=['GET'])
 def get_models():
     """Get all models with their settings"""
-    # For now, return wake word settings
+    # Get all models with their complete configuration
+    models = {}
+    for model_name in discover_available_models():
+        model_config = settings_manager.get_model_config(model_name)
+        if model_config:
+            models[model_name] = {
+                "sensitivity": model_config['sensitivity'],
+                "threshold": model_config['threshold'],
+                "api_url": model_config['api_url'],
+                "active": model_config['active']
+            }
+    
     return jsonify({
-        "wake_word": {
-            "model": settings_manager.get("wake_word.model"),
-            "cooldown": settings_manager.get("wake_word.cooldown"),
-            "debounce": settings_manager.get("wake_word.debounce")
-        }
+        "models": models,
+        "active_models": settings_manager.get_active_models()
     })
 
 @app.route('/api/config/models/<model_name>', methods=['GET'])
 def get_model_config(model_name):
-    """Get specific model settings (per-model sensitivity, threshold and API URL)"""
+    """Get specific model settings (per-model sensitivity, threshold, API URL, and active state)"""
     model_config = settings_manager.get_model_config(model_name)
     if model_config:
         return jsonify({
             "sensitivity": model_config['sensitivity'],
             "threshold": model_config['threshold'],
             "api_url": model_config['api_url'],
+            "active": model_config['active'],
             "model": model_name
         })
     else:
@@ -171,19 +181,29 @@ def get_model_config(model_name):
 
 @app.route('/api/config/models/<model_name>', methods=['POST'])
 def set_model_config(model_name):
-    """Update specific model settings (per-model sensitivity, threshold and API URL)"""
+    """Update specific model settings (per-model sensitivity, threshold, API URL, and active state)"""
     try:
         settings = request.json
+        success = True
+        
         if "sensitivity" in settings:
-            settings_manager.set_model_sensitivity(model_name, settings["sensitivity"])
+            success &= settings_manager.set_model_sensitivity(model_name, settings["sensitivity"])
         if "threshold" in settings:
-            settings_manager.set_model_threshold(model_name, settings["threshold"])
+            success &= settings_manager.set_model_threshold(model_name, settings["threshold"])
         if "api_url" in settings:
-            settings_manager.set_model_api_url(model_name, settings["api_url"])
-        # Optionally update model selection
-        if settings.get("activate", False):
-            settings_manager.set("wake_word.model", model_name)
-        return jsonify({"status": "success"})
+            success &= settings_manager.set_model_api_url(model_name, settings["api_url"])
+        if "active" in settings:
+            if settings["active"]:
+                # Set this model as the active model (deactivates others)
+                success &= settings_manager.set_active_model(model_name)
+            else:
+                # Deactivate this specific model
+                success &= settings_manager.set_model_active(model_name, False)
+        
+        if success:
+            return jsonify({"status": "success", "message": f"Model {model_name} settings updated"})
+        else:
+            return jsonify({"status": "error", "message": "Failed to update model settings"}), 500
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
 
@@ -218,15 +238,21 @@ def get_custom_models():
     for model_name in discover_available_models():
         model_info = get_model_info(model_name)
         if model_info:
+            # Get model configuration including active state
+            model_config = settings_manager.get_model_config(model_name)
+            if model_config:
+                model_info['active'] = model_config['active']
+                model_info['sensitivity'] = model_config['sensitivity']
+                model_info['threshold'] = model_config['threshold']
+                model_info['api_url'] = model_config['api_url']
             available_models.append(model_info)
     
-    # Get current selection from settings
-    current_model = settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
+    # Get currently active models
+    active_models = settings_manager.get_active_models()
     
     return jsonify({
         'available_models': available_models,
-        'current_model': current_model,
-        'current_path': get_model_info(current_model)['path'] if get_model_info(current_model) else None
+        'active_models': active_models
     })
 
 @app.route('/api/custom-models/<model_name>', methods=['POST'])
@@ -237,13 +263,13 @@ def set_custom_model(model_name):
     if not model_info:
         return jsonify({'error': f'Model {model_name} not found'}), 404
     
-    # Update the settings
-    if settings_manager.set("wake_word.model", model_name):
+    # Set this model as the active model (deactivates others)
+    if settings_manager.set_active_model(model_name):
         return jsonify({
             'status': 'success',
             'message': f'Model {model_name} activated',
-            'current_model': model_name,
-            'current_path': model_info['path']
+            'active_model': model_name,
+            'active_models': settings_manager.get_active_models()
         })
     else:
         return jsonify({'error': 'Failed to update model setting'}), 500

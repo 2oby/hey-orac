@@ -888,10 +888,10 @@
                 const response = await fetch(`${API_BASE}/config`);
                 const config = await response.json();
                 
-                // Convert config to our model format
+                // Convert config to our model format with active states
                 sampleModels = Object.keys(config.models).map(name => ({
                     name: name,
-                    active: false, // We'll need to add active state to config later
+                    active: config.models[name].active || false,
                     sensitivity: config.models[name].sensitivity,
                     threshold: config.models[name].threshold,
                     apiUrl: config.models[name].api_url
@@ -963,7 +963,8 @@
                     body: JSON.stringify({
                         sensitivity: settings.sensitivity,
                         threshold: settings.threshold,
-                        api_url: settings.apiUrl
+                        api_url: settings.apiUrl,
+                        active: settings.active
                     })
                 });
             } catch (error) {
@@ -991,7 +992,8 @@
                 customModelGrid.innerHTML = '';
                 
                 data.available_models.forEach(model => {
-                    const isActive = model.name === data.current_model;
+                    // Check if this model is in the active models list
+                    const isActive = data.active_models && data.active_models.includes(model.name);
                     const modelCard = document.createElement('div');
                     modelCard.className = `model-card ${isActive ? 'active' : 'inactive'}`;
                     modelCard.dataset.modelName = model.name;
@@ -1299,7 +1301,8 @@
                 saveModelSettingsToAPI(currentEditingModel, {
                     sensitivity: model.sensitivity,
                     threshold: model.threshold,
-                    apiUrl: model.apiUrl
+                    apiUrl: model.apiUrl,
+                    active: model.active // Include active state
                 });
             }
             

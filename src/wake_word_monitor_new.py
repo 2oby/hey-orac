@@ -70,6 +70,7 @@ class WakeWordMonitor_new:
                 logger.info(f"   Sensitivity: {model_config['sensitivity']:.3f}")
                 logger.info(f"   Threshold: {model_config['threshold']:.3f}")
                 logger.info(f"   API URL: {model_config['api_url']}")
+                logger.info(f"   Active: {model_config['active']}")
                 logger.info(f"   Files: {list(model_config['file_paths'].keys())}")
     
     def get_available_models(self) -> List[str]:
@@ -99,11 +100,18 @@ class WakeWordMonitor_new:
         config = self.get_model_config(model_name)
         return config['api_url'] if config else "https://api.example.com/webhook"
     
+    def get_model_active(self, model_name: str) -> bool:
+        """Get active state for a specific model."""
+        config = self.get_model_config(model_name)
+        return config['active'] if config else False
+    
+    def get_active_models(self) -> List[str]:
+        """Get list of currently active models."""
+        return self.settings_manager.get_active_models()
+    
     def get_cooldown_seconds(self) -> float:
         """Get global cooldown setting."""
         return self.global_settings['cooldown']
-    
-
     
     def get_engine_type(self) -> str:
         """Get the wake word engine type."""
@@ -124,11 +132,23 @@ class WakeWordMonitor_new:
         logger.info(f"   Keyword: {self.get_keyword()}")
         logger.info(f"   Cooldown: {self.get_cooldown_seconds()}s")
         
-        # Model configurations
-        logger.info(f"\n🤖 Model Configurations ({len(self.available_models)} models):")
+        # Active models
+        active_models = self.get_active_models()
+        logger.info(f"\n🎯 Active Models ({len(active_models)} models):")
+        for model_name in active_models:
+            config = self.get_model_config(model_name)
+            if config:
+                logger.info(f"   ✅ {model_name}:")
+                logger.info(f"      Sensitivity: {config['sensitivity']:.3f}")
+                logger.info(f"      Threshold: {config['threshold']:.3f}")
+                logger.info(f"      API URL: {config['api_url']}")
+        
+        # All model configurations
+        logger.info(f"\n🤖 All Model Configurations ({len(self.available_models)} models):")
         for model_name in self.available_models:
             config = self.get_model_config(model_name)
-            logger.info(f"   📁 {model_name}:")
+            status = "✅ ACTIVE" if config['active'] else "❌ INACTIVE"
+            logger.info(f"   📁 {model_name} ({status}):")
             logger.info(f"      Sensitivity: {config['sensitivity']:.3f}")
             logger.info(f"      Threshold: {config['threshold']:.3f}")
             logger.info(f"      API URL: {config['api_url']}")
