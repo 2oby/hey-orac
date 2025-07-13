@@ -37,8 +37,17 @@ class AudioPipeline:
         
         # Audio processing parameters
         self.silence_threshold = self.settings_manager.get("volume_monitoring", {}).get("rms_filter", 10)  # Use GUI setting
-        self.volume_window_size = self.settings_manager.get("volume_monitoring.window_size")
-        self.silence_duration_threshold = self.settings_manager.get("volume_monitoring.silence_duration_threshold")  # seconds
+        self.volume_window_size = self.settings_manager.get("volume_monitoring.window_size", 10)
+        self.silence_duration_threshold = self.settings_manager.get("volume_monitoring.silence_duration_threshold", 2.0)  # seconds
+
+        # Validate and default volume_window_size
+        if not isinstance(self.volume_window_size, int) or self.volume_window_size <= 0:
+            logger.warning(f"⚠️ Invalid or missing volume_window_size: {self.volume_window_size}, defaulting to 10")
+            self.volume_window_size = 10
+        # Validate and default silence_duration_threshold
+        if not isinstance(self.silence_duration_threshold, (int, float)) or self.silence_duration_threshold <= 0:
+            logger.warning(f"⚠️ Invalid or missing silence_duration_threshold: {self.silence_duration_threshold}, defaulting to 2.0")
+            self.silence_duration_threshold = 2.0
         
         # Audio state tracking
         self.volume_history = []

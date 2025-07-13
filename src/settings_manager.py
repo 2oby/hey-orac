@@ -68,7 +68,6 @@ class SettingsManager:
             "wake_word": {
                 "engine": "openwakeword",
                 "cooldown": 1.5,
-                "debounce": 0.2,
                 "model_path": "/app/models/porcupine/orac.ppn",
                 "sensitivity": 0.8,
                 "threshold": 0.01,
@@ -145,7 +144,6 @@ class SettingsManager:
             "wake_word": {
                 "engine": "openwakeword",
                 "cooldown": 1.5,
-                "debounce": 0.2,
                 "models": {
                     "Hay--compUta_v_lrg": {
                         "sensitivity": 0.8,

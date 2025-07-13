@@ -778,11 +778,7 @@
                     <span class="slider-value" id="rmsFilterValue">10.0</span>
                 </div>
                 
-                <div class="slider-group">
-                    <label class="slider-label">Debounce (ms)</label>
-                    <input type="range" class="slider" id="debounce" min="0" max="1000" value="200">
-                    <span class="slider-value" id="debounceValue">200ms</span>
-                </div>
+                <!-- Remove Debounce slider and label -->
                 
                 <div class="slider-group">
                     <label class="slider-label">Cooldown (s)</label>
@@ -905,9 +901,7 @@
                     document.getElementById('rmsFilter').value = sliderValue;
                     document.getElementById('rmsFilterValue').textContent = rmsFilterValue.toFixed(0);
                     
-                    // Load debounce and cooldown settings
-                    document.getElementById('debounce').value = config.global.debounce_ms;
-                    document.getElementById('debounceValue').textContent = config.global.debounce_ms + 'ms';
+                    // Load cooldown settings
                     document.getElementById('cooldown').value = config.global.cooldown_s;
                     document.getElementById('cooldownValue').textContent = config.global.cooldown_s + 's';
                 }
@@ -936,7 +930,6 @@
                     rms_filter: rmsValue
                 },
                 wake_word: {
-                    debounce: parseInt(document.getElementById('debounce').value) / 1000, // Convert ms to seconds
                     cooldown: parseFloat(document.getElementById('cooldown').value)
                 }
             };
@@ -1193,7 +1186,6 @@
         function setupSliders() {
             const sliders = [
                 { id: 'rmsFilter', valueId: 'rmsFilterValue', format: (v) => v },
-                { id: 'debounce', valueId: 'debounceValue', format: (v) => v + 'ms' },
                 { id: 'cooldown', valueId: 'cooldownValue', format: (v) => v + 's' }
             ];
 

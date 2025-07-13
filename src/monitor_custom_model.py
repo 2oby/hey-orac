@@ -39,8 +39,6 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         self.last_detection_time = 0
         self.last_detection_chunk = 0
         self.detection_cooldown_seconds = 1.5
-        self.debounce_seconds = 0.2
-        self.detection_debounce_chunks = 0
         
         # Volume filtering
         self.rms_filter_value = self.settings_manager.get("volume_monitoring", {}).get("rms_filter", 10)
@@ -86,11 +84,9 @@ class CustomModelMonitor(BaseWakeWordMonitor):
     def _update_timing_controls(self):
         """Update timing controls from settings."""
         self.detection_cooldown_seconds = self.settings_manager.get("wake_word.cooldown", 1.5)
-        self.debounce_seconds = self.settings_manager.get("wake_word.debounce", 0.2)
-        self.detection_debounce_chunks = int(self.debounce_seconds * self.wake_detector.get_sample_rate() / self.wake_detector.get_frame_length())
         self.rms_filter_value = self.settings_manager.get("volume_monitoring", {}).get("rms_filter", 10)
         
-        logger.info(f"🔧 Timing controls updated: Cooldown={self.detection_cooldown_seconds}s, Debounce={self.debounce_seconds}s, RMS Filter={self.rms_filter_value}")
+        logger.info(f"🔧 Timing controls updated: Cooldown={self.detection_cooldown_seconds}s, RMS Filter={self.rms_filter_value}")
     
     def _on_settings_changed(self, new_settings):
         """Handle settings changes."""
@@ -106,12 +102,6 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         time_since_last = current_time - self.last_detection_time
         if time_since_last < self.detection_cooldown_seconds:
             logger.debug(f"🛡️ Cooldown active: {self.detection_cooldown_seconds - time_since_last:.2f}s remaining")
-            return False
-        
-        # Check debounce period
-        chunks_since_last = current_chunk - self.last_detection_chunk
-        if chunks_since_last < self.detection_debounce_chunks:
-            logger.debug(f"🛡️ Debounce active: {self.detection_debounce_chunks - chunks_since_last} chunks remaining")
             return False
         
         # Check RMS filter
@@ -192,7 +182,6 @@ class CustomModelMonitor(BaseWakeWordMonitor):
             logger.info(f"   Time since last detection: {current_time - self.last_detection_time:.2f}s")
             logger.info(f"   Chunks since last detection: {self.chunk_count - self.last_detection_chunk}")
             logger.info(f"   Cooldown setting: {self.detection_cooldown_seconds}s")
-            logger.info(f"   Debounce setting: {self.debounce_seconds}s ({self.detection_debounce_chunks} chunks)")
             logger.info(f"   RMS filter setting: {self.rms_filter_value}")
             logger.info(f"   Audio RMS level: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
             logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
@@ -246,8 +235,7 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         logger.info("🎯 Starting continuous custom model monitoring...")
         logger.info("📊 Debug info will be logged every 100 chunks")
         logger.info("🔍 Custom model confidence will be logged every 50 chunks")
-        logger.info(f"🛡️ Detection cooldown: {self.detection_cooldown_seconds}s, Debounce: {self.detection_debounce_chunks} chunks")
-        logger.info(f"🔧 Using settings values - Cooldown: {self.detection_cooldown_seconds}s, Debounce: {self.debounce_seconds}s, RMS Filter: {self.rms_filter_value}")
+        logger.info(f"🛡️ Detection cooldown: {self.detection_cooldown_seconds}s, RMS Filter: {self.rms_filter_value}")
         
         # Initialize activation state to not listening
         self._update_activation_state(False)
