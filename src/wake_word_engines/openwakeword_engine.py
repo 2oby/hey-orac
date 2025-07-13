@@ -208,9 +208,8 @@ class OpenWakeWordEngine(WakeWordEngine):
                 logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
                 return True
             else:
-                # Log every 50th chunk to see what's happening with confidence scores
-                self.debug_counter += 1
-                if self.debug_counter % 50 == 0:
+                # Only log when confidence is greater than 0 to reduce spam
+                if max_confidence > 0:
                     logger.info(f"🔍 DEBUG: Wake word confidence: {max_confidence:.6f} (threshold: {self.threshold:.6f}) - Source: {best_model}")
                     logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
                     logger.info(f"   Sensitivity setting: {self.sensitivity:.6f}")
