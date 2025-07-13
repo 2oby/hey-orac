@@ -17,7 +17,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Ensure our logger has DEBUG level enabled
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)  # Set to INFO for normal operation
 
 # Configure Flask logging to reduce verbosity for frequent polling endpoints only
 import logging

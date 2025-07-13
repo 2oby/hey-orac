@@ -17,7 +17,7 @@ from wake_word_monitor_new import create_wake_word_monitor_new
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,  # Set to DEBUG to see debug messages
+    level=logging.INFO,  # Set to INFO for normal operation
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)

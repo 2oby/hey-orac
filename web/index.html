@@ -1557,14 +1557,6 @@
         }
 
         // Demo: Simulate detections every few seconds
-        setInterval(() => {
-            const activeModel = sampleModels.find(m => m.active);
-            if (activeModel && Math.random() < 0.3) {
-                simulateDetection(activeModel.name);
-                document.getElementById('lastDetection').textContent = 
-                    `Last Detection: ${new Date().toLocaleTimeString()}`;
-            }
-        }, 3000);
     </script>
 </body>
 </html> 
