@@ -344,7 +344,8 @@ def main():
     # Handle pipeline mode
     if args.pipeline:
         logger.info("🎯 Starting optimized audio pipeline with volume monitoring...")
-        return run_audio_pipeline(config, usb_device, audio_manager)
+        custom_model_path = config['wake_word'].get('custom_model_path', None)
+        return run_audio_pipeline(config, usb_device, audio_manager, custom_model_path)
     
     # Default behavior: Monitor default models
     logger.info("🎯 Starting default model monitoring (default behavior)...")

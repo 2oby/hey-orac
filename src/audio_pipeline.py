@@ -12,14 +12,40 @@ from audio_buffer import AudioBuffer
 from audio_feedback import AudioFeedback
 from shared_memory_ipc import shared_memory_ipc
 from wake_word_interface import WakeWordDetector
+from settings_manager import get_settings_manager
 
 logger = logging.getLogger(__name__)
 
-def initialize_wake_detector(config: dict) -> WakeWordDetector:
-    """Initialize wake word detector with error handling."""
+def initialize_wake_detector(config: dict, custom_model_path: str = None) -> WakeWordDetector:
+    """Initialize wake word detector with error handling and settings manager integration."""
     try:
+        # Get settings manager for dynamic configuration
+        settings_manager = get_settings_manager()
+        
+        # Get selected model and its per-model settings
+        model_name = settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
+        sensitivity = settings_manager.get_model_sensitivity(model_name, 0.8)
+        threshold = settings_manager.get_model_threshold(model_name, 0.3)
+        
+        logger.info(f"🔧 DEBUG: Model: {model_name}, Sensitivity: {sensitivity:.6f}, Threshold: {threshold:.6f}")
+
+        # Create custom config for custom models
+        custom_config = config.copy()
+        if custom_model_path:
+            custom_config['wake_word']['custom_model_path'] = custom_model_path
+            logger.info(f"📁 Using custom model: {custom_model_path}")
+        
+        # Inject per-model sensitivity and threshold
+        if 'wake_word' not in custom_config:
+            custom_config['wake_word'] = {}
+        custom_config['wake_word']['sensitivity'] = sensitivity
+        custom_config['wake_word']['threshold'] = threshold
+        
+        logger.info(f"🔧 DEBUG: Config sensitivity: {custom_config['wake_word'].get('sensitivity', 'NOT SET')}")
+        logger.info(f"🔧 DEBUG: Config threshold: {custom_config['wake_word'].get('threshold', 'NOT SET')}")
+        
         wake_detector = WakeWordDetector()
-        if wake_detector.initialize(config):
+        if wake_detector.initialize(custom_config):
             logger.info(f"✅ Wake word detector initialized: {wake_detector.get_wake_word_name()}")
             return wake_detector
         else:
@@ -30,12 +56,15 @@ def initialize_wake_detector(config: dict) -> WakeWordDetector:
         return None
 
 
-def run_audio_pipeline(config: dict, usb_device, audio_manager) -> int:
-    """Run the main audio processing pipeline with enhanced debugging."""
+def run_audio_pipeline(config: dict, usb_device, audio_manager, custom_model_path: str = None) -> int:
+    """Run the main audio processing pipeline with enhanced debugging and settings manager integration."""
     logger.info("🎯 Starting audio pipeline with enhanced debugging...")
     
+    # Get settings manager for dynamic configuration
+    settings_manager = get_settings_manager()
+    
     # Initialize components
-    wake_detector = initialize_wake_detector(config)
+    wake_detector = initialize_wake_detector(config, custom_model_path)
     if not wake_detector:
         logger.error("❌ Failed to initialize wake detector")
         return 1
@@ -48,17 +77,17 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager) -> int:
     
     audio_feedback = AudioFeedback()
     
-    # Audio processing parameters
-    silence_threshold = config.get('volume_monitoring', {}).get('silence_threshold', 0.5)
-    volume_window_size = config.get('volume_monitoring', {}).get('volume_window_size', 10)
+    # Audio processing parameters from settings manager
+    silence_threshold = settings_manager.get("volume_monitoring.silence_threshold", 0.5)
+    volume_window_size = settings_manager.get("volume_monitoring.volume_window_size", 10)
     volume_history = []
     
     # Enhanced debugging variables
     detection_debug_count = 0
     last_detection_time = 0
     last_detection_chunk = 0
-    detection_cooldown_seconds = 1.5
-    # debounce_seconds = 0.2  # COMMENTED OUT - debounce removed
+    detection_cooldown_seconds = settings_manager.get("wake_word.cooldown", 1.5)
+    # debounce_seconds = settings_manager.get("wake_word.debounce", 0.2)  # COMMENTED OUT - debounce removed
     # detection_debounce_chunks = int(debounce_seconds * wake_detector.get_sample_rate() / wake_detector.get_frame_length())
     
     logger.info(f"🔧 DEBUG: Detection timing controls:")
@@ -253,12 +282,19 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager) -> int:
                         except Exception as e:
                             logger.warning(f"⚠️ Could not write to detection log: {e}")
                         
-                        # Log detection details
+                        # Log detection details with enhanced parameters (from custom monitor)
                         logger.info(f"📊 Detection details:")
+                        logger.info(f"   Model: {wake_detector.get_wake_word_name()}")
+                        logger.info(f"   Sensitivity: {settings_manager.get_model_sensitivity(settings_manager.get('wake_word.model', 'Hay--compUta_v_lrg'), 0.4):.6f}")
+                        logger.info(f"   Confidence: {wake_detector.engine.get_latest_confidence():.6f}" if hasattr(wake_detector, 'engine') else "   Confidence: N/A")
                         logger.info(f"   Chunk number: {chunk_count}")
+                        logger.info(f"   Time since last detection: {current_time - last_detection_time:.2f}s")
+                        logger.info(f"   Chunks since last detection: {chunk_count - last_detection_chunk}")
+                        logger.info(f"   Cooldown setting: {detection_cooldown_seconds}s")
+                        logger.info(f"   Debounce setting: DISABLED")
+                        logger.info(f"   RMS filter setting: {silence_threshold}")
                         logger.info(f"   Audio RMS level: {rms_level:.4f}")
                         logger.info(f"   Audio max level: {np.max(np.abs(audio_data))}")
-                        logger.info(f"   Average volume: {avg_volume:.2f}")
                         logger.info(f"   Buffer status: {audio_buffer.get_buffer_status()}")
                         
                         # Audio feedback

@@ -184,6 +184,10 @@ class WakeWordDetector:
             return self.engine.get_frame_length()
         return 512  # Default
     
+    def get_channels(self) -> int:
+        """Get the required number of channels."""
+        return 1  # Default to mono audio
+    
     def get_wake_word_name(self) -> str:
         """Get the wake word name."""
         if self.engine:
