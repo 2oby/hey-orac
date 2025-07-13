@@ -178,6 +178,16 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager, custom_model_pat
                 # Process audio for wake-word detection
                 detection_result = wake_detector.process_audio(audio_data)
                 
+                # DEBUG: Always log confidence scores to see what the neural model is producing
+                try:
+                    confidence = wake_detector.engine.get_latest_confidence() if hasattr(wake_detector, 'engine') else 0.0
+                    model_name = wake_detector.get_wake_word_name()
+                    # Log every 50 chunks like the old monitor (more frequent than 100)
+                    if chunk_count % 50 == 0:
+                        logger.info(f"🔍 DEBUG: Wake word confidence: {confidence:.6f} (threshold: 0.300000) - Source: {model_name}")
+                except Exception as e:
+                    logger.warning(f"⚠️ Could not get confidence score: {e}")
+                
                 if detection_result:
                     detection_debug_count += 1
                     
