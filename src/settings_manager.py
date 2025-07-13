@@ -133,15 +133,16 @@ class SettingsManager:
     def _save_settings(self) -> bool:
         """Save settings to tmpfs file."""
         try:
+            logger.debug(f"💾 SETTINGS: Saving settings to {self.settings_file}")
             with open(self.settings_file, 'w') as f:
                 # Use file locking to prevent corruption
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)
                 json.dump(self._settings, f, indent=2)
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-            logger.debug(f"💾 Settings saved to {self.settings_file}")
+            logger.debug(f"✅ SETTINGS: Settings saved successfully to {self.settings_file}")
             return True
         except Exception as e:
-            logger.error(f"❌ Failed to save settings: {e}")
+            logger.error(f"❌ SETTINGS: Failed to save settings: {e}")
             return False
     
     def _backup_settings(self) -> bool:
@@ -553,6 +554,7 @@ class SettingsManager:
     def set_active_model(self, model_name: str) -> bool:
         """Set a specific model as the only active model (deactivates others)."""
         try:
+            logger.info(f"🔄 SETTINGS: Setting active model to '{model_name}'")
             with self._lock:
                 if "wake_word" not in self._settings:
                     self._settings["wake_word"] = {}
@@ -562,6 +564,7 @@ class SettingsManager:
                 # Deactivate all models first
                 for existing_model in self._settings["wake_word"]["models"]:
                     self._settings["wake_word"]["models"][existing_model]["active"] = False
+                    logger.debug(f"🔄 SETTINGS: Deactivated model '{existing_model}'")
                 
                 # Activate the specified model
                 if model_name not in self._settings["wake_word"]["models"]:
@@ -571,12 +574,23 @@ class SettingsManager:
                         "api_url": "https://api.example.com/webhook",
                         "active": True
                     }
+                    logger.debug(f"🔄 SETTINGS: Created new model config for '{model_name}'")
                 else:
                     self._settings["wake_word"]["models"][model_name]["active"] = True
-                logger.debug(f"🔄 Active model changed to '{model_name}' (all others deactivated)")
-                return self._save_settings()
+                    logger.debug(f"🔄 SETTINGS: Activated existing model '{model_name}'")
+                
+                logger.info(f"🔄 SETTINGS: Active model changed to '{model_name}' (all others deactivated)")
+                
+                # Save settings and verify
+                success = self._save_settings()
+                if success:
+                    logger.info(f"✅ SETTINGS: Model activation saved successfully")
+                else:
+                    logger.error(f"❌ SETTINGS: Failed to save model activation")
+                
+                return success
         except Exception as e:
-            logger.error(f"❌ Failed to set active model {model_name}: {e}")
+            logger.error(f"❌ SETTINGS: Failed to set active model {model_name}: {e}")
             return False
 
 # Global settings manager instance
