@@ -8,8 +8,7 @@ Delegates wake word detection to external callback.
 import logging
 import time
 import numpy as np
-from typing import Callable, Optional
-from audio_buffer import AudioBuffer
+from typing import Callable, Optional, Dict, Any
 from shared_memory_ipc import shared_memory_ipc
 from settings_manager import get_settings_manager
 
