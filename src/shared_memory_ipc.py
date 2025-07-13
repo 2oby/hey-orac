@@ -173,9 +173,10 @@ class SharedMemoryIPC:
                 
                 # Check if data is stale (older than 5 seconds)
                 if time_diff > 5.0:
+                    rms_level = 0.0  # Reset RMS to 0 when data is stale
                     is_active = False
                     is_listening = False
-                    logger.warning(f"⚠️ Shared memory data is stale ({time_diff:.2f}s), setting is_active=False, is_listening=False")
+                    logger.warning(f"⚠️ Shared memory data is stale ({time_diff:.2f}s), resetting RMS=0.0, is_active=False, is_listening=False")
                 
                 return {
                     'current_rms': float(rms_level),
@@ -188,9 +189,9 @@ class SharedMemoryIPC:
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(f"❌ Failed to read from shared memory: {e}")
-                # Fallback to local data
+                # Fallback to safe defaults
                 return {
-                    'current_rms': float(self._audio_data['current_rms']),
+                    'current_rms': 0.0,  # Return 0.0 instead of stale data
                     'is_active': False,
                     'is_listening': False,
                     'last_update': time.time()
