@@ -104,9 +104,9 @@ def get_config():
     
     # Get global settings
     global_settings = {
-        "rms_filter": settings_manager.get("volume_monitoring.rms_filter", 50),
-        "debounce_ms": int(settings_manager.get("wake_word.debounce", 0.2) * 1000),
-        "cooldown_s": settings_manager.get("wake_word.cooldown", 1.5)
+        "rms_filter": settings_manager.get("volume_monitoring.rms_filter"),
+        "debounce_ms": int(settings_manager.get("wake_word.debounce") * 1000),
+        "cooldown_s": settings_manager.get("wake_word.cooldown")
     }
     
     return jsonify({

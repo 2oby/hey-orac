@@ -760,8 +760,8 @@
             <div class="sliders-container">
                 <div class="slider-group">
                     <label class="slider-label">RMS Filter</label>
-                    <input type="range" class="slider" id="rmsFilter" min="0" max="10" step="0.1" value="6.5">
-                    <span class="slider-value" id="rmsFilterValue">6.5</span>
+                    <input type="range" class="slider" id="rmsFilter" min="0" max="20" step="0.5" value="10">
+                    <span class="slider-value" id="rmsFilterValue">10.0</span>
                 </div>
                 
                 <div class="slider-group">
@@ -881,8 +881,8 @@
                 
                 // Set global sliders from config
                 if (config.global) {
-                    // Load RMS filter from the correct setting
-                    const rmsFilterValue = config.global["detection.rms_filter"] || 6.5;
+                                    // Load RMS filter from the correct setting
+                const rmsFilterValue = config.global["rms_filter"] || 10;
                     document.getElementById('rmsFilter').value = rmsFilterValue;
                     document.getElementById('rmsFilterValue').textContent = rmsFilterValue.toFixed(1);
                     document.getElementById('debounce').value = config.global.debounce_ms;
@@ -909,7 +909,7 @@
 
         async function saveGlobalSettings() {
             const settings = {
-                "detection.rms_filter": parseFloat(document.getElementById('rmsFilter').value),
+                "volume_monitoring.rms_filter": parseFloat(document.getElementById('rmsFilter').value),
                 debounce_ms: parseInt(document.getElementById('debounce').value),
                 cooldown_s: parseFloat(document.getElementById('cooldown').value)
             };

@@ -43,7 +43,7 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         self.detection_debounce_chunks = 0
         
         # Volume filtering
-        self.rms_filter_value = 50
+        self.rms_filter_value = self.settings_manager.get("volume_monitoring.rms_filter")
         self.silence_threshold = 0.5
         self.volume_window_size = 10
         self.volume_history = []
@@ -88,7 +88,7 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         self.detection_cooldown_seconds = self.settings_manager.get("wake_word.cooldown", 1.5)
         self.debounce_seconds = self.settings_manager.get("wake_word.debounce", 0.2)
         self.detection_debounce_chunks = int(self.debounce_seconds * self.wake_detector.get_sample_rate() / self.wake_detector.get_frame_length())
-        self.rms_filter_value = self.settings_manager.get("volume_monitoring.rms_filter", 50)
+        self.rms_filter_value = self.settings_manager.get("volume_monitoring.rms_filter")
         
         logger.info(f"🔧 Timing controls updated: Cooldown={self.detection_cooldown_seconds}s, Debounce={self.debounce_seconds}s, RMS Filter={self.rms_filter_value}")
     

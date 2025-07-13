@@ -82,9 +82,13 @@ class SettingsManager:
                 }
             },
             "detection": {
-                "rms_filter": 50,
                 "min_audio_level": 100,
                 "max_audio_level": 32767
+            },
+            "volume_monitoring": {
+                "rms_filter": 10,
+                "window_size": 10,
+                "silence_duration_threshold": 2.0
             },
             "web": {
                 "port": 7171,

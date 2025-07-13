@@ -33,9 +33,9 @@ class AudioPipeline:
         self.settings_manager = get_settings_manager()
         
         # Audio processing parameters
-        self.silence_threshold = self.settings_manager.get("detection.rms_filter", 50)  # Use GUI setting
-        self.volume_window_size = self.settings_manager.get("volume_monitoring.window_size", 10)
-        self.silence_duration_threshold = self.settings_manager.get("volume_monitoring.silence_duration_threshold", 2.0)  # seconds
+        self.silence_threshold = self.settings_manager.get("volume_monitoring.rms_filter")  # Use GUI setting
+        self.volume_window_size = self.settings_manager.get("volume_monitoring.window_size")
+        self.silence_duration_threshold = self.settings_manager.get("volume_monitoring.silence_duration_threshold")  # seconds
         
         # Audio state tracking
         self.volume_history = []
@@ -234,7 +234,9 @@ class AudioPipeline:
         """Handle settings changes from GUI."""
         try:
             # Get the new threshold from the settings
-            new_threshold = new_settings.get("detection", {}).get("rms_filter", 50)
+            new_threshold = new_settings.get("volume_monitoring", {}).get("rms_filter")
+            if new_threshold is None:
+                return  # Skip if no value found
             if new_threshold != self.silence_threshold:
                 old_threshold = self.silence_threshold
                 self.silence_threshold = new_threshold
