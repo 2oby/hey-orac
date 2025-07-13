@@ -260,11 +260,8 @@ class WakeWordMonitor_new:
         for model_name, detector in self.active_detectors.items():
             try:
                 if detector.is_ready():
-                    # Convert audio data to bytes for the detector
-                    audio_bytes = audio_data.tobytes()
-                    
-                    # Process audio
-                    detection_result = detector.process_audio(audio_bytes)
+                    # Process audio directly with numpy array (same as working implementation)
+                    detection_result = detector.process_audio(audio_data)
                     
                     if detection_result:
                         logger.info(f"🎯 WAKE WORD DETECTED by model '{model_name}'!")
