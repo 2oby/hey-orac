@@ -75,19 +75,22 @@ class SettingsManager:
                 "custom_model_path": "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx",
                 "models": {
                     "Hay--compUta_v_lrg": {
+                        "sensitivity": 0.8,
+                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": True
-                        # Note: sensitivity and threshold must be set by user via GUI
                     },
                     "Hey_computer": {
+                        "sensitivity": 0.8,
+                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": False
-                        # Note: sensitivity and threshold must be set by user via GUI
                     },
                     "hey-CompUter_lrg": {
+                        "sensitivity": 0.8,
+                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": False
-                        # Note: sensitivity and threshold must be set by user via GUI
                     }
                 }
             },
@@ -129,51 +132,6 @@ class SettingsManager:
             "performance": {
                 "cpu_affinity": None,
                 "memory_limit_mb": 200
-            }
-        }
-        return {
-            "audio": {
-                "sample_rate": 16000,
-                "chunk_size": 1280,
-                "channels": 1,
-                "device_index": 0
-            },
-            "wake_word": {
-                "engine": "openwakeword",
-                "cooldown": 1.5,
-                "models": {
-                    "Hay--compUta_v_lrg": {
-                        "api_url": "https://api.example.com/webhook",
-                        "active": True
-                    },
-                    "Hey_computer": {
-                        "api_url": "https://api.example.com/webhook",
-                        "active": False
-                    },
-                    "hey-CompUter_lrg": {
-                        "api_url": "https://api.example.com/webhook",
-                        "active": False
-                    }
-                }
-            },
-            "detection": {
-                "min_audio_level": 100,
-                "max_audio_level": 32767
-            },
-            "volume_monitoring": {
-                "rms_filter": 10,
-                "window_size": 10,
-                "silence_duration_threshold": 2.0
-            },
-            "web": {
-                "port": 7171,
-                "host": "0.0.0.0",
-                "debug": False
-            },
-            "system": {
-                "log_level": "INFO",
-                "max_log_size": "10MB",
-                "backup_interval": 300  # 5 minutes
             }
         }
     
@@ -677,9 +635,10 @@ class SettingsManager:
             models = self._settings.get("wake_word", {}).get("models", {})
             return models.get(model_name, {}).get("active", default)
 
-    def set_model_active(self, model_name: str, value: bool) -> bool:
-        """Set active state for a specific model."""
+    def set_model_active(self, model_name: str) -> bool:
+        """Set a specific model as the only active model (deactivates others)."""
         try:
+            logger.info(f"🔄 SETTINGS: Setting active model to '{model_name}'")
             with self._lock:
                 if "wake_word" not in self._settings:
                     self._settings["wake_word"] = {}
@@ -694,11 +653,12 @@ class SettingsManager:
                 # Activate the specified model
                 if model_name not in self._settings["wake_word"]["models"]:
                     self._settings["wake_word"]["models"][model_name] = {
+                        "sensitivity": 0.8,
+                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": True
-                        # Note: sensitivity and threshold must be set by user via GUI
                     }
-                    logger.debug(f"🔄 SETTINGS: Created new model config for '{model_name}' (sensitivity and threshold must be set via GUI)")
+                    logger.debug(f"🔄 SETTINGS: Created new model config for '{model_name}' with defaults")
                 else:
                     self._settings["wake_word"]["models"][model_name]["active"] = True
                     logger.debug(f"🔄 SETTINGS: Activated existing model '{model_name}'")
@@ -726,47 +686,6 @@ class SettingsManager:
                 if config.get("active", False):
                     active_models.append(model_name)
             return active_models
-
-    def set_active_model(self, model_name: str) -> bool:
-        """Set a specific model as the only active model (deactivates others)."""
-        try:
-            logger.info(f"🔄 SETTINGS: Setting active model to '{model_name}'")
-            with self._lock:
-                if "wake_word" not in self._settings:
-                    self._settings["wake_word"] = {}
-                if "models" not in self._settings["wake_word"]:
-                    self._settings["wake_word"]["models"] = {}
-                
-                # Deactivate all models first
-                for existing_model in self._settings["wake_word"]["models"]:
-                    self._settings["wake_word"]["models"][existing_model]["active"] = False
-                    logger.debug(f"🔄 SETTINGS: Deactivated model '{existing_model}'")
-                
-                # Activate the specified model
-                if model_name not in self._settings["wake_word"]["models"]:
-                    self._settings["wake_word"]["models"][model_name] = {
-                        "api_url": "https://api.example.com/webhook",
-                        "active": True
-                        # Note: sensitivity and threshold must be set by user via GUI
-                    }
-                    logger.debug(f"🔄 SETTINGS: Created new model config for '{model_name}' (sensitivity and threshold must be set via GUI)")
-                else:
-                    self._settings["wake_word"]["models"][model_name]["active"] = True
-                    logger.debug(f"🔄 SETTINGS: Activated existing model '{model_name}'")
-                
-                logger.info(f"🔄 SETTINGS: Active model changed to '{model_name}' (all others deactivated)")
-                
-                # Save settings and verify
-                success = self._save_settings()
-                if success:
-                    logger.info(f"✅ SETTINGS: Model activation saved successfully")
-                else:
-                    logger.error(f"❌ SETTINGS: Failed to save model activation")
-                
-                return success
-        except Exception as e:
-            logger.error(f"❌ SETTINGS: Failed to set active model {model_name}: {e}")
-            return False
 
 # Global settings manager instance
 _settings_manager = None
