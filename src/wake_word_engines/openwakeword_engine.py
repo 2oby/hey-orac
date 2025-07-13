@@ -204,12 +204,15 @@ class OpenWakeWordEngine(WakeWordEngine):
             if audio_chunk.dtype == np.int16:
                 # Convert int16 [-32768, 32767] to float32 [-1.0, 1.0]
                 audio_chunk = audio_chunk.astype(np.float32) / 32768.0
+                logger.info(f"🔍 CRITICAL: Audio normalized from int16 to float32, shape: {audio_chunk.shape}, range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
             elif audio_chunk.dtype != np.float32:
                 # If not int16 or float32, convert to float32
                 audio_chunk = audio_chunk.astype(np.float32)
+                logger.info(f"🔍 CRITICAL: Audio converted to float32, shape: {audio_chunk.shape}, range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
             else:
                 # Already float32, use as-is
                 audio_chunk = audio_chunk
+                logger.info(f"🔍 CRITICAL: Audio already float32, shape: {audio_chunk.shape}, range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
             
             # Get predictions from OpenWakeWord model
             predictions = self.model.predict(audio_chunk)
@@ -218,7 +221,7 @@ class OpenWakeWordEngine(WakeWordEngine):
             # SOLUTION: Log all predictions to understand what the model is actually returning
             if self.debug_mode:
                 # Log all model predictions to see what names are being used
-                logger.debug(f"All predictions: {predictions}")
+                logger.info(f"🔍 CRITICAL: All predictions: {predictions}")
                 # Track prediction history for pattern analysis
                 self.detection_history.append({
                     'timestamp': time.time(),
@@ -227,6 +230,12 @@ class OpenWakeWordEngine(WakeWordEngine):
                 # Keep only last 50 predictions
                 if len(self.detection_history) > 50:
                     self.detection_history.pop(0)
+                
+                # Log every 100th prediction to see if we're getting non-zero values
+                if len(self.detection_history) % 100 == 0:
+                    logger.info(f"🔍 CRITICAL: Prediction history summary (last 10):")
+                    for i, entry in enumerate(self.detection_history[-10:]):
+                        logger.info(f"   Entry {i}: {entry['predictions']}")
             
             # ISSUE #4: Model name might not match what we expect
             # SOLUTION: Check all predictions, not just our expected name
@@ -234,11 +243,17 @@ class OpenWakeWordEngine(WakeWordEngine):
             detection_model = None
             detection_confidence = 0.0
             
+            # CRITICAL: Log threshold and all predictions for debugging
+            logger.info(f"🔍 CRITICAL: Current threshold: {self.threshold:.6f}")
+            logger.info(f"🔍 CRITICAL: Checking predictions against threshold:")
+            
             for model_name, confidence in predictions.items():
+                logger.info(f"   Model '{model_name}': {confidence:.6f} {'✓' if confidence > self.threshold else '✗'}")
                 if confidence > self.threshold:
                     detected = True
                     detection_model = model_name
                     detection_confidence = confidence
+                    logger.info(f"🔍 CRITICAL: DETECTION TRIGGERED! Model: {detection_model}, Confidence: {detection_confidence:.6f}")
                     break
             
             # ISSUE #5: Single-chunk detection might be too sensitive or not sensitive enough
