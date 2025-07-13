@@ -58,6 +58,7 @@ class AudioPipeline:
         
         # Add settings watcher to update threshold dynamically
         self.settings_manager.add_watcher(self._on_settings_changed)
+        logger.info(f"✅ Settings watcher registered for dynamic threshold updates")
         
         logger.info(f"🔧 Audio Pipeline Configuration:")
         logger.info(f"   Silence threshold: {self.silence_threshold}")
@@ -232,11 +233,13 @@ class AudioPipeline:
     def _on_settings_changed(self, new_settings: Dict[str, Any]):
         """Handle settings changes from GUI."""
         try:
+            # Get the new threshold from the settings
             new_threshold = new_settings.get("detection", {}).get("rms_filter", 50)
             if new_threshold != self.silence_threshold:
                 old_threshold = self.silence_threshold
                 self.silence_threshold = new_threshold
                 logger.info(f"🔄 Audio threshold updated: {old_threshold} → {new_threshold}")
+                logger.info(f"   New threshold will be used for next audio processing")
         except Exception as e:
             logger.error(f"❌ Error updating audio threshold: {e}")
     
