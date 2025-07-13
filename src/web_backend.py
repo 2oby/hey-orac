@@ -230,7 +230,7 @@ def set_model_config(model_name):
             else:
                 # Deactivate this specific model
                 logger.info(f"🌐 API: Deactivating model '{model_name}' via /api/config/models/{model_name}")
-                success &= settings_manager.set_model_active(model_name, False)
+                success &= settings_manager.set_model_active_state(model_name, False)
         
         if success:
             logger.info(f"🌐 API: Model {model_name} settings updated successfully")

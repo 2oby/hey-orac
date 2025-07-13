@@ -494,12 +494,15 @@ class WakeWordMonitor_new:
         logger.info(f"\n🤖 All Model Configurations ({len(self.available_models)} models):")
         for model_name in self.available_models:
             config = self.get_model_config(model_name)
-            status = "✅ ACTIVE" if config['active'] else "❌ INACTIVE"
-            logger.info(f"   📁 {model_name} ({status}):")
-            logger.info(f"      Sensitivity: {config['sensitivity']:.3f}")
-            logger.info(f"      Threshold: {config['threshold']:.3f}")
-            logger.info(f"      API URL: {config['api_url']}")
-            logger.info(f"      Files: {list(config['file_paths'].keys())}")
+            if config:
+                status = "✅ ACTIVE" if config['active'] else "❌ INACTIVE"
+                logger.info(f"   📁 {model_name} ({status}):")
+                logger.info(f"      Sensitivity: {config['sensitivity']:.3f}")
+                logger.info(f"      Threshold: {config['threshold']:.3f}")
+                logger.info(f"      API URL: {config['api_url']}")
+                logger.info(f"      Files: {list(config['file_paths'].keys())}")
+            else:
+                logger.warning(f"   ⚠️ {model_name}: No configuration available")
         
         logger.info("=" * 50)
 

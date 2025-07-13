@@ -677,6 +677,39 @@ class SettingsManager:
             logger.error(f"❌ SETTINGS: Failed to set active model {model_name}: {e}")
             return False
 
+    def set_model_active_state(self, model_name: str, active: bool) -> bool:
+        """Set a specific model's active state to a boolean value."""
+        try:
+            logger.info(f"🔄 SETTINGS: Setting model '{model_name}' active state to {active}")
+            with self._lock:
+                if "wake_word" not in self._settings:
+                    self._settings["wake_word"] = {}
+                if "models" not in self._settings["wake_word"]:
+                    self._settings["wake_word"]["models"] = {}
+                if model_name not in self._settings["wake_word"]["models"]:
+                    self._settings["wake_word"]["models"][model_name] = {
+                        "sensitivity": 0.8,
+                        "threshold": 0.3,
+                        "api_url": "https://api.example.com/webhook",
+                        "active": active
+                    }
+                    logger.debug(f"🔄 SETTINGS: Created new model config for '{model_name}' with active={active}")
+                else:
+                    self._settings["wake_word"]["models"][model_name]["active"] = active
+                    logger.debug(f"🔄 SETTINGS: Set model '{model_name}' active state to {active}")
+                
+                # Save settings and verify
+                success = self._save_settings()
+                if success:
+                    logger.info(f"✅ SETTINGS: Model active state saved successfully")
+                else:
+                    logger.error(f"❌ SETTINGS: Failed to save model active state")
+                
+                return success
+        except Exception as e:
+            logger.error(f"❌ SETTINGS: Failed to set model active state for {model_name}: {e}")
+            return False
+
     def get_active_models(self) -> List[str]:
         """Get list of currently active models."""
         with self._lock:
