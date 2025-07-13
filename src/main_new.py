@@ -13,6 +13,7 @@ from typing import Dict, Any
 from audio_utils import AudioManager
 from wake_word_interface import WakeWordDetector
 from audio_pipeline_new import create_audio_pipeline
+from wake_word_monitor_new import create_wake_word_monitor_new
 
 # Configure logging
 logging.basicConfig(
@@ -28,6 +29,7 @@ logger.debug("🔧 Main new application initialized with DEBUG logging enabled")
 class HeyOracApp:
     """
     Minimal Hey Orac application with just the essential monitoring loop.
+    Now properly integrates wake_word_monitor_new and audio_pipeline_new.
     """
     
     def __init__(self, config_path: str = "/app/config.yaml"):
@@ -37,6 +39,7 @@ class HeyOracApp:
         self.audio_manager = None
         self.wake_detector = None
         self.usb_device = None
+        self.wake_word_monitor = None
         
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from YAML file."""
@@ -80,6 +83,14 @@ class HeyOracApp:
                 return False
             
             logger.info("✅ Wake word detector initialized successfully")
+            
+            # Initialize wake word monitor (new implementation)
+            self.wake_word_monitor = create_wake_word_monitor_new()
+            logger.info("✅ Wake word monitor (new) initialized successfully")
+            
+            # Print configuration summary
+            self.wake_word_monitor.print_configuration_summary()
+            
             return True
             
         except Exception as e:
@@ -88,7 +99,7 @@ class HeyOracApp:
     
     def run_monitoring(self) -> int:
         """Run the basic monitoring loop."""
-        logger.info("🎯 Starting new audio pipeline with RMS monitoring...")
+        logger.info("🎯 Starting new audio pipeline with RMS monitoring and wake word monitor...")
         
         # Create audio pipeline
         audio_pipeline = create_audio_pipeline(
@@ -99,12 +110,33 @@ class HeyOracApp:
             channels=self.wake_detector.get_channels()
         )
         
-        # TODO: Set up wake word callback
-        # For now, just run the audio pipeline without wake word detection
-        # def wake_word_callback(audio_data, chunk_count, rms_level, avg_volume):
-        #     # Wake word detection logic will go here
-        #     pass
-        # audio_pipeline.set_wake_word_callback(wake_word_callback)
+        # Set up wake word callback using the new monitor
+        def wake_word_callback(audio_data, chunk_count, rms_level, avg_volume):
+            """Wake word detection callback using the new monitor."""
+            try:
+                # Get active models from the new monitor
+                active_models = self.wake_word_monitor.get_active_models()
+                
+                if not active_models:
+                    logger.debug("🔇 No active models, skipping wake word detection")
+                    return
+                
+                # For now, just log that we would process wake word detection
+                # TODO: Implement actual wake word detection with the active models
+                logger.debug(f"🎯 Wake word callback called - RMS: {rms_level:.4f}, Active models: {active_models}")
+                
+                # Here we would:
+                # 1. Get the active model configuration
+                # 2. Run the model on the audio data
+                # 3. Check against threshold and sensitivity
+                # 4. Trigger activation if detected
+                
+            except Exception as e:
+                logger.error(f"❌ Error in wake word callback: {e}")
+        
+        # Set the callback
+        audio_pipeline.set_wake_word_callback(wake_word_callback)
+        logger.info("✅ Wake word callback set with new monitor integration")
         
         return audio_pipeline.run()
 
