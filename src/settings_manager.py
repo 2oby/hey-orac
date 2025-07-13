@@ -242,9 +242,13 @@ class SettingsManager:
             logger.debug(f"✅ SETTINGS: Settings saved successfully to {self.settings_file}")
             
             # Automatically backup settings when they change
+            logger.debug(f"💾 SETTINGS: Attempting to backup settings...")
             try:
-                self._backup_settings()
-                logger.debug(f"💾 SETTINGS: Settings backed up to {self.backup_file}")
+                backup_success = self._backup_settings()
+                if backup_success:
+                    logger.debug(f"💾 SETTINGS: Settings backed up to {self.backup_file}")
+                else:
+                    logger.warning(f"⚠️ SETTINGS: Backup failed")
             except Exception as e:
                 logger.warning(f"⚠️ SETTINGS: Failed to backup settings: {e}")
             
@@ -256,12 +260,41 @@ class SettingsManager:
     def _backup_settings(self) -> bool:
         """Backup settings to permanent storage."""
         try:
-            self.backup_file.parent.mkdir(parents=True, exist_ok=True)
+            logger.debug(f"💾 BACKUP: Starting backup to {self.backup_file}")
+            logger.debug(f"💾 BACKUP: Backup file parent: {self.backup_file.parent}")
+            logger.debug(f"💾 BACKUP: Current working directory: {os.getcwd()}")
+            logger.debug(f"💾 BACKUP: Current user: {os.getuid() if hasattr(os, 'getuid') else 'N/A'}")
+            
+            # Check if parent directory exists
+            if not self.backup_file.parent.exists():
+                logger.debug(f"💾 BACKUP: Creating parent directory: {self.backup_file.parent}")
+                self.backup_file.parent.mkdir(parents=True, exist_ok=True)
+                logger.debug(f"💾 BACKUP: Parent directory created: {self.backup_file.parent.exists()}")
+            else:
+                logger.debug(f"💾 BACKUP: Parent directory already exists: {self.backup_file.parent}")
+            
+            # Check write permissions
+            try:
+                test_file = self.backup_file.parent / "test_write.tmp"
+                with open(test_file, 'w') as f:
+                    f.write("test")
+                test_file.unlink()
+                logger.debug(f"💾 BACKUP: Write permissions OK for {self.backup_file.parent}")
+            except Exception as perm_error:
+                logger.error(f"💾 BACKUP: Permission error testing write: {perm_error}")
+                return False
+            
+            logger.debug(f"💾 BACKUP: Writing backup file: {self.backup_file}")
             with open(self.backup_file, 'w') as f:
                 json.dump(self._settings, f, indent=2)
+            
+            logger.debug(f"💾 BACKUP: Backup file created: {self.backup_file.exists()}")
+            logger.debug(f"💾 BACKUP: Backup file size: {self.backup_file.stat().st_size} bytes")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to backup settings: {e}")
+            logger.error(f"💾 BACKUP: Exception type: {type(e).__name__}")
+            logger.error(f"💾 BACKUP: Exception details: {str(e)}")
             return False
     
     def _restore_from_backup(self) -> bool:
