@@ -58,12 +58,12 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager) -> int:
     last_detection_time = 0
     last_detection_chunk = 0
     detection_cooldown_seconds = 1.5
-    debounce_seconds = 0.2
-    detection_debounce_chunks = int(debounce_seconds * wake_detector.get_sample_rate() / wake_detector.get_frame_length())
+    # debounce_seconds = 0.2  # COMMENTED OUT - debounce removed
+    # detection_debounce_chunks = int(debounce_seconds * wake_detector.get_sample_rate() / wake_detector.get_frame_length())
     
     logger.info(f"🔧 DEBUG: Detection timing controls:")
     logger.info(f"   Cooldown: {detection_cooldown_seconds}s")
-    logger.info(f"   Debounce: {debounce_seconds}s ({detection_debounce_chunks} chunks)")
+    logger.info(f"   Debounce: DISABLED (commented out)")
     logger.info(f"   Silence threshold: {silence_threshold}")
     logger.info(f"   Volume window size: {volume_window_size}")
     
@@ -114,14 +114,19 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager) -> int:
                 avg_volume = np.mean(volume_history) if volume_history else 0
                 
                 # Volume monitoring - skip silent audio
-                if avg_volume < silence_threshold:
-                    silent_chunks += 1
-                    if silent_chunks % 100 == 0:
-                        logger.debug(f"🔇 Silent audio: {silent_chunks} chunks, avg_volume={avg_volume:.2f}")
-                    continue
-                else:
-                    active_chunks += 1
-                    silent_chunks = 0
+                # COMMENTED OUT - RMS filter disabled to allow all audio through
+                # if avg_volume < silence_threshold:
+                #     silent_chunks += 1
+                #     if silent_chunks % 100 == 0:
+                #         logger.debug(f"🔇 Silent audio: {silent_chunks} chunks, avg_volume={avg_volume:.2f}")
+                #     continue
+                # else:
+                #     active_chunks += 1
+                #     silent_chunks = 0
+                
+                # RMS filter disabled - always process audio regardless of volume
+                active_chunks += 1
+                silent_chunks = 0
                 
                 # Add to audio buffer
                 audio_buffer.add_audio(audio_data)
@@ -135,32 +140,78 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager) -> int:
                 if chunk_count % 50 == 0:
                     logger.info(f"🔍 DEBUG: Timing status at chunk {chunk_count}:")
                     logger.info(f"   Time since last detection: {time_since_last:.2f}s (cooldown: {detection_cooldown_seconds}s)")
-                    logger.info(f"   Chunks since last detection: {chunks_since_last} (debounce: {detection_debounce_chunks})")
+                    logger.info(f"   Chunks since last detection: {chunks_since_last} (debounce: DISABLED)")
                     logger.info(f"   Cooldown active: {time_since_last < detection_cooldown_seconds}")
-                    logger.info(f"   Debounce active: {chunks_since_last < detection_debounce_chunks}")
+                    logger.info(f"   Debounce active: DISABLED")
                     logger.info(f"   Audio RMS: {rms_level:.4f}, Avg: {avg_volume:.4f}")
-                    logger.info(f"   Buffer capturing postroll: {audio_buffer.is_capturing_postroll()}")
+                    logger.info(f"   Buffer capturing postroll: DISABLED")
                 
                 # Process audio for wake-word detection
                 detection_result = wake_detector.process_audio(audio_data)
                 
                 if detection_result:
                     detection_debug_count += 1
-                    logger.info(f"🎯🎯🎯 WAKE WORD DETECTED! (Debug #{detection_debug_count}) 🎯🎯🎯")
-                    logger.info(f"🎯 DETECTION #{detection_count + 1} - {wake_detector.get_wake_word_name()} detected!")
-                    logger.info(f"🔊 Audio volume: {avg_volume:.2f} (threshold: {silence_threshold})")
+                    
+                    # Get confidence and model info for logging
+                    try:
+                        confidence = wake_detector.engine.get_latest_confidence() if hasattr(wake_detector, 'engine') else 0.0
+                        model_name = wake_detector.get_wake_word_name()
+                    except Exception as e:
+                        confidence = 0.0
+                        model_name = "Unknown"
+                        logger.warning(f"⚠️ Could not get confidence/model info: {e}")
+                    
+                    # Log EVERY neural model detection, regardless of filters
+                    logger.info(f"🧠 NEURAL MODEL DETECTION #{detection_debug_count}:")
+                    logger.info(f"   Model: {model_name}")
+                    logger.info(f"   Confidence: {confidence:.6f}")
+                    logger.info(f"   Chunk: {chunk_count}")
+                    logger.info(f"   Audio RMS: {rms_level:.4f}")
+                    logger.info(f"   Audio Avg: {avg_volume:.4f}")
                     
                     # ENHANCED DEBUGGING: Check all blocking conditions
                     cooldown_blocked = time_since_last < detection_cooldown_seconds
-                    debounce_blocked = chunks_since_last < detection_debounce_chunks
-                    buffer_blocked = audio_buffer.is_capturing_postroll()
-                    volume_blocked = avg_volume < silence_threshold
+                    # debounce_blocked = chunks_since_last < detection_debounce_chunks  # COMMENTED OUT - debounce removed
+                    debounce_blocked = False  # Debounce disabled
+                    # buffer_blocked = audio_buffer.is_capturing_postroll()  # COMMENTED OUT - Post-roll buffer filter removed
+                    buffer_blocked = False  # Post-roll buffer disabled
+                    # volume_blocked = avg_volume < silence_threshold  # COMMENTED OUT - RMS filter removed
+                    volume_blocked = False  # RMS filter disabled
                     
                     logger.info(f"🔍 DEBUG: Detection blocking analysis:")
                     logger.info(f"   Cooldown blocked: {cooldown_blocked} ({time_since_last:.2f}s < {detection_cooldown_seconds}s)")
-                    logger.info(f"   Debounce blocked: {debounce_blocked} ({chunks_since_last} < {detection_debounce_chunks})")
-                    logger.info(f"   Buffer blocked: {buffer_blocked}")
-                    logger.info(f"   Volume blocked: {volume_blocked} ({avg_volume:.4f} < {silence_threshold})")
+                    logger.info(f"   Debounce blocked: DISABLED")
+                    logger.info(f"   Buffer blocked: DISABLED")
+                    logger.info(f"   Volume blocked: DISABLED")
+                    
+                    # Check if detection should be allowed
+                    should_allow = (not cooldown_blocked and 
+                                  not debounce_blocked and 
+                                  not buffer_blocked and 
+                                  not volume_blocked)
+                    
+                    logger.info(f"🔍 DEBUG: Should allow detection: {should_allow}")
+                    
+                    if should_allow:
+                        detection_count += 1
+                        logger.info(f"✅ DETECTION ALLOWED - Processing downstream actions")
+                        logger.info(f"🎯 DETECTION #{detection_count} - {model_name} detected!")
+                        logger.info(f"🔊 Audio volume: {avg_volume:.2f} (threshold: {silence_threshold})")
+                    
+                    # ENHANCED DEBUGGING: Check all blocking conditions
+                    cooldown_blocked = time_since_last < detection_cooldown_seconds
+                    # debounce_blocked = chunks_since_last < detection_debounce_chunks  # COMMENTED OUT - debounce removed
+                    debounce_blocked = False  # Debounce disabled
+                    # buffer_blocked = audio_buffer.is_capturing_postroll()  # COMMENTED OUT - Post-roll buffer filter removed
+                    buffer_blocked = False  # Post-roll buffer disabled
+                    # volume_blocked = avg_volume < silence_threshold  # COMMENTED OUT - RMS filter removed
+                    volume_blocked = False  # RMS filter disabled
+                    
+                    logger.info(f"🔍 DEBUG: Detection blocking analysis:")
+                    logger.info(f"   Cooldown blocked: {cooldown_blocked} ({time_since_last:.2f}s < {detection_cooldown_seconds}s)")
+                    logger.info(f"   Debounce blocked: DISABLED")
+                    logger.info(f"   Buffer blocked: DISABLED")
+                    logger.info(f"   Volume blocked: DISABLED")
                     
                     # Check if detection should be allowed
                     should_allow = (not cooldown_blocked and 
@@ -223,22 +274,26 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager) -> int:
                                 logger.error(f"❌ Audio feedback failed: {e}")
                         
                         # Start post-roll capture
-                        logger.info("📦 Starting post-roll capture...")
-                        audio_buffer.start_postroll_capture()
+                        # COMMENTED OUT - Post-roll buffer filter disabled for testing
+                        # logger.info("📦 Starting post-roll capture...")
+                        # audio_buffer.start_postroll_capture()
                         
                         # Wait for post-roll capture to complete
-                        postroll_chunks = 0
-                        while audio_buffer.is_capturing_postroll():
-                            audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
-                            audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
-                            audio_buffer.add_audio(audio_data)
-                            chunk_count += 1
-                            postroll_chunks += 1
-                            
-                            if postroll_chunks % 10 == 0:
-                                logger.debug(f"📦 Post-roll capture: {postroll_chunks} chunks captured")
+                        # COMMENTED OUT - Post-roll capture disabled
+                        # postroll_chunks = 0
+                        # while audio_buffer.is_capturing_postroll():
+                        #     audio_chunk = stream.read(wake_detector.get_frame_length(), exception_on_overflow=False)
+                        #     audio_data = np.frombuffer(audio_chunk, dtype=np.int16)
+                        #     audio_buffer.add_audio(audio_data)
+                        #     chunk_count += 1
+                        #     postroll_chunks += 1
+                        #     
+                        #     if postroll_chunks % 10 == 0:
+                        #         logger.debug(f"📦 Post-roll capture: {postroll_chunks} chunks captured")
+                        # 
+                        # logger.info(f"📦 Post-roll capture completed: {postroll_chunks} chunks")
                         
-                        logger.info(f"📦 Post-roll capture completed: {postroll_chunks} chunks")
+                        logger.info("📦 Post-roll capture DISABLED - skipping buffer capture")
                         
                         # Get complete audio clip
                         logger.info("🎵 Retrieving complete audio clip...")
@@ -270,15 +325,17 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager) -> int:
                         logger.info("📡 Audio capture completed - ready for streaming to Jetson")
                         logger.info("🔄 Resuming audio pipeline monitoring...")
                     else:
-                        logger.info(f"🚫 DETECTION BLOCKED - Reason:")
+                        logger.info(f"🚫 DETECTION BLOCKED - Neural model detected but filters prevented processing")
+                        logger.info(f"   Blocking reasons:")
                         if cooldown_blocked:
-                            logger.info(f"   Cooldown period active ({detection_cooldown_seconds - time_since_last:.2f}s remaining)")
-                        if debounce_blocked:
-                            logger.info(f"   Debounce period active ({detection_debounce_chunks - chunks_since_last} chunks remaining)")
-                        if buffer_blocked:
-                            logger.info(f"   Audio buffer capturing post-roll")
-                        if volume_blocked:
-                            logger.info(f"   Audio volume too low ({avg_volume:.4f} < {silence_threshold})")
+                            logger.info(f"   - Cooldown period active ({detection_cooldown_seconds - time_since_last:.2f}s remaining)")
+                        # if debounce_blocked:  # COMMENTED OUT - debounce removed
+                        #     logger.info(f"   - Debounce period active ({detection_debounce_chunks - chunks_since_last} chunks remaining)")
+                        # if buffer_blocked:  # COMMENTED OUT - Post-roll buffer filter removed
+                        #     logger.info(f"   - Audio buffer capturing post-roll")
+                        # if volume_blocked:  # COMMENTED OUT - RMS filter removed
+                        #     logger.info(f"   - Audio volume too low ({avg_volume:.4f} < {silence_threshold})")
+                        logger.info(f"   Neural model detection #{detection_debug_count} was blocked")
                 
                 # Progress logging
                 if chunk_count % 1000 == 0:
