@@ -56,8 +56,8 @@ class CustomModelMonitor(BaseWakeWordMonitor):
         """Initialize the wake word detector for custom models."""
         # Get selected model and its per-model settings
         model_name = self.settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
-        sensitivity = self.settings_manager.get_model_sensitivity(model_name, 0.8)
-        threshold = self.settings_manager.get_model_threshold(model_name, 0.3)
+        sensitivity = self.settings_manager.get_model_sensitivity(model_name)  # No fallback - must be set in config
+        threshold = self.settings_manager.get_model_threshold(model_name)  # No fallback - must be set in config
         
         logger.info(f"🔧 DEBUG: Model: {model_name}, Sensitivity: {sensitivity:.6f}, Threshold: {threshold:.6f}")
 
@@ -176,7 +176,7 @@ class CustomModelMonitor(BaseWakeWordMonitor):
             # Log detection details with enhanced parameters
             logger.info(f"🎯 Detection details:")
             logger.info(f"   Model: {self.wake_detector.get_wake_word_name()}")
-            logger.info(f"   Sensitivity: {self.settings_manager.get_model_sensitivity(self.settings_manager.get('wake_word.model', 'Hay--compUta_v_lrg'), 0.4):.6f}")
+            logger.info(f"   Sensitivity: {self.settings_manager.get_model_sensitivity(self.settings_manager.get('wake_word.model', 'Hay--compUta_v_lrg')):.6f}")
             logger.info(f"   Confidence: {self.wake_detector.engine.get_latest_confidence():.6f}" if hasattr(self.wake_detector, 'engine') else "   Confidence: N/A")
             logger.info(f"   Chunk number: {self.chunk_count}")
             logger.info(f"   Time since last detection: {current_time - self.last_detection_time:.2f}s")

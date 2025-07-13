@@ -75,22 +75,19 @@ class SettingsManager:
                 "custom_model_path": "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx",
                 "models": {
                     "Hay--compUta_v_lrg": {
-                        "sensitivity": 0.95,
-                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": True
+                        # Note: sensitivity and threshold must be set by user via GUI
                     },
                     "Hey_computer": {
-                        "sensitivity": 0.95,
-                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": False
+                        # Note: sensitivity and threshold must be set by user via GUI
                     },
                     "hey-CompUter_lrg": {
-                        "sensitivity": 0.95,
-                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": False
+                        # Note: sensitivity and threshold must be set by user via GUI
                     }
                 }
             },
@@ -146,20 +143,14 @@ class SettingsManager:
                 "cooldown": 1.5,
                 "models": {
                     "Hay--compUta_v_lrg": {
-                        "sensitivity": 0.8,
-                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": True
                     },
                     "Hey_computer": {
-                        "sensitivity": 0.8,
-                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": False
                     },
                     "hey-CompUter_lrg": {
-                        "sensitivity": 0.8,
-                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": False
                     }
@@ -557,8 +548,6 @@ class SettingsManager:
                 for model_name in available_models:
                     if model_name not in self._settings["wake_word"]["models"]:
                         self._settings["wake_word"]["models"][model_name] = {
-                            "sensitivity": 0.8,
-                            "threshold": 0.3,
                             "api_url": "https://api.example.com/webhook",
                             "active": False
                         }
@@ -592,20 +581,32 @@ class SettingsManager:
             models = self._settings.get("wake_word", {}).get("models", {})
             model_config = models.get(model_name, {})
             
+            # Check if required fields are present
+            if 'threshold' not in model_config:
+                logger.error(f"❌ Missing threshold configuration for model: {model_name}")
+                return None
+            
+            if 'sensitivity' not in model_config:
+                logger.error(f"❌ Missing sensitivity configuration for model: {model_name}")
+                return None
+            
             return {
                 'name': model_name,
-                'sensitivity': model_config.get('sensitivity', 0.8),
-                'threshold': model_config.get('threshold', 0.3),
+                'sensitivity': model_config['sensitivity'],  # No fallback - must be set
+                'threshold': model_config['threshold'],  # No fallback - must be set
                 'api_url': model_config.get('api_url', 'https://api.example.com/webhook'),
                 'active': model_config.get('active', False),
                 'file_paths': self.get_model_file_paths(model_name)
             }
 
-    def get_model_sensitivity(self, model_name: str, default: float = 0.8) -> float:
+    def get_model_sensitivity(self, model_name: str) -> float:
         """Get sensitivity for a specific model."""
         with self._lock:
             models = self._settings.get("wake_word", {}).get("models", {})
-            return models.get(model_name, {}).get("sensitivity", default)
+            model_config = models.get(model_name, {})
+            if 'sensitivity' not in model_config:
+                raise ValueError(f"❌ No sensitivity configuration found for model: {model_name}")
+            return model_config['sensitivity']
 
     def set_model_sensitivity(self, model_name: str, value: float) -> bool:
         """Set sensitivity for a specific model."""
@@ -645,11 +646,14 @@ class SettingsManager:
             logger.error(f"❌ Failed to set model API URL for {model_name}: {e}")
             return False
 
-    def get_model_threshold(self, model_name: str, default: float = 0.3) -> float:
+    def get_model_threshold(self, model_name: str) -> float:
         """Get threshold for a specific model."""
         with self._lock:
             models = self._settings.get("wake_word", {}).get("models", {})
-            return models.get(model_name, {}).get("threshold", default)
+            model_config = models.get(model_name, {})
+            if 'threshold' not in model_config:
+                raise ValueError(f"❌ No threshold configuration found for model: {model_name}")
+            return model_config['threshold']
 
     def set_model_threshold(self, model_name: str, value: float) -> bool:
         """Set threshold for a specific model."""
@@ -681,13 +685,36 @@ class SettingsManager:
                     self._settings["wake_word"] = {}
                 if "models" not in self._settings["wake_word"]:
                     self._settings["wake_word"]["models"] = {}
+                
+                # Deactivate all models first
+                for existing_model in self._settings["wake_word"]["models"]:
+                    self._settings["wake_word"]["models"][existing_model]["active"] = False
+                    logger.debug(f"🔄 SETTINGS: Deactivated model '{existing_model}'")
+                
+                # Activate the specified model
                 if model_name not in self._settings["wake_word"]["models"]:
-                    self._settings["wake_word"]["models"][model_name] = {}
-                self._settings["wake_word"]["models"][model_name]["active"] = value
-                logger.debug(f"🔄 Model '{model_name}' active state set to {value}")
-                return self._save_settings()
+                    self._settings["wake_word"]["models"][model_name] = {
+                        "api_url": "https://api.example.com/webhook",
+                        "active": True
+                        # Note: sensitivity and threshold must be set by user via GUI
+                    }
+                    logger.debug(f"🔄 SETTINGS: Created new model config for '{model_name}' (sensitivity and threshold must be set via GUI)")
+                else:
+                    self._settings["wake_word"]["models"][model_name]["active"] = True
+                    logger.debug(f"🔄 SETTINGS: Activated existing model '{model_name}'")
+                
+                logger.info(f"🔄 SETTINGS: Active model changed to '{model_name}' (all others deactivated)")
+                
+                # Save settings and verify
+                success = self._save_settings()
+                if success:
+                    logger.info(f"✅ SETTINGS: Model activation saved successfully")
+                else:
+                    logger.error(f"❌ SETTINGS: Failed to save model activation")
+                
+                return success
         except Exception as e:
-            logger.error(f"❌ Failed to set model active state for {model_name}: {e}")
+            logger.error(f"❌ SETTINGS: Failed to set active model {model_name}: {e}")
             return False
 
     def get_active_models(self) -> List[str]:
@@ -718,12 +745,11 @@ class SettingsManager:
                 # Activate the specified model
                 if model_name not in self._settings["wake_word"]["models"]:
                     self._settings["wake_word"]["models"][model_name] = {
-                        "sensitivity": 0.8,
-                        "threshold": 0.3,
                         "api_url": "https://api.example.com/webhook",
                         "active": True
+                        # Note: sensitivity and threshold must be set by user via GUI
                     }
-                    logger.debug(f"🔄 SETTINGS: Created new model config for '{model_name}'")
+                    logger.debug(f"🔄 SETTINGS: Created new model config for '{model_name}' (sensitivity and threshold must be set via GUI)")
                 else:
                     self._settings["wake_word"]["models"][model_name]["active"] = True
                     logger.debug(f"🔄 SETTINGS: Activated existing model '{model_name}'")

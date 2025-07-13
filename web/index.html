@@ -1256,20 +1256,33 @@
         }
 
         // Modal functions
-        function openSettingsModal(modelName) {
+        async function openSettingsModal(modelName) {
             currentEditingModel = modelName;
-            const model = sampleModels.find(m => m.name === modelName);
             
-            document.getElementById('modalTitle').textContent = `${modelName} Settings`;
-            
-            // Load per-model settings
-            document.getElementById('sensitivityInput').value = model.sensitivity;
-            document.getElementById('sensitivityValue').textContent = model.sensitivity.toFixed(5);
-            document.getElementById('thresholdInput').value = model.threshold || 0.3;
-            document.getElementById('thresholdValue').textContent = (model.threshold || 0.3).toFixed(5);
-            document.getElementById('apiUrlInput').value = model.apiUrl;
-            
-            document.getElementById('settingsModal').classList.add('active');
+            try {
+                // Get current model config from API
+                const response = await fetch(`${API_BASE}/config/models/${encodeURIComponent(modelName)}`);
+                if (response.ok) {
+                    const modelConfig = await response.json();
+                    
+                    document.getElementById('modalTitle').textContent = `${modelName} Settings`;
+                    
+                    // Load per-model settings from API
+                    document.getElementById('sensitivityInput').value = modelConfig.sensitivity;
+                    document.getElementById('sensitivityValue').textContent = modelConfig.sensitivity.toFixed(5);
+                    document.getElementById('thresholdInput').value = modelConfig.threshold;
+                    document.getElementById('thresholdValue').textContent = modelConfig.threshold.toFixed(5);
+                    document.getElementById('apiUrlInput').value = modelConfig.api_url;
+                    
+                    document.getElementById('settingsModal').classList.add('active');
+                } else {
+                    console.error('Failed to load model config:', response.status);
+                    showNotification('Failed to load model settings', 'error');
+                }
+            } catch (error) {
+                console.error('Error loading model settings:', error);
+                showNotification('Error loading model settings', 'error');
+            }
         }
 
         function closeSettingsModal() {
@@ -1277,25 +1290,40 @@
             currentEditingModel = null;
         }
 
-        function saveModelSettings() {
+        async function saveModelSettings() {
             if (!currentEditingModel) return;
             
-            const model = sampleModels.find(m => m.name === currentEditingModel);
-            if (model) {
-                // Save per-model settings
+            try {
+                // Get current values from form
                 const sensitivity = parseFloat(document.getElementById('sensitivityInput').value);
                 const threshold = parseFloat(document.getElementById('thresholdInput').value);
-                model.sensitivity = sensitivity;
-                model.threshold = threshold;
-                model.apiUrl = document.getElementById('apiUrlInput').value;
+                const apiUrl = document.getElementById('apiUrlInput').value;
                 
                 // Save to API
-                saveModelSettingsToAPI(currentEditingModel, {
-                    sensitivity: model.sensitivity,
-                    threshold: model.threshold,
-                    apiUrl: model.apiUrl,
-                    active: model.active // Include active state
+                const response = await fetch(`${API_BASE}/config/models/${encodeURIComponent(currentEditingModel)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        sensitivity: sensitivity,
+                        threshold: threshold,
+                        api_url: apiUrl,
+                        active: true  // Always set to active when saving settings
+                    })
                 });
+                
+                if (response.ok) {
+                    console.log('Model settings saved successfully');
+                    showNotification('Model settings saved successfully!', 'success');
+                    
+                    // Reload the custom models to update the UI
+                    loadCustomModels();
+                } else {
+                    console.error('Failed to save model settings:', response.status);
+                    showNotification('Failed to save model settings', 'error');
+                }
+            } catch (error) {
+                console.error('Error saving model settings:', error);
+                showNotification('Error saving model settings', 'error');
             }
             
             closeSettingsModal();

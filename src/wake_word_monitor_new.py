@@ -103,7 +103,13 @@ class WakeWordMonitor_new:
                 logger.error(f"❌ Failed to load model: {model_name}")
     
     def _load_single_model(self, model_name: str) -> bool:
-        """Load a single model and create its detector."""
+        """
+        Load a single model and create its detector.
+        
+        TODO: In the future, we want to load multiple models simultaneously 
+        for parallel processing instead of loading them one by one.
+        This will improve performance and allow for better model comparison.
+        """
         try:
             logger.info(f"🔧 Loading model: {model_name}")
             
@@ -201,8 +207,17 @@ class WakeWordMonitor_new:
         old_threshold = old_config.get('threshold', 0.0)
         new_threshold = new_config.get('threshold', 0.0)
         
-        return (abs(old_sensitivity - new_sensitivity) > 0.001 or 
-                abs(old_threshold - new_threshold) > 0.001)
+        has_changed = (abs(old_sensitivity - new_sensitivity) > 0.001 or 
+                      abs(old_threshold - new_threshold) > 0.001)
+        
+        if has_changed:
+            # Update the internal cache with the new config
+            self.model_configs[model_name] = new_config
+            logger.info(f"🔄 Updated model config cache for {model_name}:")
+            logger.info(f"   Old threshold: {old_threshold:.3f} → New threshold: {new_threshold:.3f}")
+            logger.info(f"   Old sensitivity: {old_sensitivity:.3f} → New sensitivity: {new_sensitivity:.3f}")
+        
+        return has_changed
     
     def _reload_active_models(self):
         """Reload all active models when settings change."""
@@ -232,6 +247,14 @@ class WakeWordMonitor_new:
                 self.active_detectors[model_name].cleanup()
             except Exception as e:
                 logger.warning(f"⚠️ Error cleaning up detector {model_name}: {e}")
+        
+        # Rebuild model configs from settings manager
+        new_config = self.settings_manager.get_model_config(model_name)
+        if new_config:
+            self.model_configs[model_name] = new_config
+            logger.info(f"🔄 Updated model config for {model_name}:")
+            logger.info(f"   Threshold: {new_config['threshold']:.3f}")
+            logger.info(f"   Sensitivity: {new_config['sensitivity']:.3f}")
         
         # Reload the model
         if self._load_single_model(model_name):
@@ -349,22 +372,30 @@ class WakeWordMonitor_new:
     def get_model_sensitivity(self, model_name: str) -> float:
         """Get sensitivity for a specific model."""
         config = self.get_model_config(model_name)
-        return config['sensitivity'] if config else 0.8
+        if not config:
+            raise ValueError(f"❌ No configuration found for model: {model_name}")
+        return config['sensitivity']
     
     def get_model_threshold(self, model_name: str) -> float:
         """Get threshold for a specific model."""
         config = self.get_model_config(model_name)
-        return config['threshold'] if config else 0.3
+        if not config:
+            raise ValueError(f"❌ No configuration found for model: {model_name}")
+        return config['threshold']
     
     def get_model_api_url(self, model_name: str) -> str:
         """Get API URL for a specific model."""
         config = self.get_model_config(model_name)
-        return config['api_url'] if config else "https://api.example.com/webhook"
+        if not config:
+            raise ValueError(f"❌ No configuration found for model: {model_name}")
+        return config['api_url']
     
     def get_model_active(self, model_name: str) -> bool:
         """Get active state for a specific model."""
         config = self.get_model_config(model_name)
-        return config['active'] if config else False
+        if not config:
+            raise ValueError(f"❌ No configuration found for model: {model_name}")
+        return config['active']
     
     def get_active_models(self) -> List[str]:
         """Get list of currently active models."""

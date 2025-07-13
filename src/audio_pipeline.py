@@ -24,8 +24,8 @@ def initialize_wake_detector(config: dict, custom_model_path: str = None) -> Wak
         
         # Get selected model and its per-model settings
         model_name = settings_manager.get("wake_word.model", "Hay--compUta_v_lrg")
-        sensitivity = settings_manager.get_model_sensitivity(model_name, 0.8)
-        threshold = settings_manager.get_model_threshold(model_name, 0.3)
+        sensitivity = settings_manager.get_model_sensitivity(model_name)  # No fallback - must be set in config
+        threshold = settings_manager.get_model_threshold(model_name)  # No fallback - must be set in config
         
         logger.info(f"🔧 DEBUG: Model: {model_name}, Sensitivity: {sensitivity:.6f}, Threshold: {threshold:.6f}")
 
@@ -296,7 +296,7 @@ def run_audio_pipeline(config: dict, usb_device, audio_manager, custom_model_pat
                         # Log detection details with enhanced parameters (from custom monitor)
                         logger.info(f"📊 Detection details:")
                         logger.info(f"   Model: {wake_detector.get_wake_word_name()}")
-                        logger.info(f"   Sensitivity: {settings_manager.get_model_sensitivity(settings_manager.get('wake_word.model', 'Hay--compUta_v_lrg'), 0.4):.6f}")
+                        logger.info(f"   Sensitivity: {settings_manager.get_model_sensitivity(settings_manager.get('wake_word.model', 'Hay--compUta_v_lrg')):.6f}")
                         logger.info(f"   Confidence: {wake_detector.engine.get_latest_confidence():.6f}" if hasattr(wake_detector, 'engine') else "   Confidence: N/A")
                         logger.info(f"   Chunk number: {chunk_count}")
                         logger.info(f"   Time since last detection: {current_time - last_detection_time:.2f}s")
