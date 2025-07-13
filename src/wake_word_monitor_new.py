@@ -283,9 +283,33 @@ class WakeWordMonitor_new:
         logger.info(f"   Wake word: {detector.get_wake_word_name()}")
         logger.info(f"   Audio RMS: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
         
-        # Update shared memory
+        # Create detection event for web interface
         try:
-            shared_memory_ipc.update_activation_state(True, model_name, 0.0)  # TODO: Get confidence
+            detection_event = {
+                'model_name': model_name,
+                'wake_word': detector.get_wake_word_name(),
+                'confidence': 0.0,  # TODO: Get actual confidence from detector
+                'timestamp': int(time.time() * 1000),  # Convert to milliseconds
+                'detection_count': self.detection_count,
+                'audio_rms': float(np.sqrt(np.mean(audio_data.astype(np.float32)**2)))
+            }
+            
+            # Write detection to file for web API
+            import json
+            detection_file = "/tmp/recent_detections.json"
+            with open(detection_file, 'w') as f:
+                json.dump([detection_event], f)  # Store as array for compatibility
+            
+            logger.info(f"📁 Created detection file: {detection_file}")
+            logger.info(f"   Detection event: {detection_event}")
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Could not create detection file: {e}")
+        
+        # Update shared memory (but don't set is_listening=True for detections)
+        try:
+            # Keep the current listening state, just update the detection info
+            shared_memory_ipc.update_activation_state(False, model_name, 0.0)  # Don't change listening state
             logger.info(f"🌐 Updated shared memory with detection from {model_name}")
         except Exception as e:
             logger.warning(f"⚠️ Could not update shared memory: {e}")

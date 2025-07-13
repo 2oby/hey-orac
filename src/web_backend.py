@@ -10,6 +10,8 @@ from shared_memory_ipc import shared_memory_ipc
 from pathlib import Path
 import time
 import logging
+import os
+import json
 
 # Configure logging - use the same configuration as main.py
 # Note: logging.basicConfig() can only be called once per process
@@ -323,29 +325,37 @@ def set_custom_model(model_name):
 
 @app.route('/api/detections', methods=['GET'])
 def get_detections():
-    """Get recent wake word detections from shared memory (replaces file-based system)"""
+    """Get recent wake word detections from detection file"""
     logger.debug("🌐 API: GET /api/detections called")
     try:
-        # Get activation data from shared memory
-        activation_data = shared_memory_ipc.get_activation_state()
-        
-        # Convert to detection format for backward compatibility
+        # Read detection file
+        detection_file = "/tmp/recent_detections.json"
         detections = []
-        if activation_data.get('is_listening', False):
-            # Create a detection entry if currently listening
-            detection = {
-                'model_name': 'Custom Model',  # Will be updated when we add model name to shared memory
-                'confidence': 0.0,  # Will be updated when we add confidence to shared memory
-                'timestamp': int(activation_data.get('last_update', time.time()) * 1000),  # Convert to milliseconds
-                'is_listening': True
-            }
-            detections.append(detection)
         
-        logger.debug(f"🌐 API: Returning {len(detections)} detections")
-        return jsonify(detections)
+        if os.path.exists(detection_file):
+            try:
+                with open(detection_file, 'r') as f:
+                    detections = json.load(f)
+                
+                # Filter to only recent detections (last 5 seconds)
+                current_time = int(time.time() * 1000)  # Convert to milliseconds
+                recent_detections = [
+                    detection for detection in detections 
+                    if current_time - detection.get('timestamp', 0) < 5000
+                ]
+                
+                logger.debug(f"🌐 API: Found {len(detections)} total detections, {len(recent_detections)} recent")
+                return jsonify(recent_detections)
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to read detection file: {e}")
+                return jsonify([])
+        else:
+            logger.debug("🌐 API: No detection file found")
+            return jsonify([])
         
     except Exception as e:
-        logger.error(f"❌ Failed to get detections from shared memory: {e}")
+        logger.error(f"❌ Failed to get detections: {e}")
         return jsonify([])
 
 @app.route('/api/activation', methods=['GET'])

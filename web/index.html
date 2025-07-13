@@ -1367,9 +1367,8 @@
                             console.log(`🎯 ACTIVATION: Listening for wake word detected!`);
                             showNotification('Listening for wake word...', 'info');
                             
-                            // Update last detection time
-                            document.getElementById('lastDetection').textContent = 
-                                `Last Detection: ${new Date().toLocaleTimeString()}`;
+                            // DON'T update last detection time here - this is just listening, not detection
+                            // Last detection time should only update on actual wake word detections
                         }
                         
                         // Update the tracking state
