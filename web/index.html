@@ -1548,14 +1548,11 @@
                     }
                 } catch (error) {
                     console.error('Failed to fetch RMS data:', error);
-                    // Fall back to demo data if API fails
-                    const demoVolume = Math.random() * 0.3;
-                    updateVolumeMeter(demoVolume);
+                    // Don't generate random noise - just show inactive state
+                    updateVolumeMeter(0);
                 }
             }, 100); // Update every 100ms (10 FPS) - INCREASED FOR TESTING
         }
-
-        // Demo: Simulate detections every few seconds
     </script>
 </body>
 </html> 
