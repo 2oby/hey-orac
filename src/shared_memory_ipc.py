@@ -92,10 +92,10 @@ class SharedMemoryIPC:
                 packed_data = self._pack_state_data(rms_level, True, is_listening)
                 self._shm.buf[:len(packed_data)] = packed_data
                 
-                # Debug logging for testing
+                # Debug logging for testing (reduced verbosity)
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.info(f"🔗 Audio State Updated: {rms_level:.2f}, Active: True, Listening: {is_listening} (Shared Memory)")
+                logger.debug(f"🔗 Audio State Updated: {rms_level:.2f}, Active: True, Listening: {is_listening} (Shared Memory)")
                 
             except Exception as e:
                 import logging
@@ -132,7 +132,7 @@ class SharedMemoryIPC:
                 verification_rms, verification_active, verification_listening, verification_timestamp = self._unpack_state_data(verification_data)
                 
                 if verification_listening == is_listening:
-                    logger.info(f"✅ ACTIVATION: Shared memory updated successfully - Listening: {is_listening}")
+                    logger.debug(f"✅ ACTIVATION: Shared memory updated successfully - Listening: {is_listening}")
                 else:
                     logger.error(f"❌ ACTIVATION: Shared memory write verification failed!")
                     logger.error(f"   Expected: {is_listening}, Got: {verification_listening}")

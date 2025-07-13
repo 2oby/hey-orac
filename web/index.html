@@ -760,8 +760,8 @@
             <div class="sliders-container">
                 <div class="slider-group">
                     <label class="slider-label">RMS Filter</label>
-                    <input type="range" class="slider" id="rmsFilter" min="0" max="100" value="50">
-                    <span class="slider-value" id="rmsFilterValue">50</span>
+                    <input type="range" class="slider" id="rmsFilter" min="0" max="10" step="0.1" value="6.5">
+                    <span class="slider-value" id="rmsFilterValue">6.5</span>
                 </div>
                 
                 <div class="slider-group">
@@ -882,10 +882,9 @@
                 // Set global sliders from config
                 if (config.global) {
                     document.getElementById('rmsFilter').value = config.global.rms_filter;
-                    // Show both linear and enhanced logarithmic values for RMS filter
-                    const linearValue = config.global.rms_filter;
-                    const logValue = Math.log(1 + linearValue / 5) / Math.log(1 + 200 / 5);
-                    document.getElementById('rmsFilterValue').textContent = `${linearValue} (${(logValue * 100).toFixed(1)}% log)`;
+                    // Show RMS filter value (now 0-10 range)
+                    const rmsValue = config.global.rms_filter;
+                    document.getElementById('rmsFilterValue').textContent = rmsValue.toFixed(1);
                     document.getElementById('debounce').value = config.global.debounce_ms;
                     document.getElementById('debounceValue').textContent = config.global.debounce_ms + 'ms';
                     document.getElementById('cooldown').value = config.global.cooldown_s;
@@ -910,7 +909,7 @@
 
         async function saveGlobalSettings() {
             const settings = {
-                rms_filter: parseInt(document.getElementById('rmsFilter').value),
+                rms_filter: parseFloat(document.getElementById('rmsFilter').value),
                 debounce_ms: parseInt(document.getElementById('debounce').value),
                 cooldown_s: parseFloat(document.getElementById('cooldown').value)
             };
@@ -1140,11 +1139,10 @@
                 const valueElement = document.getElementById(slider.valueId);
                 
                 sliderElement.addEventListener('input', (e) => {
-                    // Special handling for RMS filter - show both linear and enhanced logarithmic values
+                    // Special handling for RMS filter - show simple value
                     if (slider.id === 'rmsFilter') {
-                        const linearValue = parseInt(e.target.value);
-                        const logValue = Math.log(1 + linearValue / 5) / Math.log(1 + 200 / 5);
-                        valueElement.textContent = `${linearValue} (${(logValue * 100).toFixed(1)}% log)`;
+                        const rmsValue = parseFloat(e.target.value);
+                        valueElement.textContent = rmsValue.toFixed(1);
                         updateFilterIndicator();
                     } else {
                         valueElement.textContent = slider.format(e.target.value);

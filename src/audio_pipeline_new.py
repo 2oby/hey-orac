@@ -149,8 +149,8 @@ class AudioPipeline:
             # This tells the web GUI whether the system is "listening" for wake words
             shared_memory_ipc.update_activation_state(is_passing_audio)
             
-            # Log state changes every 100 chunks
-            if self.chunk_count % 100 == 0:
+            # Log state changes every 500 chunks (reduced frequency)
+            if self.chunk_count % 500 == 0:
                 logger.info(f"🔍 Audio Pipeline State:")
                 logger.info(f"   RMS: {rms_level:.4f}")
                 logger.info(f"   Avg Volume: {avg_volume:.4f}")
