@@ -65,7 +65,6 @@ class WakeWordMonitor_new:
         logger.info(f"🔧 Global Configuration:")
         logger.info(f"   Cooldown: {self.global_settings['cooldown']}s")
         logger.info(f"   Engine: {self.global_settings['engine']}")
-        logger.info(f"   Keyword: {self.global_settings['keyword']}")
         logger.info(f"   Model Path: {self.global_settings['model_path']}")
         logger.info(f"   Custom Model Path: {self.global_settings['custom_model_path']}")
     
@@ -377,7 +376,11 @@ class WakeWordMonitor_new:
     
     def get_keyword(self) -> str:
         """Get the wake word keyword."""
-        return self.global_settings['keyword']
+        # Return the first active model name as the keyword
+        active_models = self.get_active_models()
+        if active_models:
+            return active_models[0]
+        return "Unknown"
     
     def get_detection_count(self) -> int:
         """Get the total number of detections."""
@@ -429,7 +432,7 @@ class WakeWordMonitor_new:
         # Global settings
         logger.info("🌐 Global Settings:")
         logger.info(f"   Engine: {self.get_engine_type()}")
-        logger.info(f"   Keyword: {self.get_keyword()}")
+        logger.info(f"   Active Models: {', '.join(self.get_active_models())}")
         logger.info(f"   Cooldown: {self.get_cooldown_seconds()}s")
         
         # Active models
