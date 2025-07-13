@@ -141,30 +141,86 @@ class SettingsManager:
             if self.settings_file.exists():
                 with open(self.settings_file, 'r') as f:
                     with self._lock:
-                        self._settings = json.load(f)
-                logger.info(f"✅ Settings loaded from {self.settings_file}")
+                        loaded_settings = json.load(f)
+                        
+                        # Validate that the loaded settings have the required structure
+                        if self._validate_settings(loaded_settings):
+                            self._settings = loaded_settings
+                            logger.info(f"✅ Settings loaded from {self.settings_file}")
+                        else:
+                            logger.error(f"❌ Settings file corrupted, attempting backup restore")
+                            if not self._restore_from_backup():
+                                logger.error(f"❌ Backup restore failed, falling back to default settings")
+                                self._settings = self.default_settings.copy()
+                                self._save_settings()
+                        return
             else:
                 # Try to restore from backup first
                 if self._restore_from_backup():
                     logger.info(f"✅ Settings restored from backup: {self.backup_file}")
+                    return
                 else:
                     # Create with defaults
                     with self._lock:
                         self._settings = self.default_settings.copy()
                     self._save_settings()
                     logger.info(f"✅ Created new settings file with defaults: {self.settings_file}")
+                    return
         except Exception as e:
             logger.error(f"❌ Failed to load settings: {e}")
             # Try to restore from backup as fallback
             if not self._restore_from_backup():
+                logger.error(f"❌ Backup restore failed, falling back to default settings")
                 with self._lock:
                     self._settings = self.default_settings.copy()
         
         # Update models from filesystem after loading settings
         self.update_models_from_filesystem()
     
+    def _validate_settings(self, settings: Dict[str, Any]) -> bool:
+        """Validate that settings have the required structure."""
+        try:
+            # Check for required top-level keys
+            required_keys = ['wake_word', 'audio', 'detection']
+            for key in required_keys:
+                if key not in settings:
+                    logger.error(f"❌ SETTINGS VALIDATION FAILED: Missing required settings key: {key}")
+                    logger.error(f"❌ Available keys: {list(settings.keys())}")
+                    return False
+            
+            # Check wake_word structure
+            wake_word = settings.get('wake_word', {})
+            if 'models' not in wake_word:
+                logger.error(f"❌ SETTINGS VALIDATION FAILED: Missing wake_word.models in settings")
+                logger.error(f"❌ Available wake_word keys: {list(wake_word.keys())}")
+                return False
+            
+            # Check that at least one model has proper configuration
+            models = wake_word.get('models', {})
+            if not models:
+                logger.error(f"❌ SETTINGS VALIDATION FAILED: No models configured in settings")
+                return False
+            
+            # Check that at least one model has required fields
+            for model_name, model_config in models.items():
+                if not isinstance(model_config, dict):
+                    logger.error(f"❌ SETTINGS VALIDATION FAILED: Invalid model config for {model_name} - not a dict")
+                    return False
+                
+                required_model_fields = ['sensitivity', 'threshold', 'active']
+                for field in required_model_fields:
+                    if field not in model_config:
+                        logger.error(f"❌ SETTINGS VALIDATION FAILED: Missing required field '{field}' for model {model_name}")
+                        logger.error(f"❌ Available fields for {model_name}: {list(model_config.keys())}")
+                        return False
+            
+            logger.info(f"✅ Settings validation passed - {len(models)} models configured")
+            return True
+        except Exception as e:
+            logger.error(f"❌ SETTINGS VALIDATION ERROR: {e}")
+            return False
+    
     def _save_settings(self) -> bool:
-        logger.debug(f"💾 SETTINGS_MANAGER: _save_settings() called. Current settings: {self._settings}")
         try:
             # Check if settings have actually changed by comparing with current file
             current_settings = {}
@@ -177,25 +233,17 @@ class SettingsManager:
             
             # Only save if settings have actually changed
             if current_settings == self._settings:
-                logger.debug(f"💾 SETTINGS: No changes detected, skipping save")
                 return True
             
-            logger.debug(f"💾 SETTINGS: Settings changed, saving to {self.settings_file}")
             with open(self.settings_file, 'w') as f:
                 # Use file locking to prevent corruption
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)
                 json.dump(self._settings, f, indent=2)
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-            logger.debug(f"✅ SETTINGS: Settings saved successfully to {self.settings_file}")
             
             # Automatically backup settings when they change
-            logger.debug(f"💾 SETTINGS: Attempting to backup settings...")
             try:
-                backup_success = self._backup_settings()
-                if backup_success:
-                    logger.debug(f"💾 SETTINGS: Settings backed up to {self.backup_file}")
-                else:
-                    logger.warning(f"⚠️ SETTINGS: Backup failed")
+                self._backup_settings()
             except Exception as e:
                 logger.warning(f"⚠️ SETTINGS: Failed to backup settings: {e}")
             
@@ -205,20 +253,10 @@ class SettingsManager:
             return False
     
     def _backup_settings(self) -> bool:
-        logger.debug(f"💾 SETTINGS_MANAGER: _backup_settings() called. Backing up to {self.backup_file}")
         try:
-            logger.debug(f"💾 BACKUP: Starting backup to {self.backup_file}")
-            logger.debug(f"💾 BACKUP: Backup file parent: {self.backup_file.parent}")
-            logger.debug(f"💾 BACKUP: Current working directory: {os.getcwd()}")
-            logger.debug(f"💾 BACKUP: Current user: {os.getuid() if hasattr(os, 'getuid') else 'N/A'}")
-            
             # Check if parent directory exists
             if not self.backup_file.parent.exists():
-                logger.debug(f"💾 BACKUP: Creating parent directory: {self.backup_file.parent}")
                 self.backup_file.parent.mkdir(parents=True, exist_ok=True)
-                logger.debug(f"💾 BACKUP: Parent directory created: {self.backup_file.parent.exists()}")
-            else:
-                logger.debug(f"💾 BACKUP: Parent directory already exists: {self.backup_file.parent}")
             
             # Check write permissions
             try:
@@ -226,22 +264,16 @@ class SettingsManager:
                 with open(test_file, 'w') as f:
                     f.write("test")
                 test_file.unlink()
-                logger.debug(f"💾 BACKUP: Write permissions OK for {self.backup_file.parent}")
             except Exception as perm_error:
                 logger.error(f"💾 BACKUP: Permission error testing write: {perm_error}")
                 return False
             
-            logger.debug(f"💾 BACKUP: Writing backup file: {self.backup_file}")
             with open(self.backup_file, 'w') as f:
                 json.dump(self._settings, f, indent=2)
             
-            logger.debug(f"💾 BACKUP: Backup file created: {self.backup_file.exists()}")
-            logger.debug(f"💾 BACKUP: Backup file size: {self.backup_file.stat().st_size} bytes")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to backup settings: {e}")
-            logger.error(f"💾 BACKUP: Exception type: {type(e).__name__}")
-            logger.error(f"💾 BACKUP: Exception details: {str(e)}")
             return False
     
     def _restore_from_backup(self) -> bool:
@@ -327,7 +359,6 @@ class SettingsManager:
             return value
     
     def set(self, key: str, value: Any) -> bool:
-        logger.debug(f"💾 SETTINGS_MANAGER: set() called with key={key}, value={value}")
         try:
             with self._lock:
                 keys = key.split('.')
@@ -343,12 +374,7 @@ class SettingsManager:
                 current[keys[-1]] = value
                 
                 # Save to file
-                success = self._save_settings()
-                
-                if success:
-                    logger.info(f"✅ Setting updated: {key} = {value}")
-                
-                return success
+                return self._save_settings()
                 
         except Exception as e:
             logger.error(f"❌ Failed to set setting {key}: {e}")

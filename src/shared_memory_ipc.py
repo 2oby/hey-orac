@@ -92,10 +92,7 @@ class SharedMemoryIPC:
                 packed_data = self._pack_state_data(rms_level, True, is_listening)
                 self._shm.buf[:len(packed_data)] = packed_data
                 
-                # Debug logging for testing (reduced verbosity)
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.debug(f"🔗 Audio State Updated: {rms_level:.2f}, Active: True, Listening: {is_listening} (Shared Memory)")
+                # Removed excessive debug logging
                 
             except Exception as e:
                 import logging
@@ -121,7 +118,8 @@ class SharedMemoryIPC:
                     logger.info(f"   RMS Level: {rms_level:.4f}")
                     logger.info(f"   Timestamp: {time.time()}")
                 else:
-                    logger.debug(f"🔍 ACTIVATION: No state change - Listening: {is_listening}")
+                    # Removed excessive debug logging
+                    pass
                 
                 # Write updated data with new activation state
                 packed_data = self._pack_state_data(rms_level, is_active_old, is_listening)
@@ -131,9 +129,7 @@ class SharedMemoryIPC:
                 verification_data = bytes(self._shm.buf[:struct_size])
                 verification_rms, verification_active, verification_listening, verification_timestamp = self._unpack_state_data(verification_data)
                 
-                if verification_listening == is_listening:
-                    logger.debug(f"✅ ACTIVATION: Shared memory updated successfully - Listening: {is_listening}")
-                else:
+                if verification_listening != is_listening:
                     logger.error(f"❌ ACTIVATION: Shared memory write verification failed!")
                     logger.error(f"   Expected: {is_listening}, Got: {verification_listening}")
                 
@@ -160,16 +156,7 @@ class SharedMemoryIPC:
                 import logging
                 logger = logging.getLogger(__name__)
                 
-                # Log every 100th read to avoid spam
-                if hasattr(self, '_read_count'):
-                    self._read_count += 1
-                else:
-                    self._read_count = 1
-                
-                if self._read_count % 100 == 0:
-                    logger.info(f"📖 SHARED MEMORY READ #{self._read_count}:")
-                    logger.info(f"   RMS: {rms_level:.4f}, Active: {is_active}, Listening: {is_listening}")
-                    logger.info(f"   Timestamp: {timestamp:.2f}, Age: {time_diff:.2f}s")
+                # Removed excessive read logging
                 
                 # Check if data is stale (older than 5 seconds)
                 if time_diff > 5.0:

@@ -17,13 +17,13 @@ from settings_manager import get_settings_manager
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,  # Set to DEBUG to see debug messages
+    level=logging.INFO,  # Set to INFO to reduce noise
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-# Add debug log to verify logging is working
-logger.debug("🔧 Main new application initialized with DEBUG logging enabled")
+# Add info log to verify logging is working
+logger.info("🔧 Main new application initialized")
 
 
 class HeyOracApp:
@@ -118,21 +118,13 @@ class HeyOracApp:
         def wake_word_callback(audio_data, chunk_count, rms_level, avg_volume):
             """Wake word detection callback using the new monitor."""
             try:
-                # DEBUG: Add logging to see if callback is being called
-                logger.debug(f"🎯 DEBUG: Audio callback called - Chunk: {chunk_count}, RMS: {rms_level:.4f}")
-                logger.info(f"🎯 INFO: Audio callback called - Chunk: {chunk_count}, RMS: {rms_level:.4f}")
-                
                 # Process audio through the new monitor's detection system
                 detection_result = self.wake_word_monitor.process_audio(audio_data)
                 
                 if detection_result:
                     logger.info(f"🎯 Wake word detected! Chunk: {chunk_count}, RMS: {rms_level:.4f}")
                     logger.info(f"   Total detections: {self.wake_word_monitor.get_detection_count()}")
-                else:
-                    # Log progress periodically (every 1000 chunks to reduce spam)
-                    if chunk_count % 1000 == 0:
-                        logger.debug(f"🔍 Processing audio - Chunk: {chunk_count}, RMS: {rms_level:.4f}")
-                        logger.debug(f"   Active detectors: {list(self.wake_word_monitor.get_active_detectors().keys())}")
+                # Removed excessive debug logging - only log detections
                 
             except Exception as e:
                 logger.error(f"❌ Error in wake word callback: {e}")
