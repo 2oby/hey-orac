@@ -192,28 +192,24 @@ class OpenWakeWordEngine(WakeWordEngine):
             # Get predictions from the model
             predictions = self.model.predict(audio_chunk)
             
-            # Find the highest confidence score
-            max_confidence = 0.0
-            best_model = None
+            # Check specifically for our custom model's confidence
+            our_model_confidence = predictions.get(self.wake_word_name, 0.0)
             
-            for model_name, confidence in predictions.items():
-                if confidence > max_confidence:
-                    max_confidence = confidence
-                    best_model = model_name
+            # Log all predictions for debugging
+            logger.debug(f"🔍 Predictions for {self.wake_word_name}: {predictions}")
+            logger.debug(f"   Our model ({self.wake_word_name}) confidence: {our_model_confidence:.6f}")
+            logger.debug(f"   Threshold: {self.threshold:.6f}")
             
-            # Check if any model exceeds the threshold
-            if max_confidence >= self.threshold:
-                # Only log when there's a detection
-                logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {self.threshold:.6f}) - Source: {best_model}")
+            # Check if our specific model exceeds the threshold
+            if our_model_confidence >= self.threshold:
+                logger.info(f"🎯 WAKE WORD DETECTED! Model: {self.wake_word_name}, Confidence: {our_model_confidence:.6f} (threshold: {self.threshold:.6f})")
                 logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
                 return True
             else:
                 # Only log when confidence is greater than 0 to reduce spam
-                if max_confidence > 0:
-                    logger.info(f"🔍 DEBUG: Wake word confidence: {max_confidence:.6f} (threshold: {self.threshold:.6f}) - Source: {best_model}")
-                    logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
-                    logger.info(f"   Sensitivity setting: {self.sensitivity:.6f}")
-                    logger.info(f"   Threshold calculation: 0.7 - ({self.sensitivity:.6f} * 0.6) = {self.threshold:.6f}")
+                if our_model_confidence > 0:
+                    logger.debug(f"🔍 DEBUG: {self.wake_word_name} confidence: {our_model_confidence:.6f} (threshold: {self.threshold:.6f})")
+                    logger.debug(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in predictions.items()]}")
                 
                 return False
                 
