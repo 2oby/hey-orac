@@ -183,7 +183,15 @@ class SettingsManager:
             logger.info("✅ Settings file watcher started")
     
     def _file_watcher_loop(self) -> None:
-        """File watcher loop that monitors for changes."""
+        """
+        File watcher loop that monitors for changes.
+        
+        TODO: Replace polling with file system events (inotify/fsevents) for better efficiency.
+        Current implementation polls every 1 second, but true file system events would:
+        - Use zero CPU when file isn't changing
+        - Provide immediate response to changes
+        - Be more efficient overall
+        """
         last_modified = 0
         
         while not self._stop_watching:
@@ -202,7 +210,7 @@ class SettingsManager:
                         
                         logger.info(f"✅ Settings reloaded from file: {self.settings_file}")
                 
-                time.sleep(1.0)  # Check every 1 second instead of 100ms
+                time.sleep(1.0)  # TODO: Replace with file system events (inotify/fsevents)
                 
             except Exception as e:
                 logger.error(f"❌ File watcher error: {e}")

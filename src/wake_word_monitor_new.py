@@ -248,25 +248,36 @@ class WakeWordMonitor_new:
         Returns:
             True if any model detected a wake word, False otherwise
         """
+        # DEBUG: Add logging to see if this method is being called
+        logger.debug(f"🎵 DEBUG: process_audio called - shape={audio_data.shape}, dtype={audio_data.dtype}")
+        
         if not self.is_detection_enabled or not self.active_detectors:
+            logger.debug(f"🎵 DEBUG: Detection disabled or no active detectors")
             return False
         
         # Check cooldown
         current_time = time.time()
         if current_time - self.last_detection_time < self.global_settings['cooldown']:
+            logger.debug(f"🎵 DEBUG: Cooldown active - {self.global_settings['cooldown'] - (current_time - self.last_detection_time):.2f}s remaining")
             return False
         
         # Process through all active detectors
         for model_name, detector in self.active_detectors.items():
             try:
+                logger.debug(f"🎵 DEBUG: Processing with detector {model_name}")
                 if detector.is_ready():
+                    logger.debug(f"🎵 DEBUG: Detector {model_name} is ready, processing audio")
                     # Process audio directly with numpy array (same as working implementation)
                     detection_result = detector.process_audio(audio_data)
+                    
+                    logger.debug(f"🎵 DEBUG: Detector {model_name} result: {detection_result}")
                     
                     if detection_result:
                         logger.info(f"🎯 WAKE WORD DETECTED by model '{model_name}'!")
                         self._handle_detection(model_name, detector, audio_data)
                         return True
+                else:
+                    logger.debug(f"🎵 DEBUG: Detector {model_name} is not ready")
                         
             except Exception as e:
                 logger.error(f"❌ Error processing audio with model {model_name}: {e}")

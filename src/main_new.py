@@ -114,6 +114,9 @@ class HeyOracApp:
         def wake_word_callback(audio_data, chunk_count, rms_level, avg_volume):
             """Wake word detection callback using the new monitor."""
             try:
+                # DEBUG: Add logging to see if callback is being called
+                logger.debug(f"🎯 DEBUG: Audio callback called - Chunk: {chunk_count}, RMS: {rms_level:.4f}")
+                
                 # Process audio through the new monitor's detection system
                 detection_result = self.wake_word_monitor.process_audio(audio_data)
                 

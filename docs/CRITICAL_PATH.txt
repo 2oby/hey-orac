@@ -4,6 +4,13 @@
 **Priority**: 🔥 **CRITICAL** - Implement actual wake word detection logic in the new monitor
 **Status**: 🔴 **BLOCKING** - Current `wake_word_monitor_new.py` only handles configuration, no actual detection
 
+## 🔧 **TODO: Replace Settings Manager Polling with File System Events**
+**Priority**: 🟡 **MEDIUM** - Improve efficiency of settings monitoring
+**Issue**: Settings manager currently polls config file every 1 second instead of using file system events
+**Action Required**: Replace polling with inotify (Linux) or fsevents (macOS) for immediate file change detection
+**Impact**: Zero CPU usage when file isn't changing, immediate response to changes
+**Status**: 🟡 **PENDING** - Current polling works but is inefficient
+
 ### **Implementation Plan**
 
 #### **Phase 1: Model Loading Infrastructure**
