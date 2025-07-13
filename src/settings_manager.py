@@ -3,7 +3,8 @@ import os
 import time
 import threading
 import logging
-from typing import Dict, Any, Optional, Callable
+import glob
+from typing import Dict, Any, Optional, Callable, List
 from pathlib import Path
 import fcntl
 
@@ -120,6 +121,9 @@ class SettingsManager:
             logger.error(f"❌ Failed to load settings: {e}")
             with self._lock:
                 self._settings = self.default_settings.copy()
+        
+        # Update models from filesystem after loading settings
+        self.update_models_from_filesystem()
     
     def _save_settings(self) -> bool:
         """Save settings to tmpfs file."""
@@ -308,6 +312,123 @@ class SettingsManager:
         if self._file_watcher_thread:
             self._file_watcher_thread.join(timeout=1)
         logger.info("✅ Settings manager stopped")
+
+    def discover_available_models(self) -> List[str]:
+        """Discover available wake word models in the custom models directory."""
+        logger.info("🔍 Discovering available wake word models...")
+        
+        # Define the custom models directory
+        custom_models_dir = Path("third_party/openwakeword/custom_models")
+        
+        if not custom_models_dir.exists():
+            logger.warning(f"⚠️ Custom models directory not found: {custom_models_dir}")
+            return []
+        
+        # Look for .onnx and .tflite files
+        model_files = []
+        model_files.extend(glob.glob(str(custom_models_dir / "*.onnx")))
+        model_files.extend(glob.glob(str(custom_models_dir / "*.tflite")))
+        
+        # Extract model names (remove extension and path)
+        discovered_models = set()
+        for model_file in model_files:
+            model_name = Path(model_file).stem  # Remove extension
+            discovered_models.add(model_name)
+        
+        available_models = sorted(list(discovered_models))
+        
+        logger.info(f"🔍 Discovered models: {available_models}")
+        
+        # Log model file details
+        for model_name in available_models:
+            onnx_file = custom_models_dir / f"{model_name}.onnx"
+            tflite_file = custom_models_dir / f"{model_name}.tflite"
+            
+            logger.info(f"📁 Model '{model_name}':")
+            logger.info(f"   ONNX: {'✅' if onnx_file.exists() else '❌'} {onnx_file}")
+            logger.info(f"   TFLite: {'✅' if tflite_file.exists() else '❌'} {tflite_file}")
+        
+        return available_models
+
+    def get_model_file_paths(self, model_name: str) -> Dict[str, str]:
+        """Get file paths for a specific model."""
+        custom_models_dir = Path("third_party/openwakeword/custom_models")
+        
+        return {
+            'onnx': str(custom_models_dir / f"{model_name}.onnx"),
+            'tflite': str(custom_models_dir / f"{model_name}.tflite")
+        }
+
+    def update_models_from_filesystem(self) -> bool:
+        """Update model settings based on filesystem discovery."""
+        logger.info("🔄 Updating models from filesystem...")
+        
+        try:
+            with self._lock:
+                # Discover available models
+                available_models = self.discover_available_models()
+                
+                # Ensure wake_word section exists
+                if "wake_word" not in self._settings:
+                    self._settings["wake_word"] = {}
+                
+                # Update sensitivities for new models
+                if "sensitivities" not in self._settings["wake_word"]:
+                    self._settings["wake_word"]["sensitivities"] = {}
+                
+                for model_name in available_models:
+                    if model_name not in self._settings["wake_word"]["sensitivities"]:
+                        self._settings["wake_word"]["sensitivities"][model_name] = 0.8
+                        logger.info(f"➕ Added sensitivity for model '{model_name}': 0.8")
+                
+                # Update thresholds for new models
+                if "thresholds" not in self._settings["wake_word"]:
+                    self._settings["wake_word"]["thresholds"] = {}
+                
+                for model_name in available_models:
+                    if model_name not in self._settings["wake_word"]["thresholds"]:
+                        self._settings["wake_word"]["thresholds"][model_name] = 0.3
+                        logger.info(f"➕ Added threshold for model '{model_name}': 0.3")
+                
+                # Update API URLs for new models
+                if "api_urls" not in self._settings["wake_word"]:
+                    self._settings["wake_word"]["api_urls"] = {}
+                
+                for model_name in available_models:
+                    if model_name not in self._settings["wake_word"]["api_urls"]:
+                        self._settings["wake_word"]["api_urls"][model_name] = "https://api.example.com/webhook"
+                        logger.info(f"➕ Added API URL for model '{model_name}': https://api.example.com/webhook")
+                
+                # Save updated settings
+                success = self._save_settings()
+                
+                if success:
+                    logger.info(f"✅ Updated settings with {len(available_models)} models from filesystem")
+                
+                return success
+                
+        except Exception as e:
+            logger.error(f"❌ Failed to update models from filesystem: {e}")
+            return False
+
+    def get_available_models(self) -> List[str]:
+        """Get list of available model names."""
+        return self.discover_available_models()
+
+    def get_model_config(self, model_name: str) -> Optional[Dict[str, Any]]:
+        """Get complete configuration for a specific model."""
+        available_models = self.discover_available_models()
+        
+        if model_name not in available_models:
+            return None
+        
+        return {
+            'name': model_name,
+            'sensitivity': self.get_model_sensitivity(model_name),
+            'threshold': self.get_model_threshold(model_name),
+            'api_url': self.get_model_api_url(model_name),
+            'file_paths': self.get_model_file_paths(model_name)
+        }
 
     def get_model_sensitivity(self, model_name: str, default: float = 0.4) -> float:
         """Get sensitivity for a specific model."""

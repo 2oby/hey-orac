@@ -6,10 +6,7 @@ Handles wake word detection with configuration-driven model management
 """
 
 import logging
-import os
-import glob
 from typing import Dict, Any, List, Optional
-from pathlib import Path
 from settings_manager import get_settings_manager
 
 logger = logging.getLogger(__name__)
@@ -30,7 +27,6 @@ class WakeWordMonitor_new:
         
         # Load configuration
         self._load_configuration()
-        self._discover_available_models()
         self._build_model_configs()
         
         logger.info("✅ WakeWordMonitor_new initialized")
@@ -56,73 +52,25 @@ class WakeWordMonitor_new:
         logger.info(f"   Model Path: {self.global_settings['model_path']}")
         logger.info(f"   Custom Model Path: {self.global_settings['custom_model_path']}")
     
-    def _discover_available_models(self):
-        """Discover available wake word models in the custom models directory."""
-        logger.info("🔍 Discovering available wake word models...")
-        
-        # Define the custom models directory
-        custom_models_dir = Path("third_party/openwakeword/custom_models")
-        
-        if not custom_models_dir.exists():
-            logger.warning(f"⚠️ Custom models directory not found: {custom_models_dir}")
-            return
-        
-        # Look for .onnx and .tflite files
-        model_files = []
-        model_files.extend(glob.glob(str(custom_models_dir / "*.onnx")))
-        model_files.extend(glob.glob(str(custom_models_dir / "*.tflite")))
-        
-        # Extract model names (remove extension and path)
-        discovered_models = set()
-        for model_file in model_files:
-            model_name = Path(model_file).stem  # Remove extension
-            discovered_models.add(model_name)
-        
-        self.available_models = sorted(list(discovered_models))
-        
-        logger.info(f"🔍 Discovered models: {self.available_models}")
-        
-        # Log model file details
-        for model_name in self.available_models:
-            onnx_file = custom_models_dir / f"{model_name}.onnx"
-            tflite_file = custom_models_dir / f"{model_name}.tflite"
-            
-            logger.info(f"📁 Model '{model_name}':")
-            logger.info(f"   ONNX: {'✅' if onnx_file.exists() else '❌'} {onnx_file}")
-            logger.info(f"   TFLite: {'✅' if tflite_file.exists() else '❌'} {tflite_file}")
-    
     def _build_model_configs(self):
         """Build configuration for each discovered model."""
         logger.info("🔧 Building model configurations...")
         
-        for model_name in self.available_models:
-            # Get model-specific settings from settings manager
-            sensitivity = self.settings_manager.get_model_sensitivity(model_name, 0.8)
-            threshold = self.settings_manager.get_model_threshold(model_name, 0.3)
-            api_url = self.settings_manager.get_model_api_url(model_name, "https://api.example.com/webhook")
-            
-            self.model_configs[model_name] = {
-                'name': model_name,
-                'sensitivity': sensitivity,
-                'threshold': threshold,
-                'api_url': api_url,
-                'file_paths': self._get_model_file_paths(model_name)
-            }
-            
-            logger.info(f"🔧 Model '{model_name}' configuration:")
-            logger.info(f"   Sensitivity: {sensitivity:.3f}")
-            logger.info(f"   Threshold: {threshold:.3f}")
-            logger.info(f"   API URL: {api_url}")
-            logger.info(f"   Files: {self.model_configs[model_name]['file_paths']}")
-    
-    def _get_model_file_paths(self, model_name: str) -> Dict[str, str]:
-        """Get file paths for a specific model."""
-        custom_models_dir = Path("third_party/openwakeword/custom_models")
+        # Get available models from settings manager
+        self.available_models = self.settings_manager.get_available_models()
         
-        return {
-            'onnx': str(custom_models_dir / f"{model_name}.onnx"),
-            'tflite': str(custom_models_dir / f"{model_name}.tflite")
-        }
+        for model_name in self.available_models:
+            # Get complete model config from settings manager
+            model_config = self.settings_manager.get_model_config(model_name)
+            
+            if model_config:
+                self.model_configs[model_name] = model_config
+                
+                logger.info(f"🔧 Model '{model_name}' configuration:")
+                logger.info(f"   Sensitivity: {model_config['sensitivity']:.3f}")
+                logger.info(f"   Threshold: {model_config['threshold']:.3f}")
+                logger.info(f"   API URL: {model_config['api_url']}")
+                logger.info(f"   Files: {list(model_config['file_paths'].keys())}")
     
     def get_available_models(self) -> List[str]:
         """Get list of available model names."""

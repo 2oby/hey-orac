@@ -13,7 +13,6 @@ from typing import Dict, Any
 from audio_utils import AudioManager
 from wake_word_interface import WakeWordDetector
 from audio_pipeline_new import create_audio_pipeline
-from monitor_custom_model import CustomModelMonitor
 
 # Configure logging
 logging.basicConfig(
@@ -35,7 +34,6 @@ class HeyOracApp:
         self.audio_manager = None
         self.wake_detector = None
         self.usb_device = None
-        self.custom_monitor = None
         
     def _load_config(self) -> Dict[str, Any]:
         """Load configuration from YAML file."""
@@ -79,48 +77,15 @@ class HeyOracApp:
                 return False
             
             logger.info("✅ Wake word detector initialized successfully")
-            
-            # Initialize custom model monitor for neural engine processing
-            self.custom_monitor = CustomModelMonitor(
-                config=self.config,
-                usb_device=self.usb_device,
-                audio_manager=self.audio_manager
-            )
-            
-            if not self.custom_monitor.initialize():
-                logger.error("❌ Failed to initialize custom model monitor")
-                return False
-            
-            logger.info("✅ Custom model monitor initialized successfully")
             return True
             
         except Exception as e:
             logger.error(f"❌ Failed to initialize application: {e}")
             return False
     
-    def _wake_word_callback(self, audio_data, chunk_count, rms_level, avg_volume):
-        """
-        Callback function that receives audio from the pipeline when RMS is above threshold.
-        This is where the neural engine processes the audio for wake word detection.
-        """
-        try:
-            # Process audio through the custom model monitor (neural engine)
-            # This will only be called when audio is above the RMS filter threshold
-            detection_result = self.custom_monitor._process_audio_chunk(audio_data)
-            
-            if detection_result:
-                logger.info(f"🎯 Wake word detected in callback! Chunk: {chunk_count}, RMS: {rms_level:.4f}")
-            else:
-                # Only log occasionally to avoid spam
-                if chunk_count % 100 == 0:
-                    logger.debug(f"🔍 Processing audio chunk {chunk_count} - RMS: {rms_level:.4f}, Avg: {avg_volume:.4f}")
-                    
-        except Exception as e:
-            logger.error(f"❌ Error in wake word callback: {e}")
-    
     def run_monitoring(self) -> int:
         """Run the basic monitoring loop."""
-        logger.info("🎯 Starting new audio pipeline with RMS monitoring and neural engine...")
+        logger.info("🎯 Starting new audio pipeline with RMS monitoring...")
         
         # Create audio pipeline
         audio_pipeline = create_audio_pipeline(
@@ -131,11 +96,12 @@ class HeyOracApp:
             channels=self.wake_detector.get_channels()
         )
         
-        # Set up wake word callback to connect audio pipeline to neural engine
-        audio_pipeline.set_wake_word_callback(self._wake_word_callback)
-        
-        logger.info("✅ Wake word callback connected to audio pipeline")
-        logger.info("🎯 Neural engine will only receive audio when RMS is above filter threshold")
+        # TODO: Set up wake word callback
+        # For now, just run the audio pipeline without wake word detection
+        # def wake_word_callback(audio_data, chunk_count, rms_level, avg_volume):
+        #     # Wake word detection logic will go here
+        #     pass
+        # audio_pipeline.set_wake_word_callback(wake_word_callback)
         
         return audio_pipeline.run()
 

@@ -1,5 +1,12 @@
 # CRITICAL PATH - Hey Orac Voice Control System
 
+## ⚠️ **TODO: Remove Random Signal Generator from Web GUI**
+**Priority**: 🔥 **HIGH** - The web GUI currently uses a random signal generator for demo purposes
+**Issue**: Web interface shows fake RMS values instead of real audio data
+**Action Required**: Replace random signal generator with real audio pipeline data
+**Impact**: Users see fake data instead of actual microphone input
+**Status**: 🔴 **BLOCKING** - Need to connect real audio pipeline to web interface
+
 ## 🎉 MAJOR BREAKTHROUGH: CUSTOM WAKE WORD DETECTION WORKING!
 
 ## ✅ **PER-MODEL SENSITIVITY AND THRESHOLD IMPLEMENTATION - COMPLETED**

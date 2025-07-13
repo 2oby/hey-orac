@@ -7,7 +7,7 @@ Provides REST API for web interface and settings management
 from flask import Flask, jsonify, request, send_from_directory
 from settings_manager import get_settings_manager
 from shared_memory_ipc import shared_memory_ipc
-import glob
+from pathlib import Path
 import time
 import logging
 
@@ -31,48 +31,27 @@ settings_manager = get_settings_manager()
 
 # Helper functions
 def discover_available_models():
-    """Discover available custom models in the third_party directory"""
-    models = []
-    
-    # Look for ONNX models
-    onnx_pattern = "third_party/openwakeword/custom_models/*.onnx"
-    onnx_files = glob.glob(onnx_pattern)
-    
-    for file_path in onnx_files:
-        model_name = file_path.split('/')[-1].replace('.onnx', '')
-        models.append(model_name)
-    
-    # Look for TFLite models
-    tflite_pattern = "third_party/openwakeword/custom_models/*.tflite"
-    tflite_files = glob.glob(tflite_pattern)
-    
-    for file_path in tflite_files:
-        model_name = file_path.split('/')[-1].replace('.tflite', '')
-        if model_name not in models:  # Avoid duplicates
-            models.append(model_name)
-    
-    return models
+    """Get available models from settings manager"""
+    return settings_manager.get_available_models()
 
 def get_model_info(model_name):
-    """Get information about a specific model"""
-    # Check for ONNX model
-    onnx_path = f"third_party/openwakeword/custom_models/{model_name}.onnx"
-    if glob.glob(onnx_path):
-        return {
-            'name': model_name,
-            'path': onnx_path,
-            'type': 'onnx'
-        }
-    
-    # Check for TFLite model
-    tflite_path = f"third_party/openwakeword/custom_models/{model_name}.tflite"
-    if glob.glob(tflite_path):
-        return {
-            'name': model_name,
-            'path': tflite_path,
-            'type': 'tflite'
-        }
-    
+    """Get information about a specific model from settings manager"""
+    model_config = settings_manager.get_model_config(model_name)
+    if model_config:
+        # Determine which file type exists
+        file_paths = model_config['file_paths']
+        if Path(file_paths['onnx']).exists():
+            return {
+                'name': model_name,
+                'path': file_paths['onnx'],
+                'type': 'onnx'
+            }
+        elif Path(file_paths['tflite']).exists():
+            return {
+                'name': model_name,
+                'path': file_paths['tflite'],
+                'type': 'tflite'
+            }
     return None
 
 # Routes
@@ -92,15 +71,13 @@ def get_config():
     # Get all models with their settings
     models = {}
     for model_name in discover_available_models():
-        sensitivity = settings_manager.get_model_sensitivity(model_name, 0.8)
-        threshold = settings_manager.get_model_threshold(model_name, 0.3)
-        api_urls = settings_manager.get("wake_word.api_urls", {})
-        
-        models[model_name] = {
-            "sensitivity": sensitivity,
-            "threshold": threshold,
-            "api_url": api_urls.get(model_name, "https://api.example.com/webhook")
-        }
+        model_config = settings_manager.get_model_config(model_name)
+        if model_config:
+            models[model_name] = {
+                "sensitivity": model_config['sensitivity'],
+                "threshold": model_config['threshold'],
+                "api_url": model_config['api_url']
+            }
     
     # Get global settings
     global_settings = {
@@ -181,15 +158,16 @@ def get_models():
 @app.route('/api/config/models/<model_name>', methods=['GET'])
 def get_model_config(model_name):
     """Get specific model settings (per-model sensitivity, threshold and API URL)"""
-    sensitivity = settings_manager.get_model_sensitivity(model_name, 0.8)
-    threshold = settings_manager.get_model_threshold(model_name, 0.3)
-    api_url = settings_manager.get_model_api_url(model_name, "https://api.example.com/webhook")
-    return jsonify({
-        "sensitivity": sensitivity,
-        "threshold": threshold,
-        "api_url": api_url,
-        "model": model_name
-    })
+    model_config = settings_manager.get_model_config(model_name)
+    if model_config:
+        return jsonify({
+            "sensitivity": model_config['sensitivity'],
+            "threshold": model_config['threshold'],
+            "api_url": model_config['api_url'],
+            "model": model_name
+        })
+    else:
+        return jsonify({"error": f"Model {model_name} not found"}), 404
 
 @app.route('/api/config/models/<model_name>', methods=['POST'])
 def set_model_config(model_name):
