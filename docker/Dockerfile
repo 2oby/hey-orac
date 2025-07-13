@@ -72,7 +72,6 @@ COPY --chown=appuser:appuser third_party/ ./third_party/
 COPY --chown=appuser:appuser web/ ./web/
 # Copy assets directory if it exists (for audio feedback)
 COPY --chown=appuser:appuser assets/ ./assets/
-COPY --chown=appuser:appuser src/config.yaml ./config.yaml
 
 # Copy ALSA configuration for USB microphone
 COPY --chown=appuser:appuser .asoundrc /home/appuser/.asoundrc
