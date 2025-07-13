@@ -133,7 +133,21 @@ class SettingsManager:
     def _save_settings(self) -> bool:
         """Save settings to tmpfs file."""
         try:
-            logger.debug(f"💾 SETTINGS: Saving settings to {self.settings_file}")
+            # Check if settings have actually changed by comparing with current file
+            current_settings = {}
+            if self.settings_file.exists():
+                try:
+                    with open(self.settings_file, 'r') as f:
+                        current_settings = json.load(f)
+                except:
+                    pass  # If file is corrupted, we'll save anyway
+            
+            # Only save if settings have actually changed
+            if current_settings == self._settings:
+                logger.debug(f"💾 SETTINGS: No changes detected, skipping save")
+                return True
+            
+            logger.debug(f"💾 SETTINGS: Settings changed, saving to {self.settings_file}")
             with open(self.settings_file, 'w') as f:
                 # Use file locking to prevent corruption
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)
