@@ -312,7 +312,7 @@ def set_custom_model(model_name):
     
     # Set this model as the active model (deactivates others)
     logger.info(f"🌐 API: Changing active model to '{model_name}' via /api/custom-models/{model_name}")
-    if settings_manager.set_active_model(model_name):
+    if settings_manager.set_model_active(model_name):
         logger.info(f"🌐 API: Model {model_name} activated successfully")
         return jsonify({
             'status': 'success',
