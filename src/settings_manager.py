@@ -374,6 +374,7 @@ class SettingsManager:
     
     def set(self, key: str, value: Any) -> bool:
         try:
+            logger.info(f"🔧 SETTINGS: set() called with key='{key}', value={value}")
             with self._lock:
                 keys = key.split('.')
                 current = self._settings
@@ -381,10 +382,16 @@ class SettingsManager:
                 # Navigate to the parent of the target key
                 for k in keys[:-1]:
                     if k not in current:
+                        logger.info(f"🔧 SETTINGS: Creating new section '{k}'")
+                        current[k] = {}
+                    elif not isinstance(current[k], dict):
+                        # If the key exists but isn't a dict, convert it to a dict
+                        logger.warning(f"🔧 SETTINGS: Converting '{k}' from {type(current[k])} to dict")
                         current[k] = {}
                     current = current[k]
                 
                 # Set the value
+                logger.info(f"🔧 SETTINGS: Setting {keys[-1]} = {value}")
                 current[keys[-1]] = value
                 
                 # Save to file
