@@ -41,8 +41,8 @@ fi
 echo "✅ Web backend started successfully (PID: $WEB_PID)"
 
 # Start main wake word detection in background
-echo "🎤 Starting wake word detection with optimized pipeline..."
-/app/venv/bin/python src/main.py --pipeline &
+echo "🎤 Starting wake word detection with audio pipeline and RMS monitoring..."
+/app/venv/bin/python src/main_new.py &
 MAIN_PID=$!
 
 # Wait a moment for main process to start
