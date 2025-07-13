@@ -76,20 +76,31 @@ class HeyOracApp:
             
             logger.info(f"🎤 Using USB microphone: {self.usb_device.name}")
             
-            # Initialize wake word detector
-            self.wake_detector = WakeWordDetector()
-            if not self.wake_detector.initialize(self.config):
-                logger.error("❌ Failed to initialize wake word detector")
-                return False
-            
-            logger.info("✅ Wake word detector initialized successfully")
-            
-            # Initialize wake word monitor (new implementation)
+            # Initialize wake word monitor (new implementation) - this handles all wake word detection
             self.wake_word_monitor = create_wake_word_monitor_new()
             logger.info("✅ Wake word monitor (new) initialized successfully")
             
             # Print configuration summary
             self.wake_word_monitor.print_configuration_summary()
+            
+            # Get sample rate and frame length from the monitor's active detectors
+            sample_rate = 16000  # Default for OpenWakeWord
+            frame_length = 1280   # Default for OpenWakeWord
+            
+            # Try to get from active detectors if available
+            active_detectors = self.wake_word_monitor.get_active_detectors()
+            if active_detectors:
+                # Get the first active detector for audio format info
+                first_detector = list(active_detectors.values())[0]
+                sample_rate = first_detector.get_sample_rate()
+                frame_length = first_detector.get_frame_length()
+                logger.info(f"🔧 Using audio format from active detector: {sample_rate}Hz, {frame_length} samples")
+            else:
+                logger.warning("⚠️ No active detectors found, using default audio format")
+            
+            # Store audio format for pipeline creation
+            self.sample_rate = sample_rate
+            self.frame_length = frame_length
             
             return True
             
@@ -101,13 +112,14 @@ class HeyOracApp:
         """Run the basic monitoring loop."""
         logger.info("🎯 Starting new audio pipeline with RMS monitoring and wake word monitor...")
         
-        # Create audio pipeline
+        # Create audio pipeline with wake word monitor for validation
         audio_pipeline = create_audio_pipeline(
             audio_manager=self.audio_manager,
             usb_device=self.usb_device,
-            sample_rate=self.wake_detector.get_sample_rate(),
-            frame_length=self.wake_detector.get_frame_length(),
-            channels=self.wake_detector.get_channels()
+            sample_rate=self.sample_rate,
+            frame_length=self.frame_length,
+            channels=1,  # Mono audio
+            wake_word_monitor=self.wake_word_monitor
         )
         
         # Set up wake word callback using the new monitor
