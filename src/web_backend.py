@@ -260,6 +260,8 @@ def get_custom_models():
 @app.route('/api/custom-models/<model_name>', methods=['POST'])
 def set_custom_model(model_name):
     """Set the active custom model"""
+    logger.debug(f"🌐 DEBUG TEST: set_custom_model called with model_name={model_name}")
+    
     # Validate the model exists
     model_info = get_model_info(model_name)
     if not model_info:
