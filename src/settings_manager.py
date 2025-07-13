@@ -217,7 +217,7 @@ class SettingsManager:
         self.update_models_from_filesystem()
     
     def _save_settings(self) -> bool:
-        """Save settings to tmpfs file."""
+        logger.debug(f"💾 SETTINGS_MANAGER: _save_settings() called. Current settings: {self._settings}")
         try:
             # Check if settings have actually changed by comparing with current file
             current_settings = {}
@@ -258,7 +258,7 @@ class SettingsManager:
             return False
     
     def _backup_settings(self) -> bool:
-        """Backup settings to permanent storage."""
+        logger.debug(f"💾 SETTINGS_MANAGER: _backup_settings() called. Backing up to {self.backup_file}")
         try:
             logger.debug(f"💾 BACKUP: Starting backup to {self.backup_file}")
             logger.debug(f"💾 BACKUP: Backup file parent: {self.backup_file.parent}")
@@ -380,7 +380,7 @@ class SettingsManager:
             return value
     
     def set(self, key: str, value: Any) -> bool:
-        """Set a setting value using dot notation."""
+        logger.debug(f"💾 SETTINGS_MANAGER: set() called with key={key}, value={value}")
         try:
             with self._lock:
                 keys = key.split('.')
@@ -412,15 +412,15 @@ class SettingsManager:
         with self._lock:
             return self._settings.copy()
     
-    def update(self, settings: Dict[str, Any]) -> bool:
-        """Update multiple settings at once."""
+    def update(self, new_settings: dict) -> bool:
+        logger.debug(f"💾 SETTINGS_MANAGER: update() called with: {new_settings}")
         try:
             with self._lock:
-                self._settings.update(settings)
+                self._settings.update(new_settings)
                 success = self._save_settings()
                 
                 if success:
-                    logger.info(f"✅ Updated {len(settings)} settings")
+                    logger.info(f"✅ Updated {len(new_settings)} settings")
                 
                 return success
                 
