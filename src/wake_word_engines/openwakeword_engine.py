@@ -11,6 +11,7 @@ import logging
 from wake_word_interface import WakeWordEngine
 import os
 import time
+import hashlib
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,6 @@ class OpenWakeWordEngine(WakeWordEngine):
         self.model = None
         self.is_initialized = False
         self.wake_word_name = "Unknown"
-        # Remove hardcoded threshold - will be set from config during initialize()
         self.threshold = None
         self.sample_rate = 16000  # This is a constant for OpenWakeWord, not configurable
         self.debug_mode = True  # Set to False in production
@@ -43,7 +43,6 @@ class OpenWakeWordEngine(WakeWordEngine):
         """
         try:
             # OpenWakeWord-specific validation
-            # OpenWakeWord requires: 16kHz sample rate, mono channel, 16-bit PCM
             if self.sample_rate != 16000:
                 logger.error(f"❌ OpenWakeWord requires 16kHz sample rate, got {self.sample_rate}Hz")
                 return False
@@ -53,9 +52,9 @@ class OpenWakeWordEngine(WakeWordEngine):
             logger.info(f"   Frame length: {self.get_frame_length()} samples ✓")
             logger.info(f"   Expected chunk duration: {self.get_frame_length() / self.sample_rate * 1000:.1f}ms ✓")
             
-            # Get sensitivity and threshold from config (0.0-1.0)
-            self.sensitivity = config.get('sensitivity', 0.8)  # Use config default, not hardcoded
-            self.threshold = config.get('threshold', 0.001)  # Get from config, no hardcoded fallback
+            # Get sensitivity and threshold from config
+            self.sensitivity = config.get('sensitivity', 0.8)
+            self.threshold = config.get('threshold', 0.001)
             
             # Get audio processing settings from config
             self.low_audio_threshold = config.get('low_audio_threshold', 1000)
@@ -63,129 +62,83 @@ class OpenWakeWordEngine(WakeWordEngine):
             
             logger.info(f"🔧 Model Sensitivity: {self.sensitivity:.3f} (internal model parameter)")
             logger.info(f"🔧 Detection Threshold: {self.threshold:.6f} (confidence level to trigger)")
-            logger.info(f"   High sensitivity = more sensitive model processing")
-            logger.info(f"   Low threshold = easier detection (triggers at lower confidence)")
             
             # Check if custom model is specified
             custom_model_path = config.get('custom_model_path')
             
             if custom_model_path and os.path.exists(custom_model_path):
-                # For custom models, use the model name from the file path
+                # Validate model file before loading
+                if not self._validate_model_file(custom_model_path):
+                    logger.error(f"❌ Model file validation failed: {custom_model_path}")
+                    return False
+                
+                # Extract model name from file path
                 model_name = os.path.splitext(os.path.basename(custom_model_path))[0]
                 self.wake_word_name = model_name
                 logger.info(f"🔍 Using custom model name: {model_name}")
-            else:
-                # For pre-trained models, use a default name
-                self.wake_word_name = "unknown"
-                logger.info(f"🔍 Using pre-trained model (no custom model specified)")
-            
-            # Enhanced debugging: Log OpenWakeWord version and available models
-            logger.info("🔍 DEBUGGING: OpenWakeWord initialization")
-            logger.info(f"   OpenWakeWord version: {openwakeword.__version__ if hasattr(openwakeword, '__version__') else 'Unknown'}")
-            logger.info(f"   Available models: {list(openwakeword.models.keys())}")
-            logger.info(f"   Requested keyword: {config.get('keyword', 'N/A')}") # Keep this for pre-trained models
-            logger.info(f"   Threshold: {self.threshold}")
-            
-            # Check if custom model is specified
-            custom_model_path = config.get('custom_model_path')
-            
-            if custom_model_path and os.path.exists(custom_model_path):
-                logger.info(f"🔍 DEBUGGING: Loading custom model from {custom_model_path}")
                 
-                # Verify the custom model file
-                if not custom_model_path.endswith(('.onnx', '.tflite')):
-                    logger.error(f"❌ Custom model must be .onnx or .tflite format: {custom_model_path}")
-                    return False
+                # Try loading with different configurations
+                logger.info(f"🔍 Attempting to load custom model: {custom_model_path}")
                 
-                # For custom models, use the correct OpenWakeWord API
+                # First attempt: Try with inference_framework specified
                 try:
-                    logger.info(f"🔍 DEBUGGING: Using correct OpenWakeWord API for custom models")
-                    logger.info(f"   Custom model path: {custom_model_path}")
-                    logger.info(f"   Keyword: {config.get('keyword', 'N/A')}") # Keep this for pre-trained models
-                    
-                    # ISSUE #1: VAD threshold conflict - we were using both OpenWakeWord's VAD and our own RMS filtering
-                    # SOLUTION: Disable OpenWakeWord's VAD since we're doing our own audio filtering
-                    
-                    # FIX #1: Add class mapping for custom models
-                    logger.info(f"🔍 CRITICAL: Loading custom model WITH class mapping")
+                    logger.info("🔍 Attempt 1: Loading with inference_framework='onnx'")
                     self.model = openwakeword.Model(
                         wakeword_model_paths=[custom_model_path],
-                        class_mapping_dicts=[{0: self.wake_word_name}],  # FIX #1: Maps output class 0 to our wake word name
-                        vad_threshold=0.0,  # Disabled to prevent conflict with our RMS filtering
-                        enable_speex_noise_suppression=False
+                        inference_framework="onnx"  # Explicitly specify ONNX
                     )
+                    logger.info("✅ Model loaded successfully with ONNX framework")
+                except Exception as e1:
+                    logger.warning(f"⚠️ Attempt 1 failed: {e1}")
                     
-                    logger.info(f"✅ Custom model loaded successfully: {custom_model_path}")
-                    
-                    # Validate the custom model setup
-                    self._validate_model_setup()
-                    
-                except Exception as e:
-                    logger.error(f"❌ Failed to load custom model: {e}")
-                    logger.error(f"❌ Custom model path: {custom_model_path}")
-                    logger.error(f"❌ Custom model exists: {os.path.exists(custom_model_path)}")
-                    logger.error(f"❌ Custom model size: {os.path.getsize(custom_model_path) if os.path.exists(custom_model_path) else 'N/A'}")
-                    logger.info("🔄 Falling back to pre-trained models...")
-                    
-                    # Fallback to pre-trained models
-                    self.model = openwakeword.Model(
-                        vad_threshold=0.0,  # CHANGED: Disabled to prevent conflict
-                        enable_speex_noise_suppression=False
-                    )
+                    # Second attempt: Try without class mapping
+                    try:
+                        logger.info("🔍 Attempt 2: Loading without class mapping")
+                        self.model = openwakeword.Model(
+                            wakeword_model_paths=[custom_model_path]
+                        )
+                        logger.info("✅ Model loaded successfully without class mapping")
+                    except Exception as e2:
+                        logger.warning(f"⚠️ Attempt 2 failed: {e2}")
+                        
+                        # Third attempt: Original method with class mapping
+                        try:
+                            logger.info("🔍 Attempt 3: Loading with class mapping")
+                            self.model = openwakeword.Model(
+                                wakeword_model_paths=[custom_model_path],
+                                class_mapping_dicts=[{0: self.wake_word_name}],
+                                vad_threshold=0.0,
+                                enable_speex_noise_suppression=False
+                            )
+                            logger.info("✅ Model loaded successfully with class mapping")
+                        except Exception as e3:
+                            logger.error(f"❌ All loading attempts failed")
+                            logger.error(f"   Error 1: {e1}")
+                            logger.error(f"   Error 2: {e2}")
+                            logger.error(f"   Error 3: {e3}")
+                            
+                            # Try to provide more debugging info
+                            self._debug_openwakeword_internals()
+                            return False
+                
+                # Validate the model is working
+                if not self._validate_model_functionality():
+                    logger.error("❌ Model functionality validation failed")
+                    return False
                     
             else:
                 if custom_model_path:
                     logger.warning(f"⚠️ Custom model path specified but file not found: {custom_model_path}")
-                    logger.info("🔄 Falling back to pre-trained models...")
                 
-                logger.info(f"🔍 DEBUGGING: Loading pre-trained models using documented approach")
-                
-                # Use the documented approach: load ALL available models
-                # This matches ARCHITECTURE_UPDATE.md implementation
-                logger.info("🔍 DEBUGGING: Creating OpenWakeWord Model with all available models...")
-                logger.info(f"   vad_threshold: 0.0 (DISABLED)")
-                logger.info(f"   enable_speex_noise_suppression: False")
-                logger.info(f"   wakeword_models: None (load all available)")
-                
-                # Initialize model with all available models (documented approach)
-                # Note: We don't call download_models() as it's not available in this version
-                logger.info("🔍 DEBUGGING: Creating OpenWakeWord Model with available models...")
+                logger.info("🔍 Loading pre-trained models")
                 self.model = openwakeword.Model(
-                    vad_threshold=0.0,  # CHANGED: Disabled to prevent conflict
+                    vad_threshold=0.0,
                     enable_speex_noise_suppression=False
                 )
-                
-            # Enhanced model verification
-            logger.info(f"🔍 DEBUGGING: Model object created: {self.model}")
-            logger.info(f"   Model type: {type(self.model)}")
-            logger.info(f"   Model attributes: {[attr for attr in dir(self.model) if not attr.startswith('_')]}")
             
-            # Test model with dummy audio immediately after loading
-            logger.info("🔍 DEBUGGING: Testing model with dummy audio after loading...")
-            test_audio = np.zeros(1280, dtype=np.float32)
-            try:
-                test_predictions = self.model.predict(test_audio)
-                logger.info(f"   Test prediction type: {type(test_predictions)}")
-                logger.info(f"   Test prediction content: {test_predictions}")
-                logger.info(f"   Test prediction keys (if dict): {list(test_predictions.keys())}")
-                
-                # FIX #5: Check prediction keys to see what name the model actually uses
-                if isinstance(test_predictions, dict):
-                    logger.info(f"🔍 CRITICAL: Available prediction keys: {list(test_predictions.keys())}")
-                    for key, value in test_predictions.items():
-                        logger.info(f"   Key '{key}': {value} (type: {type(value)})")
-                
-                # Check prediction_buffer after first prediction
-                if hasattr(self.model, 'prediction_buffer'):
-                    logger.info(f"   ✅ prediction_buffer available after first prediction")
-                    logger.info(f"   prediction_buffer keys: {list(self.model.prediction_buffer.keys())}")
-                    for key, scores in self.model.prediction_buffer.items():
-                        logger.info(f"     Model '{key}': {len(scores)} scores, latest: {scores[-1] if scores else 'N/A'}")
-                else:
-                    logger.warning(f"   ⚠️ prediction_buffer still not available after first prediction")
-                    
-            except Exception as e:
-                logger.error(f"❌ Error testing model after loading: {e}")
+            # Final validation
+            if not self._validate_model_setup():
+                logger.error("❌ Model setup validation failed")
                 return False
                 
             self.is_initialized = True
@@ -195,6 +148,183 @@ class OpenWakeWordEngine(WakeWordEngine):
         except Exception as e:
             logger.error(f"❌ Failed to initialize OpenWakeWord engine: {e}", exc_info=True)
             return False
+    
+    def _validate_model_file(self, model_path: str) -> bool:
+        """Validate the model file integrity and format."""
+        try:
+            logger.info(f"🔍 Validating model file: {model_path}")
+            
+            # Check file exists and is readable
+            if not os.path.exists(model_path):
+                logger.error(f"❌ Model file does not exist: {model_path}")
+                return False
+            
+            # Check file size
+            file_size = os.path.getsize(model_path)
+            logger.info(f"   File size: {file_size:,} bytes ({file_size/1024/1024:.2f} MB)")
+            
+            if file_size < 1000:  # Less than 1KB is definitely wrong
+                logger.error(f"❌ Model file is too small: {file_size} bytes")
+                return False
+            
+            # Check file extension
+            if not model_path.endswith(('.onnx', '.tflite')):
+                logger.error(f"❌ Invalid model file extension: must be .onnx or .tflite")
+                return False
+            
+            # Calculate file hash for integrity check
+            with open(model_path, 'rb') as f:
+                file_hash = hashlib.md5(f.read()).hexdigest()
+            logger.info(f"   File MD5 hash: {file_hash}")
+            
+            # For ONNX files, try to validate structure
+            if model_path.endswith('.onnx'):
+                try:
+                    import onnx
+                    logger.info("   Attempting to validate ONNX model structure...")
+                    model = onnx.load(model_path)
+                    onnx.checker.check_model(model)
+                    logger.info("   ✅ ONNX model structure is valid")
+                    
+                    # Log model info
+                    logger.info(f"   Model producer: {model.producer_name} {model.producer_version}")
+                    logger.info(f"   Model version: {model.model_version}")
+                    logger.info(f"   Graph inputs: {[input.name for input in model.graph.input]}")
+                    logger.info(f"   Graph outputs: {[output.name for output in model.graph.output]}")
+                    
+                except ImportError:
+                    logger.warning("   ⚠️ ONNX library not available, skipping structural validation")
+                except Exception as e:
+                    logger.error(f"   ❌ ONNX validation failed: {e}")
+                    return False
+            
+            logger.info(f"✅ Model file validation passed")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Model file validation error: {e}")
+            return False
+    
+    def _debug_openwakeword_internals(self):
+        """Debug OpenWakeWord internals to understand the issue."""
+        try:
+            logger.info("🔍 Debugging OpenWakeWord internals...")
+            
+            # Check OpenWakeWord version and attributes
+            logger.info(f"   OpenWakeWord module: {openwakeword}")
+            logger.info(f"   Module file: {openwakeword.__file__ if hasattr(openwakeword, '__file__') else 'Unknown'}")
+            logger.info(f"   Version: {openwakeword.__version__ if hasattr(openwakeword, '__version__') else 'Unknown'}")
+            
+            # Check available attributes
+            attrs = [attr for attr in dir(openwakeword) if not attr.startswith('_')]
+            logger.info(f"   Available attributes: {attrs}")
+            
+            # Check Model class
+            if hasattr(openwakeword, 'Model'):
+                model_attrs = [attr for attr in dir(openwakeword.Model) if not attr.startswith('_')]
+                logger.info(f"   Model class attributes: {model_attrs}")
+            
+            # Try to access models
+            if hasattr(openwakeword, 'models'):
+                logger.info(f"   Available models: {list(openwakeword.models.keys())}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error debugging OpenWakeWord: {e}")
+    
+    def _validate_model_functionality(self) -> bool:
+        """Validate that the model actually processes audio differently for different inputs."""
+        try:
+            logger.info("🔍 Validating model functionality with comprehensive tests...")
+            
+            # Test 1: Complete silence
+            silence = np.zeros(1280, dtype=np.float32)
+            silence_pred = self.model.predict(silence)
+            
+            # Test 2: Low frequency sine wave (100 Hz - below speech)
+            t = np.linspace(0, 1280/16000, 1280, endpoint=False)
+            low_sine = np.sin(2 * np.pi * 100 * t).astype(np.float32) * 0.3
+            low_sine_pred = self.model.predict(low_sine)
+            
+            # Test 3: Speech-like frequency (1000 Hz)
+            speech_sine = np.sin(2 * np.pi * 1000 * t).astype(np.float32) * 0.5
+            speech_sine_pred = self.model.predict(speech_sine)
+            
+            # Test 4: High frequency (4000 Hz - sibilant range)
+            high_sine = np.sin(2 * np.pi * 4000 * t).astype(np.float32) * 0.3
+            high_sine_pred = self.model.predict(high_sine)
+            
+            # Test 5: White noise
+            white_noise = np.random.normal(0, 0.1, 1280).astype(np.float32)
+            white_noise_pred = self.model.predict(white_noise)
+            
+            # Test 6: Pink noise (more speech-like)
+            pink_noise = self._generate_pink_noise(1280)
+            pink_noise_pred = self.model.predict(pink_noise)
+            
+            # Test 7: Impulse
+            impulse = np.zeros(1280, dtype=np.float32)
+            impulse[640] = 1.0  # Spike in the middle
+            impulse_pred = self.model.predict(impulse)
+            
+            # Log all predictions
+            logger.info("📊 Model predictions for different inputs:")
+            logger.info(f"   1. Silence:        {silence_pred}")
+            logger.info(f"   2. 100Hz sine:     {low_sine_pred}")
+            logger.info(f"   3. 1kHz sine:      {speech_sine_pred}")
+            logger.info(f"   4. 4kHz sine:      {high_sine_pred}")
+            logger.info(f"   5. White noise:    {white_noise_pred}")
+            logger.info(f"   6. Pink noise:     {pink_noise_pred}")
+            logger.info(f"   7. Impulse:        {impulse_pred}")
+            
+            # Check if predictions vary
+            predictions = [silence_pred, low_sine_pred, speech_sine_pred, 
+                          high_sine_pred, white_noise_pred, pink_noise_pred, impulse_pred]
+            
+            # Extract confidence values
+            confidence_values = []
+            for pred in predictions:
+                if isinstance(pred, dict):
+                    # Get the first value from the dict
+                    conf = list(pred.values())[0] if pred else 0.0
+                else:
+                    conf = float(pred) if pred else 0.0
+                confidence_values.append(conf)
+            
+            # Check variation
+            unique_values = len(set(confidence_values))
+            value_range = max(confidence_values) - min(confidence_values)
+            
+            logger.info(f"📊 Analysis:")
+            logger.info(f"   Unique values: {unique_values}")
+            logger.info(f"   Value range: {value_range:.6f}")
+            logger.info(f"   Min confidence: {min(confidence_values):.6f}")
+            logger.info(f"   Max confidence: {max(confidence_values):.6f}")
+            
+            if unique_values < 3 or value_range < 0.0001:
+                logger.error("❌ Model shows insufficient variation in predictions!")
+                logger.error("   This indicates the model is not processing audio correctly")
+                logger.error("   Possible causes:")
+                logger.error("   - Corrupted model file")
+                logger.error("   - Incompatible OpenWakeWord version")
+                logger.error("   - Model expects different preprocessing")
+                return False
+            
+            logger.info("✅ Model shows appropriate variation in predictions")
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Model functionality validation error: {e}")
+            return False
+    
+    def _generate_pink_noise(self, n_samples: int) -> np.ndarray:
+        """Generate pink noise (1/f noise) which is more speech-like than white noise."""
+        # Simple pink noise generation using accumulation method
+        white = np.random.normal(0, 0.1, n_samples)
+        pink = np.zeros_like(white)
+        pink[0] = white[0]
+        for i in range(1, n_samples):
+            pink[i] = pink[i-1] * 0.9 + white[i] * 0.1
+        return pink.astype(np.float32)
     
     def process_audio(self, audio_chunk: np.ndarray) -> bool:
         """
@@ -210,103 +340,58 @@ class OpenWakeWordEngine(WakeWordEngine):
             return False
             
         try:
-            # ISSUE #2: Audio normalization was missing
-            # OpenWakeWord expects float32 audio normalized to [-1, 1] range
-            # SOLUTION: Properly normalize int16 audio to float32 [-1, 1]
-            
-            # CRITICAL: Check raw audio levels before normalization
+            # Convert and normalize audio
             if audio_chunk.dtype == np.int16:
                 raw_max = np.max(np.abs(audio_chunk))
                 raw_min = np.min(audio_chunk)
                 raw_range = raw_max - raw_min
-                logger.info(f"🔍 CRITICAL: Raw int16 audio - max: {raw_max}, min: {raw_min}, range: {raw_range}")
-                logger.info(f"🔍 CRITICAL: Raw audio uses {raw_max/32768*100:.2f}% of available dynamic range")
                 
-                # Check if audio levels are too low
-                if raw_max < 100:
+                if self.debug_mode and raw_max < 100:
                     logger.warning(f"⚠️ CRITICAL: Audio levels extremely low! Max value {raw_max} < 100")
-                    logger.warning(f"⚠️ CRITICAL: Check microphone gain - should be much higher")
-                elif raw_max < self.low_audio_threshold:
-                    logger.warning(f"⚠️ CRITICAL: Audio levels very low! Max value {raw_max} < {self.low_audio_threshold}")
-                    logger.warning(f"⚠️ CRITICAL: Consider increasing microphone gain")
                 
-                # Convert int16 [-32768, 32767] to float32 [-1.0, 1.0]
+                # Convert int16 to float32
                 audio_chunk = audio_chunk.astype(np.float32) / 32768.0
-                logger.info(f"🔍 CRITICAL: Audio normalized from int16 to float32, shape: {audio_chunk.shape}, range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
                 
-                # FIX #2: Add microphone gain amplification if levels are too low
-                if raw_max < self.low_audio_threshold:  # If audio levels are very low
+                # Apply amplification if needed
+                if raw_max < self.low_audio_threshold:
                     audio_chunk = audio_chunk * self.amplification_factor
-                    logger.info(f"🔧 CRITICAL: Applied {self.amplification_factor}x amplification due to low audio levels")
-                    logger.info(f"🔧 CRITICAL: Amplified audio range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
+                    if self.debug_mode:
+                        logger.debug(f"🔧 Applied {self.amplification_factor}x amplification")
                     
             elif audio_chunk.dtype != np.float32:
-                # If not int16 or float32, convert to float32
                 audio_chunk = audio_chunk.astype(np.float32)
-                logger.info(f"🔍 CRITICAL: Audio converted to float32, shape: {audio_chunk.shape}, range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
-            else:
-                # Already float32, use as-is
-                audio_chunk = audio_chunk
-                logger.info(f"🔍 CRITICAL: Audio already float32, shape: {audio_chunk.shape}, range: [{audio_chunk.min():.6f}, {audio_chunk.max():.6f}]")
             
-            # Get predictions from OpenWakeWord model
+            # Get predictions from model
             predictions = self.model.predict(audio_chunk)
             
-            # FIX #5: Log predictions.keys() to see what name the model actually uses
-            if isinstance(predictions, dict):
-                logger.info(f"🔍 CRITICAL: predictions.keys(): {list(predictions.keys())}")
-                logger.info(f"🔍 CRITICAL: All predictions: {predictions}")
-            else:
-                logger.info(f"🔍 CRITICAL: predictions is not a dict: {type(predictions)}, content: {predictions}")
+            # Process predictions
+            detected = False
+            detection_model = None
+            detection_confidence = 0.0
             
-            # Track prediction history for pattern analysis
+            if isinstance(predictions, dict):
+                for model_name, confidence in predictions.items():
+                    if confidence > self.threshold:
+                        detected = True
+                        detection_model = model_name
+                        detection_confidence = confidence
+                        logger.info(f"🎯 DETECTION! Model: {detection_model}, Confidence: {detection_confidence:.6f}")
+                        break
+            
+            # Track prediction history
             if self.debug_mode:
                 self.detection_history.append({
                     'timestamp': time.time(),
                     'predictions': predictions.copy() if isinstance(predictions, dict) else predictions
                 })
-                # Keep only last 50 predictions
                 if len(self.detection_history) > 50:
                     self.detection_history.pop(0)
-                
-                # Log every 100th prediction to see if we're getting non-zero values
-                if len(self.detection_history) % 100 == 0:
-                    logger.info(f"🔍 CRITICAL: Prediction history summary (last 10):")
-                    for i, entry in enumerate(self.detection_history[-10:]):
-                        logger.info(f"   Entry {i}: {entry['predictions']}")
             
-            # ISSUE #4: Model name might not match what we expect
-            # SOLUTION: Check all predictions, not just our expected name
-            detected = False
-            detection_model = None
-            detection_confidence = 0.0
-            
-            # CRITICAL: Log threshold and all predictions for debugging
-            logger.info(f"🔍 CRITICAL: Current threshold: {self.threshold:.6f}")
-            logger.info(f"🔍 CRITICAL: Checking predictions against threshold:")
-            
-            if isinstance(predictions, dict):
-                for model_name, confidence in predictions.items():
-                    logger.info(f"   Model '{model_name}': {confidence:.6f} {'✓' if confidence > self.threshold else '✗'}")
-                    if confidence > self.threshold:
-                        detected = True
-                        detection_model = model_name
-                        detection_confidence = confidence
-                        logger.info(f"🔍 CRITICAL: DETECTION TRIGGERED! Model: {detection_model}, Confidence: {detection_confidence:.6f}")
-                        break
-            else:
-                logger.warning(f"⚠️ CRITICAL: predictions is not a dictionary, cannot check individual models")
-            
-            # ISSUE #5: Single-chunk detection might be too sensitive or not sensitive enough
-            # SOLUTION: Implement a simple sliding window check for more robust detection
-            if detected:
-                # Check if we've had consistent detections in recent chunks
-                if self._check_detection_consistency(detection_model):
-                    logger.info(f"🎯 WAKE WORD DETECTED by model '{detection_model}'! "
-                               f"Confidence: {detection_confidence:.3f}")
-                    # Clear history after successful detection to prevent multiple triggers
-                    self.detection_history.clear()
-                    return True
+            # Apply consistency check if detected
+            if detected and self._check_detection_consistency(detection_model):
+                logger.info(f"🎯 WAKE WORD DETECTED by '{detection_model}'! Confidence: {detection_confidence:.3f}")
+                self.detection_history.clear()
+                return True
             
             return False
                 
@@ -315,28 +400,37 @@ class OpenWakeWordEngine(WakeWordEngine):
             return False
     
     def _check_detection_consistency(self, model_name: str, window_size: int = 3, min_detections: int = 2) -> bool:
-        """
-        Check if we've had consistent detections in recent chunks to reduce false positives
-        
-        Args:
-            model_name: The model that triggered detection
-            window_size: Number of recent chunks to check
-            min_detections: Minimum detections needed in the window
-        
-        Returns:
-            True if detection is consistent enough
-        """
+        """Check if we've had consistent detections in recent chunks."""
         if len(self.detection_history) < window_size:
-            # Not enough history yet, allow detection
             return True
         
-        # Check last N predictions
         recent_detections = 0
         for entry in self.detection_history[-window_size:]:
-            if entry['predictions'].get(model_name, 0.0) > self.threshold:
-                recent_detections += 1
+            if isinstance(entry['predictions'], dict):
+                if entry['predictions'].get(model_name, 0.0) > self.threshold:
+                    recent_detections += 1
         
         return recent_detections >= min_detections
+    
+    def _validate_model_setup(self):
+        """Validate that the model is properly loaded and working."""
+        try:
+            logger.info(f"🔍 Final model setup validation for '{self.wake_word_name}'")
+            
+            # Quick test with silence
+            silence_audio = np.zeros(1280, dtype=np.float32)
+            predictions = self.model.predict(silence_audio)
+            
+            if isinstance(predictions, dict):
+                logger.info(f"✅ Model setup validated - prediction keys: {list(predictions.keys())}")
+            else:
+                logger.warning(f"⚠️ Unexpected prediction format: {type(predictions)}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Model validation failed: {e}")
+            return False
     
     def get_latest_confidence(self) -> float:
         """Get the latest confidence score for the wake word."""
@@ -344,15 +438,12 @@ class OpenWakeWordEngine(WakeWordEngine):
             return 0.0
             
         try:
-            # Get the latest confidence from the prediction buffer
             if hasattr(self.model, 'prediction_buffer') and self.model.prediction_buffer:
-                # Get the confidence for our specific wake word
                 if self.wake_word_name in self.model.prediction_buffer:
                     scores = self.model.prediction_buffer[self.wake_word_name]
                     if scores:
-                        return scores[-1]  # Return the latest score
+                        return scores[-1]
                 
-                # If our specific wake word isn't found, return the highest confidence
                 max_confidence = 0.0
                 for model_name, scores in self.model.prediction_buffer.items():
                     if scores and scores[-1] > max_confidence:
@@ -378,17 +469,7 @@ class OpenWakeWordEngine(WakeWordEngine):
         return 1280  # OpenWakeWord requires 1280 samples (80ms at 16kHz)
     
     def validate_audio_format(self, sample_rate: int, channels: int, frame_length: int) -> bool:
-        """
-        Validate that the audio format is compatible with OpenWakeWord.
-        
-        Args:
-            sample_rate: Audio sample rate in Hz
-            channels: Number of audio channels
-            frame_length: Number of samples per frame
-            
-        Returns:
-            bool: True if format is compatible, False otherwise
-        """
+        """Validate that the audio format is compatible with OpenWakeWord."""
         if sample_rate != 16000:
             logger.error(f"❌ OpenWakeWord requires 16kHz sample rate, got {sample_rate}Hz")
             return False
@@ -399,12 +480,6 @@ class OpenWakeWordEngine(WakeWordEngine):
         
         if frame_length != 1280:
             logger.warning(f"⚠️ OpenWakeWord expects 1280 samples per frame, got {frame_length}")
-            logger.warning(f"   This may cause detection issues")
-        
-        logger.info(f"✅ OpenWakeWord audio format validation passed:")
-        logger.info(f"   Sample rate: {sample_rate}Hz ✓")
-        logger.info(f"   Channels: {channels} ✓")
-        logger.info(f"   Frame length: {frame_length} samples ✓")
         
         return True
     
@@ -413,26 +488,13 @@ class OpenWakeWordEngine(WakeWordEngine):
         return self.is_initialized and self.model is not None
     
     def update_sensitivity(self, new_sensitivity: float) -> bool:
-        """
-        Update the sensitivity dynamically without reinitializing the model.
-        
-        Args:
-            new_sensitivity: New sensitivity value (0.0-1.0)
-            
-        Returns:
-            bool: True if update successful, False otherwise
-        """
+        """Update the sensitivity dynamically."""
         try:
             if not self.is_initialized:
-                logger.warning("⚠️ Cannot update sensitivity - engine not initialized")
                 return False
             
-            old_sensitivity = self.sensitivity
             self.sensitivity = new_sensitivity
-            
-            logger.info(f"🔧 Model Sensitivity updated: {old_sensitivity:.3f} → {self.sensitivity:.3f}")
-            logger.info(f"   High sensitivity = more sensitive model processing")
-            
+            logger.info(f"🔧 Sensitivity updated to {self.sensitivity:.3f}")
             return True
             
         except Exception as e:
@@ -440,26 +502,13 @@ class OpenWakeWordEngine(WakeWordEngine):
             return False
     
     def update_threshold(self, new_threshold: float) -> bool:
-        """
-        Update the detection threshold dynamically without reinitializing the model.
-        
-        Args:
-            new_threshold: New threshold value (0.0-1.0)
-            
-        Returns:
-            bool: True if update successful, False otherwise
-        """
+        """Update the detection threshold dynamically."""
         try:
             if not self.is_initialized:
-                logger.warning("⚠️ Cannot update threshold - engine not initialized")
                 return False
             
-            old_threshold = self.threshold
             self.threshold = new_threshold
-            
-            logger.info(f"🔧 Detection Threshold updated: {old_threshold:.3f} → {self.threshold:.3f}")
-            logger.info(f"   Low threshold = easier detection (triggers at lower confidence)")
-            
+            logger.info(f"🔧 Threshold updated to {self.threshold:.3f}")
             return True
             
         except Exception as e:
@@ -470,56 +519,3 @@ class OpenWakeWordEngine(WakeWordEngine):
         """Clean up resources."""
         self.model = None
         self.is_initialized = False
-    
-    def _validate_model_setup(self):
-        """Validate that the model is properly loaded and working."""
-        try:
-            logger.info(f"🔍 CRITICAL: Validating model setup for '{self.wake_word_name}'")
-            
-            # FIX #3: Verify model response with different test inputs
-            logger.info(f"🔍 CRITICAL: Running validation test with sine wave, silence, and noise inputs...")
-            
-            # Test 1: Silence
-            silence_audio = np.zeros(1280, dtype=np.float32)
-            silence_predictions = self.model.predict(silence_audio)
-            logger.info(f"   Silence test predictions: {silence_predictions}")
-            
-            # Test 2: Sine wave (simulates speech-like audio)
-            t = np.linspace(0, 1280/16000, 1280, endpoint=False)
-            sine_audio = np.sin(2 * np.pi * 1000 * t).astype(np.float32) * 0.5  # 1kHz sine wave
-            sine_predictions = self.model.predict(sine_audio)
-            logger.info(f"   Sine wave test predictions: {sine_predictions}")
-            
-            # Test 3: Random noise
-            noise_audio = np.random.normal(0, 0.1, 1280).astype(np.float32)
-            noise_predictions = self.model.predict(noise_audio)
-            logger.info(f"   Noise test predictions: {noise_predictions}")
-            
-            # Check if all tests return the same value (indicates model isn't processing correctly)
-            if silence_predictions == sine_predictions == noise_predictions:
-                logger.error(f"❌ CRITICAL: Model returns same predictions for all test inputs!")
-                logger.error(f"   Silence: {silence_predictions}")
-                logger.error(f"   Sine wave: {sine_predictions}")
-                logger.error(f"   Noise: {noise_predictions}")
-                logger.error(f"   This indicates the model isn't processing audio correctly")
-                return False
-            else:
-                logger.info(f"✅ Model responds differently to different inputs - validation passed")
-            
-            # Log prediction types and ranges
-            if isinstance(silence_predictions, dict):
-                logger.info(f"   Available prediction keys: {list(silence_predictions.keys())}")
-                logger.info(f"   Expected key: '{self.wake_word_name}'")
-                logger.info(f"   Has expected key: {self.wake_word_name in silence_predictions}")
-                
-                for key, value in silence_predictions.items():
-                    logger.info(f"   Key '{key}': {value} (type: {type(value)})")
-            else:
-                logger.warning(f"⚠️ CRITICAL: predictions is not a dictionary: {type(silence_predictions)}")
-            
-            logger.info(f"✅ Model validation completed")
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Model validation failed: {e}")
-            raise 
