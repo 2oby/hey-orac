@@ -252,6 +252,8 @@ class WakeWordMonitor_new:
         
         if not self.is_detection_enabled or not self.active_detectors:
             logger.debug(f"🎵 DEBUG: Detection disabled or no active detectors")
+            logger.debug(f"🎵 DEBUG: is_detection_enabled={self.is_detection_enabled}")
+            logger.debug(f"🎵 DEBUG: active_detectors={list(self.active_detectors.keys())}")
             return False
         
         # Check cooldown
