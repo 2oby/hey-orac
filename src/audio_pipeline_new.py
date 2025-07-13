@@ -111,8 +111,13 @@ class AudioPipeline:
     def _should_pass_audio(self, avg_volume: float, current_time: float) -> bool:
         """
         Determine if audio should be passed to wake word pipeline.
+        RMS filter: 0 = pass everything, 5000 = only pass very loud audio
         Uses hysteresis: once above threshold, keep passing until prolonged silence.
         """
+        # If RMS filter is 0, pass everything
+        if self.silence_threshold <= 0:
+            return True
+        
         # If audio is above threshold, always pass
         if avg_volume >= self.silence_threshold:
             self.is_audio_active = True
@@ -155,7 +160,8 @@ class AudioPipeline:
                 logger.info(f"🔍 Audio Pipeline State:")
                 logger.info(f"   RMS: {rms_level:.4f}")
                 logger.info(f"   Avg Volume: {avg_volume:.4f}")
-                logger.info(f"   Threshold: {self.silence_threshold}")
+                logger.info(f"   RMS Filter Threshold: {self.silence_threshold}")
+                logger.info(f"   Above Threshold: {avg_volume >= self.silence_threshold}")
                 logger.info(f"   Passing Audio: {is_passing_audio}")
                 logger.info(f"   Audio Active: {self.is_audio_active}")
                 logger.info(f"   Listening State: {is_passing_audio} (Shared Memory)")
@@ -240,8 +246,11 @@ class AudioPipeline:
             if new_threshold != self.silence_threshold:
                 old_threshold = self.silence_threshold
                 self.silence_threshold = new_threshold
-                logger.info(f"🔄 Audio threshold updated: {old_threshold} → {new_threshold}")
-                logger.info(f"   New threshold will be used for next audio processing")
+                logger.info(f"🔄 RMS Filter threshold updated: {old_threshold} → {new_threshold}")
+                if new_threshold <= 0:
+                    logger.info(f"   Filter disabled - passing all audio")
+                else:
+                    logger.info(f"   Only audio above {new_threshold} RMS will be processed")
         except Exception as e:
             logger.error(f"❌ Error updating audio threshold: {e}")
     
