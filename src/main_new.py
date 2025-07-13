@@ -16,10 +16,13 @@ from audio_pipeline_new import create_audio_pipeline
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,  # Set to DEBUG to see debug messages
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# Add debug log to verify logging is working
+logger.debug("🔧 Main new application initialized with DEBUG logging enabled")
 
 
 class HeyOracApp:
