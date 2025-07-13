@@ -35,7 +35,7 @@ network:
 
 # Logging
 logging:
-  level: INFO                     # Log level (DEBUG, INFO, WARNING, ERROR) - temporarily INFO to debug
+  level: DEBUG                     # Log level (DEBUG, INFO, WARNING, ERROR) - set to DEBUG for troubleshooting
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
   file: /app/logs/hey-orac.log
 
