@@ -5,13 +5,16 @@ audio:
   channels: 1                     # Mono audio
   chunk_size: 512                 # Audio chunk size for processing
 
-# Wake-word settings
+# Wake word detection settings
 wake_word:
-  engine: "openwakeword"         # Engine to use: "porcupine", "openwakeword", "snowboy", "pocketsphinx", "test"
+  engine: "openwakeword"      # Engine to use: "openwakeword", "porcupine", "snowboy", "pocketsphinx"
+  cooldown: 1.5               # Cooldown period between detections (seconds)
+  debounce: 0.2               # Debounce period to prevent multiple detections (seconds)
+  # keyword: "hey_jarvis"     # Wake-word to detect (using pre-trained OpenWakeWord models)
+  # Removed keyword since we're using custom models
   model_path: /app/models/porcupine/orac.ppn
   sensitivity: 0.8              # Model sensitivity (0.0-1.0) - internal model parameter
   threshold: 0.01               # Detection threshold (0.0-1.0) - confidence level to trigger detection (lowered from 0.3)
-  keyword: "hey_jarvis"          # Wake-word to detect (using pre-trained OpenWakeWord models)
   access_key: ""                 # Picovoice access key (get from console.picovoice.ai)
   
   # OpenWakeWord settings (only used when engine="openwakeword")

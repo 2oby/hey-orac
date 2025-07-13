@@ -21,13 +21,16 @@ class AudioPipeline:
     Delegates wake word detection to external callback function.
     """
     
-    def __init__(self, audio_manager, usb_device, sample_rate: int, frame_length: int, channels: int = 1):
+    def __init__(self, audio_manager, usb_device, sample_rate: int, frame_length: int, channels: int = 1, wake_word_monitor=None):
         """Initialize the audio pipeline."""
         self.audio_manager = audio_manager
         self.usb_device = usb_device
         self.sample_rate = sample_rate
         self.frame_length = frame_length
         self.channels = channels
+        
+        # Wake word monitor for engine-specific validation
+        self.wake_word_monitor = wake_word_monitor
         
         # Get settings manager for configuration
         self.settings_manager = get_settings_manager()
@@ -67,11 +70,29 @@ class AudioPipeline:
         logger.info(f"   Sample rate: {sample_rate}")
         logger.info(f"   Frame length: {frame_length}")
         logger.info(f"   Channels: {channels}")
+        if self.wake_word_monitor:
+            logger.info(f"   Wake word monitor: Connected for engine validation")
     
     def set_wake_word_callback(self, callback: Callable):
         """Set the callback function for wake word detection."""
         self.wake_word_callback = callback
         logger.info("✅ Wake word callback set")
+    
+    def _validate_audio_format_with_engine(self) -> bool:
+        """
+        Validate audio format with wake word engine requirements.
+        This method calls the wake word monitor to validate against all active engines.
+        
+        Returns:
+            bool: True if audio format is compatible with wake word engine
+        """
+        if not self.wake_word_monitor:
+            logger.warning("⚠️ No wake word monitor provided for audio format validation")
+            return True
+        
+        return self.wake_word_monitor.validate_audio_format_for_engines(
+            self.sample_rate, self.channels, self.frame_length
+        )
     
     def start_stream(self) -> bool:
         """Start the audio stream."""
@@ -175,13 +196,33 @@ class AudioPipeline:
         """Run the audio processing pipeline."""
         logger.info("🎯 Starting audio pipeline monitoring...")
         
+        # Validate basic audio configuration (engine-agnostic)
+        if self.sample_rate <= 0:
+            logger.error(f"❌ Invalid sample rate: {self.sample_rate}Hz")
+            return 1
+        if self.channels <= 0:
+            logger.error(f"❌ Invalid channel count: {self.channels}")
+            return 1
+        
+        # Validate audio format with wake word engine requirements
+        if self.wake_word_callback and hasattr(self, '_validate_audio_format_with_engine'):
+            if not self._validate_audio_format_with_engine():
+                logger.error("❌ Audio format validation failed with wake word engine")
+                return 1
+        
+        logger.info(f"🔧 Audio Pipeline Configuration:")
+        logger.info(f"   Sample rate: {self.sample_rate}Hz")
+        logger.info(f"   Channels: {self.channels}")
+        logger.info(f"   Frame length: {self.frame_length} samples")
+        logger.info(f"   Chunk duration: {self.frame_length / self.sample_rate * 1000:.1f}ms")
+        
         if not self.start_stream():
             return 1
         
         try:
             while True:
                 try:
-                    # Read audio chunk
+                    # Read audio chunk from microphone
                     audio_chunk = self.stream.read(self.frame_length, exception_on_overflow=False)
                     self.chunk_count += 1
                     
@@ -209,6 +250,10 @@ class AudioPipeline:
                             self.wake_word_callback(audio_data, self.chunk_count, rms_level, avg_volume)
                         except Exception as e:
                             logger.error(f"❌ Error in wake word callback: {e}")
+                    elif self.chunk_count % 100 == 0:
+                        # Log periodic status in debug mode
+                        logger.debug(f"Audio level below threshold. RMS: {rms_level:.4f}, "
+                                    f"Threshold: {self.silence_threshold:.4f}")
                     
                     # Progress logging
                     if self.chunk_count % 1000 == 0:
@@ -276,6 +321,6 @@ class AudioPipeline:
             logger.error(f"❌ Error during cleanup: {e}")
 
 
-def create_audio_pipeline(audio_manager, usb_device, sample_rate: int, frame_length: int, channels: int = 1) -> AudioPipeline:
+def create_audio_pipeline(audio_manager, usb_device, sample_rate: int, frame_length: int, channels: int = 1, wake_word_monitor=None) -> AudioPipeline:
     """Factory function to create an audio pipeline instance."""
-    return AudioPipeline(audio_manager, usb_device, sample_rate, frame_length, channels) 
+    return AudioPipeline(audio_manager, usb_device, sample_rate, frame_length, channels, wake_word_monitor) 

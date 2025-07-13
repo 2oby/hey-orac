@@ -58,8 +58,8 @@ class WakeWordMonitor_new:
             'cooldown': self.settings_manager.get('wake_word.cooldown', 1.5),
             'engine': self.settings_manager.get('wake_word.engine', 'openwakeword'),
             'model_path': self.settings_manager.get('wake_word.model_path', ''),
-            'custom_model_path': self.settings_manager.get('wake_word.custom_model_path', ''),
-            'keyword': self.settings_manager.get('wake_word.keyword', 'hey_jarvis')
+            'custom_model_path': self.settings_manager.get('wake_word.custom_model_path', '')
+            # Removed keyword since it's not needed for custom models
         }
         
         logger.info(f"🔧 Global Configuration:")
@@ -145,8 +145,8 @@ class WakeWordMonitor_new:
                 'engine': self.global_settings['engine'],
                 'sensitivity': model_config['sensitivity'],
                 'threshold': model_config['threshold'],
-                'keyword': self.global_settings['keyword'],
                 'cooldown': self.global_settings['cooldown']
+                # Removed keyword since it's not needed for custom models
             }
         }
         
@@ -289,9 +289,15 @@ class WakeWordMonitor_new:
         self.detection_count += 1
         self.last_detection_time = time.time()
         
+        # Get actual confidence from detector if available
+        confidence = 0.0
+        if hasattr(detector.engine, 'get_latest_confidence'):
+            confidence = detector.engine.get_latest_confidence()
+        
         # Log detection details
         logger.info(f"🎯 DETECTION #{self.detection_count} - Model: {model_name}")
         logger.info(f"   Wake word: {detector.get_wake_word_name()}")
+        logger.info(f"   Confidence: {confidence:.6f}")
         logger.info(f"   Audio RMS: {np.sqrt(np.mean(audio_data.astype(np.float32)**2)):.4f}")
         
         # Create detection event for web interface
@@ -299,7 +305,7 @@ class WakeWordMonitor_new:
             detection_event = {
                 'model_name': model_name,
                 'wake_word': detector.get_wake_word_name(),
-                'confidence': 0.0,  # TODO: Get actual confidence from detector
+                'confidence': confidence,  # FIXED: Get actual confidence from detector
                 'timestamp': int(time.time() * 1000),  # Convert to milliseconds
                 'detection_count': self.detection_count,
                 'audio_rms': float(np.sqrt(np.mean(audio_data.astype(np.float32)**2)))
@@ -380,6 +386,40 @@ class WakeWordMonitor_new:
     def get_active_detectors(self) -> Dict[str, WakeWordDetector]:
         """Get the currently active detectors."""
         return self.active_detectors.copy()
+    
+    def validate_audio_format_for_engines(self, sample_rate: int, channels: int, frame_length: int) -> bool:
+        """
+        Validate audio format compatibility with all active wake word engines.
+        This method is called by the audio pipeline to ensure compatibility.
+        
+        Args:
+            sample_rate: Audio sample rate in Hz
+            channels: Number of audio channels
+            frame_length: Number of samples per frame
+            
+        Returns:
+            bool: True if all active engines are compatible with the audio format
+        """
+        if not self.active_detectors:
+            logger.warning("⚠️ No active detectors to validate audio format against")
+            return True
+        
+        logger.info(f"🔧 Validating audio format with {len(self.active_detectors)} active engines:")
+        logger.info(f"   Sample rate: {sample_rate}Hz")
+        logger.info(f"   Channels: {channels}")
+        logger.info(f"   Frame length: {frame_length} samples")
+        
+        for model_name, detector in self.active_detectors.items():
+            if hasattr(detector.engine, 'validate_audio_format'):
+                if not detector.engine.validate_audio_format(sample_rate, channels, frame_length):
+                    logger.error(f"❌ Audio format validation failed for engine: {model_name}")
+                    return False
+                logger.info(f"   ✅ {model_name}: Audio format compatible")
+            else:
+                logger.warning(f"   ⚠️ {model_name}: No audio format validation available")
+        
+        logger.info("✅ All active engines are compatible with the audio format")
+        return True
     
     def print_configuration_summary(self):
         """Print a summary of the current configuration."""
