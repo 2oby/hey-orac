@@ -1129,44 +1129,38 @@
 
         // Model selection is now handled by the custom model API
 
-        // Logarithmic conversion functions for RMS filter
+        // Precompute constants
+        const minRms = 0;
+        const maxRms = 5000;
+        const midRms = 50;
+
+        // t = midRms/maxRms
+        const t = midRms / maxRms;          // 0.01
+        // Solve for u = sqrt(base) from (sqrt(base)-1)/(base-1) = t
+        // which gives u = (1 + |2t-1|)/(2t)
+        const u = (1 + Math.abs(2 * t - 1)) / (2 * t);  
+        const base = u * u;                 // ~9801
+
         function sliderToRms(sliderValue) {
-            // Convert linear slider value (0-100) to logarithmic RMS value (0-5000)
-            // Middle of slider (50) should be 50 RMS
-            const minRms = 0;
-            const maxRms = 5000;
-            const midRms = 50;
-            
-            // Use logarithmic scale: y = a * b^x
-            // At x=0 (slider=0): y=0
-            // At x=50 (slider=50): y=50
-            // At x=100 (slider=100): y=5000
-            
-            if (sliderValue <= 0) return 0;
-            if (sliderValue >= 100) return maxRms;
-            
-            // Calculate base for logarithmic scale
-            const base = Math.pow(maxRms / midRms, 1/50);
-            
-            // Apply logarithmic conversion
-            return Math.round(minRms + (midRms - minRms) * Math.pow(base, sliderValue / 50));
+          if (sliderValue <= 0)   return minRms;
+          if (sliderValue >= 100) return maxRms;
+
+          // ratio ∈ [0,1]
+          const ratio = sliderValue / 100;
+          // normalize exponential curve, then scale to [minRms, maxRms]
+          const y = (Math.pow(base, ratio) - 1) / (base - 1) * (maxRms - minRms) + minRms;
+          return Math.round(y);
         }
-        
+
         function rmsToSlider(rmsValue) {
-            // Convert RMS value (0-5000) to linear slider value (0-100)
-            const minRms = 0;
-            const maxRms = 5000;
-            const midRms = 50;
-            
-            if (rmsValue <= 0) return 0;
-            if (rmsValue >= maxRms) return 100;
-            
-            // Calculate base for logarithmic scale
-            const base = Math.pow(maxRms / midRms, 1/50);
-            
-            // Reverse logarithmic conversion
-            const normalizedRms = (rmsValue - minRms) / (midRms - minRms);
-            return Math.round(50 * Math.log(normalizedRms) / Math.log(base));
+          if (rmsValue <= minRms) return 0;
+          if (rmsValue >= maxRms) return 100;
+
+          // normalized linear [0,1]
+          const norm = (rmsValue - minRms) / (maxRms - minRms);
+          // invert the curve
+          const ratio = Math.log(norm * (base - 1) + 1) / Math.log(base);
+          return Math.round(ratio * 100);
         }
         
         // Setup global sliders
