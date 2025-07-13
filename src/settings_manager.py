@@ -193,19 +193,20 @@ class SettingsManager:
                     
                     if current_modified > last_modified:
                         # File was modified, reload settings
+                        logger.info(f"🔄 Settings file changed, reloading...")
                         self._load_settings()
                         last_modified = current_modified
                         
                         # Notify watchers
                         self._notify_watchers()
                         
-                        logger.debug(f"🔄 Settings reloaded from file: {self.settings_file}")
+                        logger.info(f"✅ Settings reloaded from file: {self.settings_file}")
                 
-                time.sleep(0.1)  # Check every 100ms
+                time.sleep(1.0)  # Check every 1 second instead of 100ms
                 
             except Exception as e:
                 logger.error(f"❌ File watcher error: {e}")
-                time.sleep(1)  # Wait longer on error
+                time.sleep(5)  # Wait longer on error
     
     def _notify_watchers(self) -> None:
         """Notify all registered watchers of settings changes."""
@@ -320,6 +321,27 @@ class SettingsManager:
             self._file_watcher_thread.join(timeout=1)
         logger.info("✅ Settings manager stopped")
 
+    def _discover_models_quietly(self) -> List[str]:
+        """Discover available wake word models without verbose logging."""
+        # Define the custom models directory
+        custom_models_dir = Path("third_party/openwakeword/custom_models")
+        
+        if not custom_models_dir.exists():
+            return []
+        
+        # Look for .onnx and .tflite files
+        model_files = []
+        model_files.extend(glob.glob(str(custom_models_dir / "*.onnx")))
+        model_files.extend(glob.glob(str(custom_models_dir / "*.tflite")))
+        
+        # Extract model names (remove extension and path)
+        discovered_models = set()
+        for model_file in model_files:
+            model_name = Path(model_file).stem  # Remove extension
+            discovered_models.add(model_name)
+        
+        return sorted(list(discovered_models))
+
     def discover_available_models(self) -> List[str]:
         """Discover available wake word models in the custom models directory."""
         logger.info("🔍 Discovering available wake word models...")
@@ -368,12 +390,10 @@ class SettingsManager:
 
     def update_models_from_filesystem(self) -> bool:
         """Update model settings based on filesystem discovery."""
-        logger.info("🔄 Updating models from filesystem...")
-        
         try:
             with self._lock:
-                # Discover available models
-                available_models = self.discover_available_models()
+                # Discover available models (without verbose logging)
+                available_models = self._discover_models_quietly()
                 
                 # Ensure wake_word section exists
                 if "wake_word" not in self._settings:
@@ -383,18 +403,10 @@ class SettingsManager:
                 if "models" not in self._settings["wake_word"]:
                     self._settings["wake_word"]["models"] = {}
                 
-                # Update sensitivities for new models
-                for model_name in available_models:
-                    if model_name not in self._settings["wake_word"]["models"]:
-                        self._settings["wake_word"]["models"][model_name] = {
-                            "sensitivity": 0.8,
-                            "threshold": 0.3,
-                            "api_url": "https://api.example.com/webhook",
-                            "active": False
-                        }
-                        logger.info(f"➕ Added model '{model_name}' with default settings")
+                # Track if we added any new models
+                new_models_added = []
                 
-                # Update thresholds for new models
+                # Add new models with default settings
                 for model_name in available_models:
                     if model_name not in self._settings["wake_word"]["models"]:
                         self._settings["wake_word"]["models"][model_name] = {
@@ -403,24 +415,14 @@ class SettingsManager:
                             "api_url": "https://api.example.com/webhook",
                             "active": False
                         }
-                        logger.info(f"➕ Added model '{model_name}' with default settings")
+                        new_models_added.append(model_name)
                 
-                # Update API URLs for new models
-                for model_name in available_models:
-                    if model_name not in self._settings["wake_word"]["models"]:
-                        self._settings["wake_word"]["models"][model_name] = {
-                            "sensitivity": 0.8,
-                            "threshold": 0.3,
-                            "api_url": "https://api.example.com/webhook",
-                            "active": False
-                        }
-                        logger.info(f"➕ Added model '{model_name}' with default settings")
+                # Only log if we actually added new models
+                if new_models_added:
+                    logger.info(f"➕ Added {len(new_models_added)} new models: {new_models_added}")
                 
                 # Save updated settings
                 success = self._save_settings()
-                
-                if success:
-                    logger.info(f"✅ Updated settings with {len(available_models)} models from filesystem")
                 
                 return success
                 
