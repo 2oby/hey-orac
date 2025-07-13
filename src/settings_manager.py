@@ -138,6 +138,7 @@ class SettingsManager:
                 fcntl.flock(f.fileno(), fcntl.LOCK_EX)
                 json.dump(self._settings, f, indent=2)
                 fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            logger.debug(f"💾 Settings saved to {self.settings_file}")
             return True
         except Exception as e:
             logger.error(f"❌ Failed to save settings: {e}")
@@ -530,25 +531,13 @@ class SettingsManager:
                     self._settings["wake_word"] = {}
                 if "models" not in self._settings["wake_word"]:
                     self._settings["wake_word"]["models"] = {}
-                
-                # Deactivate all models first
-                for existing_model in self._settings["wake_word"]["models"]:
-                    self._settings["wake_word"]["models"][existing_model]["active"] = False
-                
-                # Activate the specified model
                 if model_name not in self._settings["wake_word"]["models"]:
-                    self._settings["wake_word"]["models"][model_name] = {
-                        "sensitivity": 0.8,
-                        "threshold": 0.3,
-                        "api_url": "https://api.example.com/webhook",
-                        "active": True
-                    }
-                else:
-                    self._settings["wake_word"]["models"][model_name]["active"] = True
-                
+                    self._settings["wake_word"]["models"][model_name] = {}
+                self._settings["wake_word"]["models"][model_name]["active"] = value
+                logger.debug(f"🔄 Model '{model_name}' active state set to {value}")
                 return self._save_settings()
         except Exception as e:
-            logger.error(f"❌ Failed to set active model {model_name}: {e}")
+            logger.error(f"❌ Failed to set model active state for {model_name}: {e}")
             return False
 
     def get_active_models(self) -> List[str]:
@@ -584,7 +573,7 @@ class SettingsManager:
                     }
                 else:
                     self._settings["wake_word"]["models"][model_name]["active"] = True
-                
+                logger.debug(f"🔄 Active model changed to '{model_name}' (all others deactivated)")
                 return self._save_settings()
         except Exception as e:
             logger.error(f"❌ Failed to set active model {model_name}: {e}")

@@ -195,9 +195,11 @@ def set_model_config(model_name):
         if "active" in settings:
             if settings["active"]:
                 # Set this model as the active model (deactivates others)
+                logger.debug(f"🌐 API: Changing active model to '{model_name}' via /api/config/models/{model_name}")
                 success &= settings_manager.set_active_model(model_name)
             else:
                 # Deactivate this specific model
+                logger.debug(f"🌐 API: Deactivating model '{model_name}' via /api/config/models/{model_name}")
                 success &= settings_manager.set_model_active(model_name, False)
         
         if success:
@@ -264,6 +266,7 @@ def set_custom_model(model_name):
         return jsonify({'error': f'Model {model_name} not found'}), 404
     
     # Set this model as the active model (deactivates others)
+    logger.debug(f"🌐 API: Changing active model to '{model_name}' via /api/custom-models/{model_name}")
     if settings_manager.set_active_model(model_name):
         return jsonify({
             'status': 'success',
