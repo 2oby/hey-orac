@@ -34,8 +34,8 @@ class AudioPipeline:
         self.settings_manager = get_settings_manager()
         
         # Audio processing parameters
-        self.silence_threshold = self.settings_manager.get("volume_monitoring.silence_threshold", 0.5)
-        self.volume_window_size = self.settings_manager.get("volume_monitoring.volume_window_size", 10)
+        self.silence_threshold = self.settings_manager.get("detection.rms_filter", 50)  # Use GUI setting
+        self.volume_window_size = self.settings_manager.get("volume_monitoring.window_size", 10)
         self.silence_duration_threshold = self.settings_manager.get("volume_monitoring.silence_duration_threshold", 2.0)  # seconds
         
         # Audio state tracking
@@ -56,6 +56,9 @@ class AudioPipeline:
         
         # Stream reference
         self.stream = None
+        
+        # Add settings watcher to update threshold dynamically
+        self.settings_manager.add_watcher(self._on_settings_changed)
         
         logger.info(f"🔧 Audio Pipeline Configuration:")
         logger.info(f"   Silence threshold: {self.silence_threshold}")
@@ -227,10 +230,24 @@ class AudioPipeline:
         
         return 0
     
+    def _on_settings_changed(self, new_settings: Dict[str, Any]):
+        """Handle settings changes from GUI."""
+        try:
+            new_threshold = new_settings.get("detection", {}).get("rms_filter", 50)
+            if new_threshold != self.silence_threshold:
+                old_threshold = self.silence_threshold
+                self.silence_threshold = new_threshold
+                logger.info(f"🔄 Audio threshold updated: {old_threshold} → {new_threshold}")
+        except Exception as e:
+            logger.error(f"❌ Error updating audio threshold: {e}")
+    
     def _cleanup(self):
         """Clean up audio pipeline resources."""
         logger.info("🧹 Starting audio pipeline cleanup...")
         try:
+            # Remove settings watcher
+            self.settings_manager.remove_watcher(self._on_settings_changed)
+            
             if self.stream:
                 logger.info("🛑 Stopping audio stream...")
                 self.stream.stop_stream()
