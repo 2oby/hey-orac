@@ -1,5 +1,65 @@
 # CRITICAL PATH - Hey Orac Voice Control System
 
+## 🚀 **NEW PRIORITY: Wake Word Detection Implementation in `wake_word_monitor_new.py`**
+**Priority**: 🔥 **CRITICAL** - Implement actual wake word detection logic in the new monitor
+**Status**: 🔴 **BLOCKING** - Current `wake_word_monitor_new.py` only handles configuration, no actual detection
+
+### **Implementation Plan**
+
+#### **Phase 1: Model Loading Infrastructure**
+1. **Extend `wake_word_monitor_new.py` with model loading capabilities**
+   - Add model loading methods to `WakeWordMonitor_new`
+   - Implement model switching logic
+   - Add settings watcher to handle GUI model changes
+   - Load active models on initialization
+   - Handle model reloading when settings change
+   - Implement proper cleanup of old models
+
+2. **Create model instance management**
+   - Start with single model loading (target: multiple active models)
+   - Use existing `WakeWordDetector` interface
+   - Engine selection defined in config (default: openwakeword)
+   - Handle audio format conversion (np.ndarray int16 → engine format)
+
+#### **Phase 2: Audio Processing Integration**
+3. **Implement detection logic in the callback**
+   - Convert audio format for engine compatibility
+   - Run detection on all active models
+   - Handle detection results and thresholds
+   - Implement cooldown logic
+   - Add detection logging and metrics
+   - Update shared memory with detection state
+
+#### **Phase 3: Real-time Model Management**
+4. **Add settings change handling**
+   - Watch for model activation/deactivation changes
+   - Implement hot-swapping of models
+   - Handle model configuration updates
+   - Pause detection and reload models when user changes active model
+
+#### **Phase 4: Integration and Testing**
+5. **Update main application**
+   - Modify the wake word callback to use the new detection logic
+   - Test end-to-end detection flow
+   - Add detection metrics and logging
+   - Implement model performance monitoring
+   - Add debugging endpoints
+
+### **Key Design Decisions**
+- **Model Loading**: Start with single model, target multiple active models
+- **Engine Selection**: Use existing `WakeWordDetector` interface, engine defined in config
+- **Audio Format**: Convert np.ndarray (int16) to engine format in monitor
+- **Real-time Updates**: Immediately reload models when user changes active model in GUI
+- **Settings Integration**: Use existing `settings_manager.py` for all configuration
+
+### **Reference Implementation**
+- **Working Example**: `src/monitor_custom_model.py` shows working detection logic
+- **Audio Format**: `np.ndarray` (int16) passed to `wake_detector.process_audio(audio_data)`
+- **Settings Management**: `settings_manager.py` already handles model configurations
+- **Base Class**: `src/base_monitor.py` provides common detection functionality
+
+---
+
 ## ⚠️ **TODO: Remove Random Signal Generator from Web GUI**
 **Priority**: 🔥 **HIGH** - The web GUI currently uses a random signal generator for demo purposes
 **Issue**: Web interface shows fake RMS values instead of real audio data

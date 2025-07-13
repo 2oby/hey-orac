@@ -114,22 +114,17 @@ class HeyOracApp:
         def wake_word_callback(audio_data, chunk_count, rms_level, avg_volume):
             """Wake word detection callback using the new monitor."""
             try:
-                # Get active models from the new monitor
-                active_models = self.wake_word_monitor.get_active_models()
+                # Process audio through the new monitor's detection system
+                detection_result = self.wake_word_monitor.process_audio(audio_data)
                 
-                if not active_models:
-                    logger.debug("🔇 No active models, skipping wake word detection")
-                    return
-                
-                # For now, just log that we would process wake word detection
-                # TODO: Implement actual wake word detection with the active models
-                logger.debug(f"🎯 Wake word callback called - RMS: {rms_level:.4f}, Active models: {active_models}")
-                
-                # Here we would:
-                # 1. Get the active model configuration
-                # 2. Run the model on the audio data
-                # 3. Check against threshold and sensitivity
-                # 4. Trigger activation if detected
+                if detection_result:
+                    logger.info(f"🎯 Wake word detected! Chunk: {chunk_count}, RMS: {rms_level:.4f}")
+                    logger.info(f"   Total detections: {self.wake_word_monitor.get_detection_count()}")
+                else:
+                    # Log progress periodically (every 1000 chunks to reduce spam)
+                    if chunk_count % 1000 == 0:
+                        logger.debug(f"🔍 Processing audio - Chunk: {chunk_count}, RMS: {rms_level:.4f}")
+                        logger.debug(f"   Active detectors: {list(self.wake_word_monitor.get_active_detectors().keys())}")
                 
             except Exception as e:
                 logger.error(f"❌ Error in wake word callback: {e}")
