@@ -33,7 +33,7 @@ class AudioPipeline:
         self.settings_manager = get_settings_manager()
         
         # Audio processing parameters
-        self.silence_threshold = self.settings_manager.get("volume_monitoring.rms_filter")  # Use GUI setting
+        self.silence_threshold = self.settings_manager.get("volume_monitoring", {}).get("rms_filter", 10)  # Use GUI setting
         self.volume_window_size = self.settings_manager.get("volume_monitoring.window_size")
         self.silence_duration_threshold = self.settings_manager.get("volume_monitoring.silence_duration_threshold")  # seconds
         

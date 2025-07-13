@@ -899,11 +899,13 @@
                 
                 // Set global sliders from config
                 if (config.global) {
-                                                    // Load RMS filter from the correct setting
-                const rmsFilterValue = config.global["rms_filter"] || 10;
-                const sliderValue = rmsToSlider(rmsFilterValue);
-                document.getElementById('rmsFilter').value = sliderValue;
-                document.getElementById('rmsFilterValue').textContent = rmsFilterValue.toFixed(0);
+                    // Load RMS filter from the correct setting
+                    const rmsFilterValue = config.global["rms_filter"] || 10;
+                    const sliderValue = rmsToSlider(rmsFilterValue);
+                    document.getElementById('rmsFilter').value = sliderValue;
+                    document.getElementById('rmsFilterValue').textContent = rmsFilterValue.toFixed(0);
+                    
+                    // Load debounce and cooldown settings
                     document.getElementById('debounce').value = config.global.debounce_ms;
                     document.getElementById('debounceValue').textContent = config.global.debounce_ms + 'ms';
                     document.getElementById('cooldown').value = config.global.cooldown_s;
@@ -930,9 +932,13 @@
             const sliderValue = parseFloat(document.getElementById('rmsFilter').value);
             const rmsValue = sliderToRms(sliderValue);
             const settings = {
-                "volume_monitoring.rms_filter": rmsValue,
-                debounce_ms: parseInt(document.getElementById('debounce').value),
-                cooldown_s: parseFloat(document.getElementById('cooldown').value)
+                volume_monitoring: {
+                    rms_filter: rmsValue
+                },
+                wake_word: {
+                    debounce: parseInt(document.getElementById('debounce').value) / 1000, // Convert ms to seconds
+                    cooldown: parseFloat(document.getElementById('cooldown').value)
+                }
             };
             
             try {

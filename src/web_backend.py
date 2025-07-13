@@ -104,7 +104,7 @@ def get_config():
     
     # Get global settings
     global_settings = {
-        "rms_filter": settings_manager.get("volume_monitoring.rms_filter"),
+        "rms_filter": settings_manager.get("volume_monitoring", {}).get("rms_filter", 10),
         "debounce_ms": int(settings_manager.get("wake_word.debounce") * 1000),
         "cooldown_s": settings_manager.get("wake_word.cooldown")
     }
@@ -124,7 +124,24 @@ def set_global_config():
     """Update global settings"""
     try:
         settings = request.json
-        if settings_manager.update(settings):
+        
+        # Convert flat keys to nested structure for proper settings management
+        converted_settings = {}
+        for key, value in settings.items():
+            if '.' in key:
+                # Convert flat key like "volume_monitoring.rms_filter" to nested structure
+                keys = key.split('.')
+                current = converted_settings
+                for k in keys[:-1]:
+                    if k not in current:
+                        current[k] = {}
+                    current = current[k]
+                current[keys[-1]] = value
+            else:
+                # Keep non-flat keys as-is
+                converted_settings[key] = value
+        
+        if settings_manager.update(converted_settings):
             return jsonify({"status": "success", "message": "Settings updated"})
         else:
             return jsonify({"status": "error", "message": "Failed to update settings"}), 500
