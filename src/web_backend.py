@@ -9,6 +9,10 @@ from settings_manager import get_settings_manager
 from shared_memory_ipc import shared_memory_ipc
 import glob
 import time
+import logging
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 # Configure Flask logging to reduce verbosity for frequent polling endpoints only
 import logging

@@ -881,10 +881,10 @@
                 
                 // Set global sliders from config
                 if (config.global) {
-                    document.getElementById('rmsFilter').value = config.global.rms_filter;
-                    // Show RMS filter value (now 0-10 range)
-                    const rmsValue = config.global.rms_filter;
-                    document.getElementById('rmsFilterValue').textContent = rmsValue.toFixed(1);
+                    // Load RMS filter from the correct setting
+                    const rmsFilterValue = config.global["detection.rms_filter"] || 6.5;
+                    document.getElementById('rmsFilter').value = rmsFilterValue;
+                    document.getElementById('rmsFilterValue').textContent = rmsFilterValue.toFixed(1);
                     document.getElementById('debounce').value = config.global.debounce_ms;
                     document.getElementById('debounceValue').textContent = config.global.debounce_ms + 'ms';
                     document.getElementById('cooldown').value = config.global.cooldown_s;
@@ -909,7 +909,7 @@
 
         async function saveGlobalSettings() {
             const settings = {
-                rms_filter: parseFloat(document.getElementById('rmsFilter').value),
+                "detection.rms_filter": parseFloat(document.getElementById('rmsFilter').value),
                 debounce_ms: parseInt(document.getElementById('debounce').value),
                 cooldown_s: parseFloat(document.getElementById('cooldown').value)
             };
