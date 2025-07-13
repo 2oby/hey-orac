@@ -760,7 +760,7 @@
             <div class="sliders-container">
                 <div class="slider-group">
                     <label class="slider-label">RMS Filter</label>
-                    <input type="range" class="slider" id="rmsFilter" min="0" max="20" step="0.5" value="10">
+                    <input type="range" class="slider" id="rmsFilter" min="0" max="100" step="1" value="50">
                     <span class="slider-value" id="rmsFilterValue">10.0</span>
                 </div>
                 
@@ -881,10 +881,11 @@
                 
                 // Set global sliders from config
                 if (config.global) {
-                                    // Load RMS filter from the correct setting
+                                                    // Load RMS filter from the correct setting
                 const rmsFilterValue = config.global["rms_filter"] || 10;
-                    document.getElementById('rmsFilter').value = rmsFilterValue;
-                    document.getElementById('rmsFilterValue').textContent = rmsFilterValue.toFixed(1);
+                const sliderValue = rmsToSlider(rmsFilterValue);
+                document.getElementById('rmsFilter').value = sliderValue;
+                document.getElementById('rmsFilterValue').textContent = rmsFilterValue.toFixed(0);
                     document.getElementById('debounce').value = config.global.debounce_ms;
                     document.getElementById('debounceValue').textContent = config.global.debounce_ms + 'ms';
                     document.getElementById('cooldown').value = config.global.cooldown_s;
@@ -908,8 +909,10 @@
         }
 
         async function saveGlobalSettings() {
+            const sliderValue = parseFloat(document.getElementById('rmsFilter').value);
+            const rmsValue = sliderToRms(sliderValue);
             const settings = {
-                "volume_monitoring.rms_filter": parseFloat(document.getElementById('rmsFilter').value),
+                "volume_monitoring.rms_filter": rmsValue,
                 debounce_ms: parseInt(document.getElementById('debounce').value),
                 cooldown_s: parseFloat(document.getElementById('cooldown').value)
             };
@@ -1126,6 +1129,46 @@
 
         // Model selection is now handled by the custom model API
 
+        // Logarithmic conversion functions for RMS filter
+        function sliderToRms(sliderValue) {
+            // Convert linear slider value (0-100) to logarithmic RMS value (0-5000)
+            // Middle of slider (50) should be 50 RMS
+            const minRms = 0;
+            const maxRms = 5000;
+            const midRms = 50;
+            
+            // Use logarithmic scale: y = a * b^x
+            // At x=0 (slider=0): y=0
+            // At x=50 (slider=50): y=50
+            // At x=100 (slider=100): y=5000
+            
+            if (sliderValue <= 0) return 0;
+            if (sliderValue >= 100) return maxRms;
+            
+            // Calculate base for logarithmic scale
+            const base = Math.pow(maxRms / midRms, 1/50);
+            
+            // Apply logarithmic conversion
+            return Math.round(minRms + (midRms - minRms) * Math.pow(base, sliderValue / 50));
+        }
+        
+        function rmsToSlider(rmsValue) {
+            // Convert RMS value (0-5000) to linear slider value (0-100)
+            const minRms = 0;
+            const maxRms = 5000;
+            const midRms = 50;
+            
+            if (rmsValue <= 0) return 0;
+            if (rmsValue >= maxRms) return 100;
+            
+            // Calculate base for logarithmic scale
+            const base = Math.pow(maxRms / midRms, 1/50);
+            
+            // Reverse logarithmic conversion
+            const normalizedRms = (rmsValue - minRms) / (midRms - minRms);
+            return Math.round(50 * Math.log(normalizedRms) / Math.log(base));
+        }
+        
         // Setup global sliders
         function setupSliders() {
             const sliders = [
@@ -1139,10 +1182,11 @@
                 const valueElement = document.getElementById(slider.valueId);
                 
                 sliderElement.addEventListener('input', (e) => {
-                    // Special handling for RMS filter - show simple value
+                    // Special handling for RMS filter - use logarithmic conversion
                     if (slider.id === 'rmsFilter') {
-                        const rmsValue = parseFloat(e.target.value);
-                        valueElement.textContent = rmsValue.toFixed(1);
+                        const sliderValue = parseFloat(e.target.value);
+                        const rmsValue = sliderToRms(sliderValue);
+                        valueElement.textContent = rmsValue.toFixed(0);
                         updateFilterIndicator();
                     } else {
                         valueElement.textContent = slider.format(e.target.value);
@@ -1388,12 +1432,12 @@
             }
 
             const segments = document.querySelectorAll('.volume-segment');
-            const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
+            const sliderValue = parseInt(document.getElementById('rmsFilter').value);
+            const rmsFilterValue = sliderToRms(sliderValue);
             
-            // Convert filter to match volume meter scaling exactly
-            // Map slider value 0-100 to RMS range 0-1000, then apply same scaling as volume meter
-            const scaledRms = (rmsFilterValue / 100) * 1000; // Convert slider 0-100 to RMS 0-1000
-            const filterThreshold = Math.log(1 + scaledRms / 5) / Math.log(1 + 200);
+            // Convert RMS filter to volume meter scale
+            // Use the same logarithmic scale as the volume meter
+            const filterThreshold = Math.log(1 + rmsFilterValue / 5) / Math.log(1 + 200);
             
             // Calculate how many segments should be active based on volume
             const activeSegments = Math.floor(volume * 12);
@@ -1424,11 +1468,12 @@
         }
 
         function updateFilterIndicator() {
-            const rmsFilterValue = parseInt(document.getElementById('rmsFilter').value);
+            const sliderValue = parseInt(document.getElementById('rmsFilter').value);
+            const rmsFilterValue = sliderToRms(sliderValue);
             
-            // Use linear positioning for the filter indicator
-            // Slider value 0-100 maps linearly to position 0-600px
-            const filterPosition = (rmsFilterValue / 100) * 600; // 600px is meter width
+            // Convert RMS filter to volume meter scale for positioning
+            const filterThreshold = Math.log(1 + rmsFilterValue / 5) / Math.log(1 + 200);
+            const filterPosition = filterThreshold * 600; // 600px is meter width
             const indicator = document.getElementById('filterIndicator');
             indicator.style.left = `${filterPosition}px`;
         }
