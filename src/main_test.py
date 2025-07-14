@@ -217,6 +217,35 @@ class OpenWakeWordTest:
                     logger.info(f"  - {wake_word}")
             
             self.is_initialized = True
+            # Test with different audio patterns to verify model is working
+            logger.info("🧪 Testing OpenWakeWord with synthetic audio...")
+            
+            # Test 1: Silence
+            silence = np.zeros(self.chunk_size, dtype=np.float32)
+            silence_pred = self.model.predict(silence)
+            logger.info(f"   Silence test: {silence_pred}")
+            
+            # Test 2: Random noise
+            noise = np.random.normal(0, 0.1, self.chunk_size).astype(np.float32)
+            noise_pred = self.model.predict(noise)
+            logger.info(f"   Noise test: {noise_pred}")
+            
+            # Test 3: Sine wave (speech-like)
+            t = np.linspace(0, self.chunk_size/self.sample_rate, self.chunk_size, endpoint=False)
+            sine = np.sin(2 * np.pi * 1000 * t).astype(np.float32) * 0.3
+            sine_pred = self.model.predict(sine)
+            logger.info(f"   Sine wave test: {sine_pred}")
+            
+            # Check if predictions are varying
+            all_preds = [silence_pred, noise_pred, sine_pred]
+            if all(isinstance(p, dict) for p in all_preds):
+                all_zeros = all(all(v == 0.0 for v in pred.values()) for pred in all_preds)
+                if all_zeros:
+                    logger.error("❌ OpenWakeWord returning all zeros - model may not be working!")
+                    return False
+                else:
+                    logger.info("✅ OpenWakeWord showing variation in predictions")
+            
             logger.info("✅ OpenWakeWord initialized successfully")
             logger.info("💡 Try saying: 'Hey Jarvis', 'Hey Mycroft', or 'Alexa'")
             return True
@@ -258,19 +287,31 @@ class OpenWakeWordTest:
             
             # Convert int16 to float32 and normalize
             if audio_np.dtype == np.int16:
+                audio_rms = np.sqrt(np.mean(audio_np.astype(np.float32)**2))
+                audio_max = np.max(np.abs(audio_np))
                 audio_np = audio_np.astype(np.float32) / 32768.0
+            
+            # Debug: Log audio properties
+            audio_min = np.min(audio_np)
+            audio_max_norm = np.max(audio_np)
+            audio_std = np.std(audio_np)
             
             predictions = self.model.predict(audio_np)
             
+            # Debug: Log prediction details
+            debug_info = f"Audio(RMS:{audio_rms:.1f},Max:{audio_max},Std:{audio_std:.4f})"
+            
             if isinstance(predictions, dict):
                 max_conf = max(predictions.values()) if predictions else 0.0
-                summary = f"Max: {max_conf:.4f}"
+                summary = f"Max: {max_conf:.4f}, {debug_info}"
+                
+                # Show ALL confidences, not just >0.01
                 for wake_word, confidence in predictions.items():
-                    if confidence > 0.01:  # Only show non-zero confidences
-                        summary += f", {wake_word}: {confidence:.4f}"
+                    summary += f", {wake_word}: {confidence:.6f}"
+                
                 return summary
-            
-            return str(predictions)
+            else:
+                return f"Unexpected prediction type: {type(predictions)} = {predictions}"
             
         except Exception as e:
             return f"Error: {e}"
