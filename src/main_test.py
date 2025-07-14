@@ -327,8 +327,8 @@ class IntegratedTest:
                         logger.info(f"   Detection #: {detection_count}")
                         logger.info(f"   Audio RMS: {rms:.4f}")
                     
-                    # Progress updates every 10 seconds
-                    if chunk_num % int(10 * self.mic_test.sample_rate / self.mic_test.chunk_size) == 0:
+                    # Progress updates every 5 seconds
+                    if chunk_num % int(5 * self.mic_test.sample_rate / self.mic_test.chunk_size) == 0:
                         seconds_elapsed = chunk_num * self.mic_test.chunk_size / self.mic_test.sample_rate
                         conf_summary = self.wake_test.get_confidence_summary(audio_np)
                         logger.info(f"📊 {seconds_elapsed:.0f}s - RMS: {rms:.4f}, Detections: {detection_count}, {conf_summary}")
@@ -385,7 +385,7 @@ def main():
         # Stage 3: Integrated test
         logger.info("📋 Stage 3: Running integrated wake word detection test...")
         
-        if not integrated_test.run_integrated_test(duration_seconds=30):
+        if not integrated_test.run_integrated_test(duration_seconds=300):  # 5 minutes for interactive testing
             logger.error("❌ Integrated test failed")
             return 1
         
