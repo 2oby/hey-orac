@@ -898,12 +898,15 @@
                     // Load RMS filter from the correct setting
                     const rmsFilterValue = config.global["rms_filter"] || 10;
                     const sliderValue = rmsToSlider(rmsFilterValue);
+                    console.log(`🔧 DEBUG: Loading RMS filter - Value: ${rmsFilterValue}, Slider: ${sliderValue}`);
                     document.getElementById('rmsFilter').value = sliderValue;
                     document.getElementById('rmsFilterValue').textContent = rmsFilterValue.toFixed(0);
                     
                     // Load cooldown settings
-                    document.getElementById('cooldown').value = config.global.cooldown_s;
-                    document.getElementById('cooldownValue').textContent = config.global.cooldown_s + 's';
+                    const cooldownValue = config.global.cooldown_s || 1.5;
+                    console.log(`🔧 DEBUG: Loading cooldown - Value: ${cooldownValue}`);
+                    document.getElementById('cooldown').value = cooldownValue;
+                    document.getElementById('cooldownValue').textContent = cooldownValue + 's';
                 }
                 
                 // Per-model sensitivity and threshold are now handled in model cards
