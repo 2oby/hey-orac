@@ -897,6 +897,7 @@
                 if (config.global) {
                     // Load RMS filter from the correct setting
                     const rmsFilterValue = config.global["rms_filter"] || 10;
+                    console.log(`🔧 DEBUG: Loading RMS filter - Raw value: ${rmsFilterValue}`);
                     const sliderValue = rmsToSlider(rmsFilterValue);
                     console.log(`🔧 DEBUG: Loading RMS filter - Value: ${rmsFilterValue}, Slider: ${sliderValue}`);
                     document.getElementById('rmsFilter').value = sliderValue;
@@ -907,6 +908,10 @@
                     console.log(`🔧 DEBUG: Loading cooldown - Value: ${cooldownValue}`);
                     document.getElementById('cooldown').value = cooldownValue;
                     document.getElementById('cooldownValue').textContent = cooldownValue + 's';
+                    
+                    // Test the conversion for debugging
+                    console.log(`🔧 DEBUG: Testing rmsToSlider conversion:`);
+                    debugRmsConversion(rmsFilterValue);
                 }
                 
                 // Per-model sensitivity and threshold are now handled in model cards
@@ -1183,6 +1188,19 @@
           // invert the curve
           const ratio = Math.log(norm * (base - 1) + 1) / Math.log(base);
           return Math.round(ratio * 100);
+        }
+        
+        // Debug function to test conversion
+        function debugRmsConversion(rmsValue) {
+          console.log(`🔧 DEBUG: rmsToSlider(${rmsValue})`);
+          console.log(`  minRms: ${minRms}, maxRms: ${maxRms}`);
+          const norm = (rmsValue - minRms) / (maxRms - minRms);
+          console.log(`  norm: ${norm}`);
+          const ratio = Math.log(norm * (base - 1) + 1) / Math.log(base);
+          console.log(`  ratio: ${ratio}`);
+          const result = Math.round(ratio * 100);
+          console.log(`  result: ${result}`);
+          return result;
         }
         
         // Setup global sliders
