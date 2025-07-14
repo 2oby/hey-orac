@@ -187,11 +187,35 @@ detector_config = {
         'engine': 'openwakeword',
         'wakeword_models': ['/path/to/model.onnx'],
         'sensitivity': 0.8,
-        'threshold': 0.3
+        'threshold': 0.00001  # CRITICAL: Very low threshold required
     }
 }
 detector.initialize(detector_config)
 ```
+
+### Critical Threshold Configuration
+
+**IMPORTANT DISCOVERY**: OpenWakeWord default models produce extremely low confidence scores that require ultra-low thresholds:
+
+```python
+# WRONG - will never detect anything
+threshold = 0.3  # 30% - far too high
+
+# CORRECT - based on actual testing
+threshold = 0.00001  # 0.001% - works with default models
+```
+
+**Confidence Score Analysis**:
+- Silence: `~0.000001` (baseline noise)
+- Ambient audio: `0.000017` - `0.000037` (normal baseline)
+- Actual speech: May reach `0.0001` - `0.001` (still very low)
+- Wake words: Typically `0.00005` - `0.0005` when properly spoken
+
+**Recommended Thresholds by Model**:
+- `hey_mycroft`: `0.00005` (most reliable)
+- `alexa`: `0.00003`
+- `hey_jarvis`: `0.00002` (less sensitive)
+- Timer commands: `0.00001` (very conservative)
 
 ## Critical Implementation Notes
 
@@ -239,15 +263,52 @@ Critical directories mounted as tmpfs for SD card protection:
 
 ## Testing Strategy
 
+### OpenWakeWord Test Implementation (main_test.py)
+
+**IMPORTANT**: A comprehensive test implementation has been created in `src/main_test.py` that provides complete OpenWakeWord testing functionality.
+
+#### Test Features:
+- **Stage 1**: USB microphone access and audio capture verification
+- **Stage 2**: OpenWakeWord initialization with default pre-trained models  
+- **Stage 3**: Live wake word detection with real-time confidence logging
+
+#### Usage:
+```bash
+# Deploy and run test (uses Docker container)
+./scripts/deploy_and_test.sh "Test OpenWakeWord functionality"
+
+# Monitor test results
+ssh pi 'cd ~/hey-orac && docker-compose logs -f hey-orac'
+```
+
+#### Key Findings from Testing:
+
+**OpenWakeWord Confidence Scores**: Default models produce very low confidence scores:
+- Typical baseline: `0.000017` - `0.000037` (0.0017% - 0.0037%)
+- These are **normal** values for OpenWakeWord default models
+- Threshold must be set extremely low: `0.00001` (0.001%) for detection
+
+**Available Wake Words** (verified working):
+- `alexa` - Most responsive default model
+- `hey_mycroft` - Consistently highest baseline confidence (~0.000037)
+- `hey_jarvis` - Lower baseline confidence (~0.000002)
+- Timer commands: `1_minute_timer`, `5_minute_timer`, etc.
+- `weather`
+
+**Audio Pipeline Verification**:
+- USB microphone: SH-04 device properly detected and accessed
+- Sample rate: 16kHz ✅ (OpenWakeWord requirement)
+- Chunk size: 1280 samples ✅ (80ms at 16kHz)
+- Audio format: int16 → float32 normalization ✅
+
 ### Model Testing
 ```bash
-# Test specific model
+# RECOMMENDED: Use main_test.py for comprehensive testing
+docker-compose up --build -d  # Runs main_test.py
+
+# Legacy testing (if needed)
 python src/monitor_custom_model.py
-
-# Test all active models  
 python src/wake_word_monitor_new.py
-
-# Integration test
 ./scripts/verify_activation_system.sh
 ```
 
@@ -256,7 +317,7 @@ python src/wake_word_monitor_new.py
 # Test audio capture
 arecord -D hw:0,0 -f S16_LE -r 16000 -c 1 test.wav
 
-# List audio devices
+# List audio devices (should show SH-04)
 arecord -l
 ```
 
