@@ -10,6 +10,11 @@ Hey Orac is a containerized wake-word detection service for Raspberry Pi deploym
 
 ## Common Commands
 
+Read the file LOCAL_ENVIRONMENT to:
+-  learn about the 'deploy_and_test' script which commits to git and then pulls from git to the Pi and tests.
+- see how to use ssh pi <command> to ssh into the Rasberry Pi and run commands
+
+
 ### Development
 ```bash
 # Run tests

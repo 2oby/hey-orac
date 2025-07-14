@@ -63,8 +63,14 @@ class OpenWakeWordEngine(WakeWordEngine):
             logger.info(f"🔧 Model Sensitivity: {self.sensitivity:.3f} (internal model parameter)")
             logger.info(f"🔧 Detection Threshold: {self.threshold:.6f} (confidence level to trigger)")
             
-            # Check if wakeword_models are specified
+            # Check if wakeword_models are specified or custom_model_path
             wakeword_models = config.get('wakeword_models', [])
+            custom_model_path = config.get('custom_model_path', None)
+            
+            # Convert custom_model_path to wakeword_models format
+            if custom_model_path and not wakeword_models:
+                wakeword_models = [custom_model_path]
+                logger.info(f"🔧 Using custom_model_path: {custom_model_path}")
             
             if wakeword_models and len(wakeword_models) > 0:
                 # Validate all model files before loading
