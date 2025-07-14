@@ -187,7 +187,7 @@ class OpenWakeWordTest:
     
     def __init__(self):
         self.model = None
-        self.threshold = 0.0001  # Much lower threshold based on debug data
+        self.threshold = 0.00001  # Ultra-low threshold - 0.001% confidence
         self.sample_rate = 16000
         self.chunk_size = 1280
         self.is_initialized = False
