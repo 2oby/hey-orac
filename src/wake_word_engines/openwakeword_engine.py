@@ -144,10 +144,13 @@ class OpenWakeWordEngine(WakeWordEngine):
                     enable_speex_noise_suppression=False
                 )
             
-            # Final validation
+            # Final validation and detailed model inspection
             if not self._validate_model_setup():
                 logger.error("❌ Model setup validation failed")
                 return False
+            
+            # CRITICAL DEBUG: Inspect what models are actually loaded
+            self._inspect_loaded_models()
                 
             self.is_initialized = True
             logger.info(f"✅ OpenWakeWord engine initialized successfully for '{self.wake_word_name}'")
@@ -452,6 +455,53 @@ class OpenWakeWordEngine(WakeWordEngine):
         except Exception as e:
             logger.error(f"❌ Model validation failed: {e}")
             return False
+    
+    def _inspect_loaded_models(self):
+        """Inspect what models are actually loaded in OpenWakeWord."""
+        try:
+            logger.info("🔍 DETAILED MODEL INSPECTION:")
+            
+            if not self.model:
+                logger.error("   ❌ No model object found!")
+                return
+            
+            # Check model attributes
+            model_attrs = [attr for attr in dir(self.model) if not attr.startswith('_')]
+            logger.info(f"   Model attributes: {model_attrs}")
+            
+            # Check prediction buffer
+            if hasattr(self.model, 'prediction_buffer'):
+                buffer_keys = list(self.model.prediction_buffer.keys())
+                logger.info(f"   Prediction buffer models: {buffer_keys}")
+                
+                # This tells us if default models are loaded
+                default_models = ['alexa', 'hey_mycroft', 'hey_jarvis', 'timer', 'weather']
+                loaded_defaults = [model for model in buffer_keys if model in default_models]
+                loaded_custom = [model for model in buffer_keys if model not in default_models]
+                
+                if loaded_defaults:
+                    logger.warning(f"   ⚠️ DEFAULT MODELS LOADED: {loaded_defaults}")
+                    logger.warning("   This might be the problem - default models instead of custom!")
+                
+                if loaded_custom:
+                    logger.info(f"   ✅ CUSTOM MODELS LOADED: {loaded_custom}")
+                else:
+                    logger.error("   ❌ NO CUSTOM MODELS FOUND!")
+            
+            # Check model paths
+            if hasattr(self.model, 'model_paths'):
+                logger.info(f"   Model paths: {self.model.model_paths}")
+            
+            # Check loaded model objects
+            if hasattr(self.model, 'models'):
+                logger.info(f"   Loaded model objects: {list(self.model.models.keys())}")
+            
+            # Check if wakeword_models was used
+            if hasattr(self.model, 'wakeword_models'):
+                logger.info(f"   Wakeword models attribute: {self.model.wakeword_models}")
+            
+        except Exception as e:
+            logger.error(f"❌ Error inspecting models: {e}")
     
     def get_latest_confidence(self) -> float:
         """Get the latest confidence score for the wake word."""

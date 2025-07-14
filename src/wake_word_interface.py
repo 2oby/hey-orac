@@ -137,6 +137,13 @@ class WakeWordDetector:
             
             # Initialize the engine with the correct config section
             engine_config = config.get('wake_word', config)  # Use wake_word section if available, otherwise use full config
+            
+            # CRITICAL DEBUG: Log the exact config being passed to the engine
+            logger.info(f"🔧 ENGINE CONFIG DEBUG for {self.engine_name}:")
+            logger.info(f"   Full config keys: {list(config.keys())}")
+            logger.info(f"   Engine config keys: {list(engine_config.keys())}")
+            logger.info(f"   Engine config: {engine_config}")
+            
             if self.engine.initialize(engine_config):
                 self.is_initialized = True
                 logger.info(f"Wake-word engine '{self.engine_name}' initialized successfully")
@@ -146,6 +153,7 @@ class WakeWordDetector:
                 return True
             else:
                 logger.error(f"Failed to initialize wake-word engine: {self.engine_name}")
+                logger.error(f"   Failed config: {engine_config}")
                 return False
                 
         except Exception as e:

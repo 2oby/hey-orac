@@ -313,9 +313,38 @@ class WakeWordMonitor_new:
                     # Log confidence every 100 chunks for debugging
                     if self._confidence_check_counter % 100 == 0:
                         confidence = 0.0
+                        all_confidences = {}
+                        
+                        # Try to get confidence from detector engine
                         if hasattr(detector.engine, 'get_latest_confidence'):
                             confidence = detector.engine.get_latest_confidence()
-                        logger.info(f"🔍 CONFIDENCE DEBUG - {model_name}: {confidence:.6f} (detection={detection_result})")
+                        
+                        # CRITICAL DEBUG: Check if multiple models are loaded in the engine
+                        if hasattr(detector.engine, 'model') and detector.engine.model:
+                            openwakeword_model = detector.engine.model
+                            
+                            # Check for prediction_buffer (contains all model predictions)
+                            if hasattr(openwakeword_model, 'prediction_buffer'):
+                                logger.info(f"🔍 FULL MODEL DEBUG for {model_name}:")
+                                logger.info(f"   Prediction buffer keys: {list(openwakeword_model.prediction_buffer.keys())}")
+                                
+                                for model_key, scores in openwakeword_model.prediction_buffer.items():
+                                    if scores and len(scores) > 0:
+                                        latest_score = scores[-1]
+                                        all_confidences[model_key] = latest_score
+                                        logger.info(f"   Model '{model_key}': {latest_score:.6f}")
+                                    else:
+                                        logger.info(f"   Model '{model_key}': No scores")
+                            
+                            # Check which models are actually loaded
+                            if hasattr(openwakeword_model, 'models'):
+                                logger.info(f"   Loaded model objects: {list(openwakeword_model.models.keys())}")
+                            
+                            # Check model paths
+                            if hasattr(openwakeword_model, 'model_paths'):
+                                logger.info(f"   Model paths: {openwakeword_model.model_paths}")
+                        
+                        logger.info(f"🔍 CONFIDENCE SUMMARY - {model_name}: primary={confidence:.6f}, all_models={all_confidences}")
                     
                     if detection_result:
                         logger.info(f"🎯 WAKE WORD DETECTED by model '{model_name}'!")
