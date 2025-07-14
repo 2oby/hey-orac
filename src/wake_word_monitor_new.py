@@ -146,8 +146,15 @@ class WakeWordMonitor_new:
     
     def _create_detector_config(self, model_name: str, model_config: Dict[str, Any]) -> Dict[str, Any]:
         """Create detector configuration for a specific model."""
-        # Start with global settings
+        # Get ALL settings, not just wake_word section
+        all_settings = self.settings_manager.get_all()
+        
+        # Create complete config with all sections
         detector_config = {
+            'audio': all_settings.get('audio', {}),
+            'detection': all_settings.get('detection', {}),
+            'buffer': all_settings.get('buffer', {}),
+            'volume_monitoring': all_settings.get('volume_monitoring', {}),
             'wake_word': {
                 'engine': self.global_settings['engine'],
                 'sensitivity': model_config['sensitivity'],
@@ -172,6 +179,10 @@ class WakeWordMonitor_new:
         logger.info(f"   Sensitivity: {detector_config['wake_word']['sensitivity']:.3f}")
         logger.info(f"   Threshold: {detector_config['wake_word']['threshold']:.3f}")
         logger.info(f"   Custom model path: {detector_config['wake_word'].get('custom_model_path', 'None')}")
+        logger.info(f"   Audio section: {list(detector_config['audio'].keys())}")
+        logger.info(f"   Detection section: {list(detector_config['detection'].keys())}")
+        logger.info(f"   Buffer section: {list(detector_config['buffer'].keys())}")
+        logger.info(f"   Volume monitoring section: {list(detector_config['volume_monitoring'].keys())}")
         
         return detector_config
     

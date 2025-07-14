@@ -1,192 +1,122 @@
-# OPENWAKEWORD AUDIO STREAM MONITORING - CORRECTED IMPLEMENTATION
+# OpenWakeWord Model Fix Guide
 
-# CLASS MAPPING EXPLAINED
-# The class_mapping_dicts parameter maps the output neurons/classes of your ONNX model to human-readable wake word names.
-# 
-# For a SINGLE wake word model (most common):
-# class_mapping_dicts=[{0: "hey_computer"}]  # Maps output class 0 to name "hey_computer"
-# 
-# For a MULTI-CLASS model (one model, multiple wake words):
-# class_mapping_dicts=[{
-#     0: "hey_computer",
-#     1: "okay_assistant", 
-#     2: "stop_listening"
-# }]
-# 
-# What is the model name?
-# The model name is arbitrary - it's just a label you choose. It:
-# - IS: A human-readable identifier for the wake word
-# - IS NOT: The file path or model filename
-# - USED FOR: The keys in the prediction dictionary
+## Quick Diagnostic Test (5 minutes)
 
-# 1. MODEL INITIALIZATION
-# When a custom model is loaded, we create the OpenWakeWord model like this:
-custom_model_path = "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx"
-model_name = "Hay--compUta_v_lrg"  # Extracted from filename
+Run this standalone test first to identify the exact issue:
 
-# ISSUE #1: VAD threshold conflict - we were using both OpenWakeWord's VAD and our own RMS filtering
-# SOLUTION: Disable OpenWakeWord's VAD since we're doing our own audio filtering
+```python
+# Save as test_model.py and run: python3 test_model.py
+import openwakeword
+import numpy as np
+
+model_path = "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx"
+
+# Try loading the model
+try:
+    model = openwakeword.Model(wakeword_model_paths=[model_path])
+    print("✅ Model loaded")
+except Exception as e:
+    print(f"❌ Loading failed: {e}")
+    exit(1)
+
+# Test with different inputs
+test_inputs = {
+    "silence": np.zeros(1280, dtype=np.float32),
+    "noise": np.random.normal(0, 0.1, 1280).astype(np.float32),
+    "sine": np.sin(2 * np.pi * 1000 * np.linspace(0, 0.08, 1280)).astype(np.float32)
+}
+
+for name, audio in test_inputs.items():
+    pred = model.predict(audio)
+    print(f"{name}: {pred}")
+
+# Check if all predictions are identical (indicates broken model)
+predictions = [model.predict(audio) for audio in test_inputs.values()]
+if len(set(str(p) for p in predictions)) == 1:
+    print("❌ BROKEN MODEL: All predictions identical!")
+else:
+    print("✅ Model working correctly")
+```
+
+## Root Issue
+The model returns constant value `0.00083711743` for ALL inputs - it's not processing audio.
+
+## Fix Priority Order
+
+### 1. **Immediate Workaround** (2 minutes)
+Lower threshold to bypass the issue temporarily:
+```python
+# In settings_manager.py, change threshold to:
+"threshold": 0.0008  # Just below the constant value
+```
+
+### 2. **Try Alternative Loading** (5 minutes)
+Replace model loading in `openwakeword_engine.py`:
+```python
+# Replace the current loading with these attempts in order:
+# Attempt 1: Basic loading
+self.model = openwakeword.Model(wakeword_model_paths=[custom_model_path])
+
+# Attempt 2: With inference framework
 self.model = openwakeword.Model(
     wakeword_model_paths=[custom_model_path],
-    class_mapping_dicts=[{0: model_name}],  # Maps class 0 to our model name
-    vad_threshold=0.0,  # CHANGED: Disabled to prevent conflict with our RMS filtering
-    enable_speex_noise_suppression=False
+    inference_framework="onnx"
 )
 
-# NEW: Add debug mode to help troubleshoot detection issues
-self.debug_mode = True  # Set to False in production
-self.detection_history = []  # Track recent predictions for pattern analysis
-
-# 2. AUDIO PROCESSING CALLBACK
-# The audio pipeline calls this function for each audio chunk:
-def wake_word_callback(audio_data, chunk_count, rms_level, avg_volume):
-    # audio_data is numpy array (int16) from microphone
-    # chunk_count is the sequential chunk number
-    # rms_level is the current RMS volume level
-    # avg_volume is the average volume over time
-    
-    # Process through wake word monitor
-    detection_result = self.wake_word_monitor.process_audio(audio_data)
-    
-    if detection_result:
-        logger.info(f"🎯 WAKE WORD DETECTED! Chunk: {chunk_count}, RMS: {rms_level:.4f}")
-
-# 3. WAKE WORD MONITOR PROCESSING
-# The wake word monitor processes each audio chunk:
-def process_audio(self, audio_data: np.ndarray) -> bool:
-    # ISSUE #2: Audio normalization was missing
-    # OpenWakeWord expects float32 audio normalized to [-1, 1] range
-    # SOLUTION: Properly normalize int16 audio to float32 [-1, 1]
-    if audio_data.dtype == np.int16:
-        # Convert int16 [-32768, 32767] to float32 [-1.0, 1.0]
-        audio_chunk = audio_data.astype(np.float32) / 32768.0
-    elif audio_data.dtype != np.float32:
-        # If not int16 or float32, convert to float32
-        audio_chunk = audio_data.astype(np.float32)
-    else:
-        # Already float32, use as-is
-        audio_chunk = audio_data
-    
-    # Get predictions from OpenWakeWord model
-    predictions = self.model.predict(audio_chunk)
-    
-    # ISSUE #3: We were only checking for our specific model name, which might not match
-    # SOLUTION: Log all predictions to understand what the model is actually returning
-    if self.debug_mode:
-        # Log all model predictions to see what names are being used
-        logger.debug(f"All predictions: {predictions}")
-        # Track prediction history for pattern analysis
-        self.detection_history.append({
-            'timestamp': time.time(),
-            'predictions': predictions.copy()
-        })
-        # Keep only last 50 predictions
-        if len(self.detection_history) > 50:
-            self.detection_history.pop(0)
-    
-    # ISSUE #4: Model name might not match what we expect
-    # SOLUTION: Check all predictions, not just our expected name
-    detected = False
-    detection_model = None
-    detection_confidence = 0.0
-    
-    for model_name, confidence in predictions.items():
-        if confidence > self.threshold:
-            detected = True
-            detection_model = model_name
-            detection_confidence = confidence
-            break
-    
-    # ISSUE #5: Single-chunk detection might be too sensitive or not sensitive enough
-    # SOLUTION: Implement a simple sliding window check for more robust detection
-    if detected:
-        # Check if we've had consistent detections in recent chunks
-        if self._check_detection_consistency(detection_model):
-            logger.info(f"🎯 WAKE WORD DETECTED by model '{detection_model}'! "
-                       f"Confidence: {detection_confidence:.3f}")
-            # Clear history after successful detection to prevent multiple triggers
-            self.detection_history.clear()
-            return True
-    
-    return False
-
-# NEW: Helper method to check detection consistency
-def _check_detection_consistency(self, model_name: str, window_size: int = 3, min_detections: int = 2) -> bool:
-    """
-    Check if we've had consistent detections in recent chunks to reduce false positives
-    
-    Args:
-        model_name: The model that triggered detection
-        window_size: Number of recent chunks to check
-        min_detections: Minimum detections needed in the window
-    
-    Returns:
-        True if detection is consistent enough
-    """
-    if len(self.detection_history) < window_size:
-        # Not enough history yet, allow detection
-        return True
-    
-    # Check last N predictions
-    recent_detections = 0
-    for entry in self.detection_history[-window_size:]:
-        if entry['predictions'].get(model_name, 0.0) > self.threshold:
-            recent_detections += 1
-    
-    return recent_detections >= min_detections
-
-# 4. AUDIO PIPELINE INTEGRATION
-# The audio pipeline continuously streams audio and calls the callback:
-def run(self):
-    # ISSUE #6: Ensure audio format matches OpenWakeWord expectations
-    # OpenWakeWord requires: 16kHz sample rate, mono channel, 16-bit PCM
-    # SOLUTION: Validate audio configuration at startup
-    assert self.sample_rate == 16000, f"OpenWakeWord requires 16kHz, got {self.sample_rate}Hz"
-    assert self.channels == 1, f"OpenWakeWord requires mono audio, got {self.channels} channels"
-    
-    while self.running:
-        # Capture audio chunk from microphone
-        # ISSUE #7: Chunk size should match model expectations
-        # Default is 1280 samples (80ms at 16kHz), but verify this matches your model
-        audio_data = self.audio_stream.read(self.chunk_size)
-        
-        # Calculate RMS level
-        rms_level = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
-        
-        # Update average volume
-        self.volume_history.append(rms_level)
-        if len(self.volume_history) > 100:
-            self.volume_history.pop(0)
-        avg_volume = np.mean(self.volume_history)
-        
-        # Check if audio should be passed to wake word detection
-        # This is our own pre-filtering to save CPU when there's silence
-        should_pass_audio = rms_level > self.rms_filter_threshold
-        
-        if should_pass_audio and self.wake_word_callback:
-            # Call the wake word callback with audio data
-            self.wake_word_callback(audio_data, self.chunk_count, rms_level, avg_volume)
-        elif self.debug_mode and self.chunk_count % 100 == 0:
-            # Log periodic status in debug mode
-            logger.debug(f"Audio level below threshold. RMS: {rms_level:.4f}, "
-                        f"Threshold: {self.rms_filter_threshold:.4f}")
-        
-        self.chunk_count += 1
-
-# 5. COMPLETE FLOW SUMMARY WITH CORRECTIONS
-# 1. Audio pipeline captures 1280-sample chunks from USB microphone (16kHz, mono, int16)
-# 2. RMS pre-filtering saves CPU by skipping silence
-# 3. Each chunk is properly normalized from int16 to float32 [-1, 1] range
-# 4. OpenWakeWord model.predict() returns confidence scores for all loaded models
-# 5. We check ALL model predictions, not just our expected name
-# 6. Detection consistency is verified across multiple chunks to reduce false positives
-# 7. Debug logging helps identify model behavior and tuning needs
-# 8. Audio pipeline continues streaming and monitoring
-
-# ADDITIONAL DEBUGGING RECOMMENDATIONS:
-# 1. Run with debug_mode=True initially to see actual prediction values
-# 2. Adjust threshold based on observed confidence scores
-# 3. Test with different chunk sizes if detection is inconsistent
-# 4. Verify your custom model was trained with 16kHz audio
-# 5. Consider implementing post-detection cooldown to prevent repeated triggers
+# Attempt 3: Without class mapping
+self.model = openwakeword.Model(
+    wakeword_model_paths=[custom_model_path],
+    vad_threshold=0.0
+)
 ```
+
+### 3. **Model Replacement** (10 minutes)
+If above fails, the model file is corrupted. Options:
+
+a) **Use pre-trained model**:
+```python
+# Comment out custom model loading and use:
+self.model = openwakeword.Model()  # Loads all pre-trained models
+```
+
+b) **Download fresh model**:
+- Check OpenWakeWord GitHub releases
+- Look for community "Hey Computer" models
+- Verify MD5 hash after download
+
+### 4. **Version Update** (5 minutes)
+```bash
+pip install --upgrade openwakeword onnxruntime numpy
+```
+
+## Key Code Fixes Already Applied
+
+1. **Audio normalization** (working correctly):
+```python
+audio_chunk = audio_chunk.astype(np.float32) / 32768.0
+```
+
+2. **Class mapping** (working correctly):
+```python
+class_mapping_dicts=[{0: self.wake_word_name}]
+```
+
+3. **Audio amplification** (working correctly):
+```python
+if raw_max < 1000:
+    audio_chunk = audio_chunk * 10
+```
+
+## Validation Checklist
+- [ ] Model file exists and >1MB
+- [ ] Test script shows varying predictions
+- [ ] Live audio produces varying confidence scores
+- [ ] Detection triggers at reasonable threshold (0.3-0.5)
+
+## If All Else Fails
+The model file is incompatible with your OpenWakeWord version. Either:
+1. Train a new model using OpenWakeWord's training pipeline
+2. Use a different wake word with pre-trained models
+3. Contact the model creator for a compatible version
+
+**Time estimate**: 15-20 minutes total to identify and fix the issue.
