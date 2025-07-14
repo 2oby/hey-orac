@@ -171,21 +171,26 @@ class WakeWordMonitor_new:
             }
         }
         
-        # CRITICAL FIX: Use custom_model_path instead of wakeword_models to match working implementation
+        # CRITICAL FIX: Use wakeword_models array instead of custom_model_path for better OpenWakeWord compatibility
         if 'file_paths' in model_config:
-            # Check for ONNX file first, then TFLite
+            model_paths = []
+            # Check for ONNX file first, then TFLite (ONNX preferred)
             if 'onnx' in model_config['file_paths']:
-                detector_config['wake_word']['custom_model_path'] = model_config['file_paths']['onnx']
+                model_paths.append(model_config['file_paths']['onnx'])
                 logger.info(f"🔧 Using ONNX model for {model_name}: {model_config['file_paths']['onnx']}")
             elif 'tflite' in model_config['file_paths']:
-                detector_config['wake_word']['custom_model_path'] = model_config['file_paths']['tflite']
+                model_paths.append(model_config['file_paths']['tflite'])
                 logger.info(f"🔧 Using TFLite model for {model_name}: {model_config['file_paths']['tflite']}")
+            
+            # Use wakeword_models array for OpenWakeWord engine
+            if model_paths:
+                detector_config['wake_word']['wakeword_models'] = model_paths
         
         logger.info(f"🔧 Detector config for {model_name}:")
         logger.info(f"   Engine: {detector_config['wake_word']['engine']}")
         logger.info(f"   Sensitivity: {detector_config['wake_word']['sensitivity']:.3f}")
         logger.info(f"   Threshold: {detector_config['wake_word']['threshold']:.3f}")
-        logger.info(f"   Custom model path: {detector_config['wake_word'].get('custom_model_path', 'None')}")
+        logger.info(f"   Wakeword models: {detector_config['wake_word'].get('wakeword_models', [])}")
         logger.info(f"   Audio section: {list(detector_config['audio'].keys())}")
         logger.info(f"   Detection section: {list(detector_config['detection'].keys())}")
         logger.info(f"   Buffer section: {list(detector_config['buffer'].keys())}")
@@ -551,6 +556,103 @@ class WakeWordMonitor_new:
                 logger.warning(f"   ⚠️ {model_name}: No configuration available")
         
         logger.info("=" * 50)
+    
+    def start_monitoring(self, stream_callback: Callable[[np.ndarray], bool] = None) -> bool:
+        """
+        Start the main audio monitoring loop.
+        
+        Args:
+            stream_callback: Optional callback for audio stream processing
+            
+        Returns:
+            bool: True if monitoring started successfully
+        """
+        try:
+            import pyaudio
+            
+            if not self.active_detectors:
+                logger.error("❌ No active detectors loaded, cannot start monitoring")
+                return False
+            
+            # Get audio settings
+            audio_settings = self.settings_manager.get('audio', {})
+            sample_rate = audio_settings.get('sample_rate', 16000)
+            channels = audio_settings.get('channels', 1)
+            chunk_size = audio_settings.get('chunk_size', 1280)
+            device_index = audio_settings.get('device_index', None)
+            
+            logger.info(f"🎤 Starting audio monitoring:")
+            logger.info(f"   Sample rate: {sample_rate}Hz")
+            logger.info(f"   Channels: {channels}")
+            logger.info(f"   Chunk size: {chunk_size} samples")
+            logger.info(f"   Device index: {device_index}")
+            
+            # Validate audio format with all active engines
+            if not self.validate_audio_format_for_engines(sample_rate, channels, chunk_size):
+                logger.error("❌ Audio format validation failed")
+                return False
+            
+            # Initialize PyAudio
+            p = pyaudio.PyAudio()
+            
+            # Open audio stream
+            stream = p.open(
+                format=pyaudio.paInt16,
+                channels=channels,
+                rate=sample_rate,
+                input=True,
+                input_device_index=device_index,
+                frames_per_buffer=chunk_size,
+                stream_callback=None  # Use blocking read for better control
+            )
+            
+            logger.info("✅ Audio stream opened successfully")
+            logger.info("🎯 Starting wake word detection loop...")
+            logger.info("Press Ctrl+C to stop")
+            
+            chunk_count = 0
+            try:
+                while True:
+                    # Read audio chunk
+                    audio_data = stream.read(chunk_size, exception_on_overflow=False)
+                    audio_np = np.frombuffer(audio_data, dtype=np.int16)
+                    
+                    chunk_count += 1
+                    
+                    # Process audio through wake word detection
+                    detection_result = self.process_audio(audio_np)
+                    
+                    # Call stream callback if provided
+                    if stream_callback:
+                        try:
+                            stream_callback(audio_np)
+                        except Exception as e:
+                            logger.warning(f"⚠️ Stream callback error: {e}")
+                    
+                    # Log progress every 1000 chunks
+                    if chunk_count % 1000 == 0:
+                        logger.info(f"📊 Processed {chunk_count} chunks ({chunk_count * chunk_size / sample_rate:.1f}s)")
+                        
+            except KeyboardInterrupt:
+                logger.info("🛑 Monitoring stopped by user")
+            except Exception as e:
+                logger.error(f"❌ Error in monitoring loop: {e}")
+                return False
+            finally:
+                # Clean up audio resources
+                try:
+                    stream.stop_stream()
+                    stream.close()
+                    p.terminate()
+                    logger.info("🧹 Audio resources cleaned up")
+                except Exception as e:
+                    logger.warning(f"⚠️ Error cleaning up audio: {e}")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"❌ Failed to start monitoring: {e}")
+            return False
 
 
 def create_wake_word_monitor_new() -> WakeWordMonitor_new:
@@ -558,7 +660,36 @@ def create_wake_word_monitor_new() -> WakeWordMonitor_new:
     return WakeWordMonitor_new()
 
 
+def run_wake_word_monitor_new() -> int:
+    """
+    Run the new wake word monitor as a standalone application.
+    
+    Returns:
+        int: Exit code (0 for success, 1 for failure)
+    """
+    try:
+        logger.info("🚀 Starting Wake Word Monitor New...")
+        
+        # Create and initialize monitor
+        monitor = create_wake_word_monitor_new()
+        
+        # Print configuration summary
+        monitor.print_configuration_summary()
+        
+        # Start monitoring
+        if monitor.start_monitoring():
+            logger.info("✅ Wake word monitoring completed successfully")
+            return 0
+        else:
+            logger.error("❌ Wake word monitoring failed")
+            return 1
+            
+    except Exception as e:
+        logger.error(f"❌ Fatal error in wake word monitor: {e}")
+        return 1
+
+
 if __name__ == "__main__":
-    # Test the new monitor
-    monitor = create_wake_word_monitor_new()
-    monitor.print_configuration_summary() 
+    # Run the new monitor as a standalone application
+    exit_code = run_wake_word_monitor_new()
+    exit(exit_code) 
