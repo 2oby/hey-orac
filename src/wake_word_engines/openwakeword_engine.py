@@ -52,31 +52,30 @@ class OpenWakeWordEngine(WakeWordEngine):
             logger.info(f"   Frame length: {self.get_frame_length()} samples ✓")
             logger.info(f"   Expected chunk duration: {self.get_frame_length() / self.sample_rate * 1000:.1f}ms ✓")
             
-            # HARDCODED VALUES FOR TESTING - bypass settings system
-            # We were getting confidence 0.000837, so let's set threshold much lower
-            self.sensitivity = 0.8
-            self.threshold = 0.0001  # Much lower than the 0.000837 we were seeing
+            # HARDCODED VALUES - Settings system is faulty, using interim hardcoded values
+            self.sensitivity = 0.5  # Standard sensitivity
+            self.threshold = 0.3   # Proper threshold to prevent false positives
             
-            # Aggressive amplification for low audio levels
-            self.low_audio_threshold = 50  # Trigger amplification earlier  
-            self.amplification_factor = 200  # Much stronger amplification
+            # Conservative amplification for low audio levels
+            self.low_audio_threshold = 1000  # Only amplify very quiet audio
+            self.amplification_factor = 2.0  # Gentle amplification
             
-            logger.info("🔧 HARDCODED TESTING VALUES:")
+            logger.info("🔧 HARDCODED VALUES (settings system faulty):")
             logger.info(f"   Sensitivity: {self.sensitivity:.3f} (hardcoded)")
-            logger.info(f"   Threshold: {self.threshold:.6f} (hardcoded - much lower for testing)")
-            logger.info(f"   Low audio threshold: {self.low_audio_threshold} (hardcoded)")
-            logger.info(f"   Amplification factor: {self.amplification_factor} (hardcoded)")
+            logger.info(f"   Threshold: {self.threshold:.3f} (hardcoded)")
+            logger.info(f"   Low audio threshold: {self.low_audio_threshold}")
+            logger.info(f"   Amplification factor: {self.amplification_factor}")
             
-            # Check if wakeword_models are specified or custom_model_path
-            wakeword_models = config.get('wakeword_models', [])
-            custom_model_path = config.get('custom_model_path', None)
+            # FORCE DEFAULT MODELS FOR TESTING - Temporarily bypass custom models
+            logger.info("🔧 FORCING DEFAULT MODELS FOR TESTING")
+            logger.info("   Ignoring any custom model configuration")
+            logger.info("   This will test with built-in OpenWakeWord models")
             
-            # Convert custom_model_path to wakeword_models format
-            if custom_model_path and not wakeword_models:
-                wakeword_models = [custom_model_path]
-                logger.info(f"🔧 Using custom_model_path: {custom_model_path}")
+            # Comment out custom model loading temporarily
+            wakeword_models = []  # Force empty to skip custom models
+            custom_model_path = None  # Force None to skip custom models
             
-            if wakeword_models and len(wakeword_models) > 0:
+            if False:  # Disable custom model loading block
                 # Validate all model files before loading
                 valid_models = []
                 for model_path in wakeword_models:
@@ -148,11 +147,15 @@ class OpenWakeWordEngine(WakeWordEngine):
                     return False
                     
             else:
-                logger.info("🔍 Loading pre-trained models")
+                logger.info("🔍 LOADING DEFAULT PRE-TRAINED MODELS")
+                logger.info("   Available wake words: alexa, hey_mycroft, hey_jarvis, timer, weather, etc.")
                 self.model = openwakeword.Model(
                     vad_threshold=0.0,
                     enable_speex_noise_suppression=False
                 )
+                self.wake_word_name = "default_models"
+                logger.info("✅ Default pre-trained models loaded successfully")
+                logger.info("   Try saying: 'Hey Jarvis', 'Hey Mycroft', or 'Alexa'")
             
             # Final validation and detailed model inspection
             if not self._validate_model_setup():
@@ -373,11 +376,11 @@ class OpenWakeWordEngine(WakeWordEngine):
                 # Convert int16 to float32
                 audio_chunk = audio_chunk.astype(np.float32) / 32768.0
                 
-                # Apply amplification if needed
+                # Apply gentle amplification only if audio is very quiet
                 if raw_max < self.low_audio_threshold:
                     audio_chunk = audio_chunk * self.amplification_factor
                     if self.debug_mode:
-                        logger.debug(f"🔧 Applied {self.amplification_factor}x amplification")
+                        logger.debug(f"🔧 Applied {self.amplification_factor}x amplification for low audio (max={raw_max})")
                     
             elif audio_chunk.dtype != np.float32:
                 audio_chunk = audio_chunk.astype(np.float32)
@@ -391,10 +394,15 @@ class OpenWakeWordEngine(WakeWordEngine):
             else:
                 self._confidence_log_counter = 0
             
+            # Enhanced debugging with proper confidence logging
             if self._confidence_log_counter % 100 == 0:
                 if isinstance(predictions, dict):
+                    max_confidence = max(predictions.values()) if predictions else 0.0
+                    logger.info(f"🔍 Confidence check (chunk {self._confidence_log_counter}):")
                     for model_name, confidence in predictions.items():
-                        logger.info(f"🔍 Confidence check - {model_name}: {confidence:.6f} (threshold: {self.threshold:.6f})")
+                        status = "ABOVE" if confidence > self.threshold else "below"
+                        logger.info(f"   {model_name}: {confidence:.6f} ({status} threshold {self.threshold:.3f})")
+                    logger.info(f"   Max confidence: {max_confidence:.6f}")
                 else:
                     logger.info(f"🔍 Confidence check - Raw predictions: {predictions}")
             
@@ -409,7 +417,7 @@ class OpenWakeWordEngine(WakeWordEngine):
                         detected = True
                         detection_model = model_name
                         detection_confidence = confidence
-                        logger.info(f"🎯 DETECTION! Model: {detection_model}, Confidence: {detection_confidence:.6f}")
+                        logger.info(f"🎯 POTENTIAL DETECTION! Model: {detection_model}, Confidence: {detection_confidence:.6f} (threshold: {self.threshold:.3f})")
                         break
             
             # Track prediction history
@@ -434,8 +442,9 @@ class OpenWakeWordEngine(WakeWordEngine):
             return False
     
     def _check_detection_consistency(self, model_name: str, window_size: int = 3, min_detections: int = 2) -> bool:
-        """Check if we've had consistent detections in recent chunks."""
+        """Check if we've had consistent detections in recent chunks to prevent false positives."""
         if len(self.detection_history) < window_size:
+            logger.debug(f"🔍 Consistency check: Not enough history ({len(self.detection_history)} < {window_size}), allowing detection")
             return True
         
         recent_detections = 0
@@ -444,6 +453,7 @@ class OpenWakeWordEngine(WakeWordEngine):
                 if entry['predictions'].get(model_name, 0.0) > self.threshold:
                     recent_detections += 1
         
+        logger.debug(f"🔍 Consistency check for {model_name}: {recent_detections}/{window_size} recent detections (need {min_detections})")
         return recent_detections >= min_detections
     
     def _validate_model_setup(self):

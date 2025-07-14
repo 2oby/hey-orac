@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Documentation Sources
+
+- **OpenWakeWord**: https://github.com/dscripka/openWakeWord - Official documentation for the wake word detection engine
+
+## Important Development Constraints
+
+- **USB Microphone Access**: Only the main program in the Docker container has exclusive access to the USB microphone. Cannot create separate test scripts that access audio hardware - must add debugging to existing code instead.
+- **Settings System Issues**: Settings persistence and reload mechanism is currently faulty (see CRITICAL_PATH.txt lines 34-47). Use hardcoded values as workaround until settings system is fixed.
+
 ## Project Overview
 
 Hey Orac is a containerized wake-word detection service for Raspberry Pi deployment. It's designed as Phase 1a of the ORAC Voice-Control Architecture - a system that monitors audio input for custom wake words and streams detected audio to remote processing endpoints.

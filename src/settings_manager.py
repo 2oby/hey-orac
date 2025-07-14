@@ -73,25 +73,25 @@ class SettingsManager:
                 "engine": "openwakeword",
                 "cooldown": 1.5,
                 "model_path": "/app/models/porcupine/orac.ppn",
-                "sensitivity": 0.8,
-                "threshold": 0.001,  # FIX #4: Lowered to 0.001 for debugging
+                "sensitivity": 0.5,
+                "threshold": 0.5,  # FIXED: Proper threshold to prevent false positives
                 "access_key": "",
                 "models": {
                     "Hay--compUta_v_lrg": {
-                        "sensitivity": 0.8,
-                        "threshold": 0.001,  # FIX #4: Lowered to 0.001 for debugging
+                        "sensitivity": 0.5,
+                        "threshold": 0.3,  # FIXED: Proper threshold for custom models
                         "api_url": "https://api.example.com/webhook",
                         "active": True
                     },
                     "Hey_computer": {
-                        "sensitivity": 0.8,
-                        "threshold": 0.001,  # FIX #4: Lowered to 0.001 for debugging
+                        "sensitivity": 0.5,
+                        "threshold": 0.3,  # FIXED: Proper threshold for custom models
                         "api_url": "https://api.example.com/webhook",
                         "active": False
                     },
                     "hey-CompUter_lrg": {
-                        "sensitivity": 0.8,
-                        "threshold": 0.001,  # FIX #4: Lowered to 0.001 for debugging
+                        "sensitivity": 0.5,
+                        "threshold": 0.3,  # FIXED: Proper threshold for custom models
                         "api_url": "https://api.example.com/webhook",
                         "active": False
                     }

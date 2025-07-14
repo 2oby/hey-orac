@@ -16,6 +16,149 @@ from shared_memory_ipc import shared_memory_ipc
 logger = logging.getLogger(__name__)
 
 
+class FalsePositiveDetector:
+    """
+    Analyzes audio and detection patterns to identify likely false positives.
+    """
+    
+    def __init__(self):
+        self.detection_history = []
+        self.last_reason = ""
+        self.noise_baseline = None
+        self.noise_samples = []
+    
+    def analyze_audio_chunk(self, audio_data: np.ndarray) -> Dict[str, Any]:
+        """Analyze audio characteristics to help identify false positives."""
+        try:
+            # Basic audio statistics
+            rms = np.sqrt(np.mean(audio_data.astype(np.float32)**2))
+            max_amplitude = np.max(np.abs(audio_data))
+            min_amplitude = np.min(audio_data)
+            dynamic_range = max_amplitude - min_amplitude
+            
+            # Estimate signal-to-noise ratio
+            if len(audio_data) > 0:
+                # Simple SNR estimation using signal variance vs. noise estimation
+                signal_power = np.var(audio_data.astype(np.float32))
+                noise_floor = np.mean(np.abs(audio_data.astype(np.float32))) * 0.1  # Rough noise estimate
+                estimated_snr = 10 * np.log10(signal_power / (noise_floor + 1e-10)) if noise_floor > 0 else 0
+            else:
+                estimated_snr = 0
+            
+            # Update noise baseline
+            if rms < 50:  # Very quiet audio
+                self.noise_samples.append(rms)
+                if len(self.noise_samples) > 100:
+                    self.noise_samples.pop(0)
+                self.noise_baseline = np.mean(self.noise_samples) if self.noise_samples else rms
+            
+            # Quality assessment
+            if max_amplitude < 10:
+                quality = "extremely_quiet"
+            elif max_amplitude < 100:
+                quality = "very_quiet"
+            elif max_amplitude < 1000:
+                quality = "quiet"
+            elif max_amplitude < 5000:
+                quality = "normal"
+            elif max_amplitude < 15000:
+                quality = "loud"
+            else:
+                quality = "very_loud"
+            
+            return {
+                'rms': rms,
+                'max_amplitude': max_amplitude,
+                'min_amplitude': min_amplitude,
+                'dynamic_range': dynamic_range,
+                'estimated_snr': estimated_snr,
+                'quality_assessment': quality,
+                'noise_baseline': self.noise_baseline or 0.0
+            }
+            
+        except Exception as e:
+            logger.error(f"❌ Error analyzing audio chunk: {e}")
+            return {
+                'rms': 0.0,
+                'max_amplitude': 0,
+                'min_amplitude': 0,
+                'dynamic_range': 0,
+                'estimated_snr': 0.0,
+                'quality_assessment': 'error',
+                'noise_baseline': 0.0
+            }
+    
+    def check_false_positive(self, confidence: float, audio_analysis: Dict[str, Any], model_name: str) -> bool:
+        """Check if a detection is likely a false positive."""
+        try:
+            # Rule 1: Very low audio levels with detection
+            if audio_analysis['max_amplitude'] < 50 and confidence > 0.1:
+                self.last_reason = f"Detection on extremely quiet audio (max_amp={audio_analysis['max_amplitude']})"
+                return True
+            
+            # Rule 2: Detection on pure noise
+            if (audio_analysis['quality_assessment'] in ['extremely_quiet', 'very_quiet'] and 
+                confidence > 0.2):
+                self.last_reason = f"Detection on {audio_analysis['quality_assessment']} audio"
+                return True
+            
+            # Rule 3: Confidence too high for noise-like audio
+            if (audio_analysis['estimated_snr'] < -10 and confidence > 0.3):
+                self.last_reason = f"High confidence ({confidence:.3f}) on low SNR audio ({audio_analysis['estimated_snr']:.1f} dB)"
+                return True
+            
+            # Rule 4: Detection frequency too high (spam detection)
+            current_time = time.time()
+            self.detection_history.append({
+                'time': current_time,
+                'model': model_name,
+                'confidence': confidence,
+                'audio_quality': audio_analysis['quality_assessment']
+            })
+            
+            # Keep only recent detections (last 30 seconds)
+            self.detection_history = [d for d in self.detection_history if current_time - d['time'] < 30]
+            
+            # Check for spam (more than 5 detections in 10 seconds)
+            recent_detections = [d for d in self.detection_history if current_time - d['time'] < 10]
+            if len(recent_detections) > 5:
+                self.last_reason = f"Too many detections ({len(recent_detections)}) in 10 seconds - likely spam"
+                return True
+            
+            # Rule 5: Consistent low-confidence detections (noise triggering)
+            if confidence < 0.15:
+                low_conf_recent = [d for d in recent_detections if d['confidence'] < 0.15]
+                if len(low_conf_recent) > 2:
+                    self.last_reason = f"Multiple low-confidence detections ({len(low_conf_recent)}) suggesting noise triggering"
+                    return True
+            
+            return False
+            
+        except Exception as e:
+            logger.error(f"❌ Error checking false positive: {e}")
+            return False
+    
+    def get_last_reason(self) -> str:
+        """Get the reason for the last false positive detection."""
+        return self.last_reason
+    
+    def get_detection_stats(self) -> Dict[str, Any]:
+        """Get statistics about recent detections."""
+        if not self.detection_history:
+            return {'total': 0, 'recent_10s': 0, 'recent_30s': 0}
+        
+        current_time = time.time()
+        recent_10s = len([d for d in self.detection_history if current_time - d['time'] < 10])
+        recent_30s = len([d for d in self.detection_history if current_time - d['time'] < 30])
+        
+        return {
+            'total': len(self.detection_history),
+            'recent_10s': recent_10s,
+            'recent_30s': recent_30s,
+            'noise_baseline': self.noise_baseline or 0.0
+        }
+
+
 class WakeWordMonitor_new:
     """
     New wake word monitor implementation with configuration-driven model management.
@@ -34,6 +177,11 @@ class WakeWordMonitor_new:
         self.is_detection_enabled = True
         self.last_detection_time = 0
         self.detection_count = 0
+        
+        # Enhanced debugging for false positive diagnosis
+        self.false_positive_detector = FalsePositiveDetector()
+        self.audio_analysis_counter = 0
+        self.confidence_history = []
         
         # Load configuration
         self._load_configuration()
@@ -308,6 +456,19 @@ class WakeWordMonitor_new:
             self._confidence_check_counter = 0
         self._confidence_check_counter += 1
         
+        # Analyze audio characteristics for false positive detection
+        self.audio_analysis_counter += 1
+        audio_analysis = self.false_positive_detector.analyze_audio_chunk(audio_data)
+        
+        # Log audio analysis every 500 chunks to avoid spam
+        if self.audio_analysis_counter % 500 == 0:
+            logger.info(f"📊 AUDIO ANALYSIS (chunk {self.audio_analysis_counter}):")
+            logger.info(f"   RMS: {audio_analysis['rms']:.4f}")
+            logger.info(f"   Max amplitude: {audio_analysis['max_amplitude']}")
+            logger.info(f"   Dynamic range: {audio_analysis['dynamic_range']}")
+            logger.info(f"   Estimated SNR: {audio_analysis['estimated_snr']:.2f} dB")
+            logger.info(f"   Audio quality: {audio_analysis['quality_assessment']}")
+        
         # Process through all active detectors
         for model_name, detector in self.active_detectors.items():
             try:
@@ -350,9 +511,34 @@ class WakeWordMonitor_new:
                                 logger.info(f"   Model paths: {openwakeword_model.model_paths}")
                         
                         logger.info(f"🔍 CONFIDENCE SUMMARY - {model_name}: primary={confidence:.6f}, all_models={all_confidences}")
+                        
+                        # Log false positive detection statistics
+                        fp_stats = self.false_positive_detector.get_detection_stats()
+                        logger.info(f"🛡️ FALSE POSITIVE STATS: {fp_stats['recent_10s']}/10s, {fp_stats['recent_30s']}/30s, noise_baseline={fp_stats['noise_baseline']:.4f}")
                     
                     if detection_result:
-                        logger.info(f"🎯 WAKE WORD DETECTED by model '{model_name}'!")
+                        # Enhanced false positive checking
+                        confidence = detector.engine.get_latest_confidence() if hasattr(detector.engine, 'get_latest_confidence') else 0.0
+                        audio_analysis = self.false_positive_detector.analyze_audio_chunk(audio_data)
+                        
+                        is_likely_false_positive = self.false_positive_detector.check_false_positive(
+                            confidence, audio_analysis, model_name
+                        )
+                        
+                        if is_likely_false_positive:
+                            logger.warning(f"⚠️ POTENTIAL FALSE POSITIVE DETECTED:")
+                            logger.warning(f"   Model: {model_name}")
+                            logger.warning(f"   Confidence: {confidence:.6f}")
+                            logger.warning(f"   Audio RMS: {audio_analysis['rms']:.4f}")
+                            logger.warning(f"   Max amplitude: {audio_analysis['max_amplitude']}")
+                            logger.warning(f"   Quality: {audio_analysis['quality_assessment']}")
+                            logger.warning(f"   Reason: {self.false_positive_detector.get_last_reason()}")
+                            # Don't return True for suspected false positives
+                            continue
+                        
+                        logger.info(f"🎯 LEGITIMATE WAKE WORD DETECTED by model '{model_name}'!")
+                        logger.info(f"   Confidence: {confidence:.6f}")
+                        logger.info(f"   Audio quality: {audio_analysis['quality_assessment']}")
                         self._handle_detection(model_name, detector, audio_data)
                         return True
                         

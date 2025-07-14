@@ -29,6 +29,22 @@
 3. **Audio Pipeline**: Integrated proper audio capture with 16kHz, mono, 1280-sample chunks
 4. **Detection Integration**: Connected audio input to wake word detection processing
 5. **Resource Management**: Added proper cleanup and error handling
+6. **Hardcoded Testing Values**: Bypassed settings system with hardcoded values for testing (threshold: 0.0001, amplification: 200x)
+
+## 🔧 **TODO: Fix Settings System Issues**
+**Priority**: 🔥 **HIGH** - Settings system has persistence and reload issues
+**Issue**: Settings are lost after Docker rebuild and not properly reloaded during runtime
+**Action Required**: Fix settings persistence and real-time reload mechanism
+**Impact**: Cannot properly configure detection thresholds and model parameters through settings files
+**Status**: 🔴 **BLOCKING** - Currently using hardcoded values as workaround
+
+**Specific Issues**:
+1. Settings lost after Docker container rebuild (need persistent storage)
+2. Settings changes not properly applied to running engines (need engine reload)
+3. Settings backup/restore mechanism unreliable
+4. Real-time settings updates don't trigger model configuration updates
+
+**Note**: Settings should survive container restarts but loss after rebuild is acceptable
 
 ## 🔧 **TODO: Replace Settings Manager Polling with File System Events**
 **Priority**: 🟡 **MEDIUM** - Improve efficiency of settings monitoring
