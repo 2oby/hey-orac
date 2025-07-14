@@ -47,6 +47,10 @@ class SettingsManager:
         self._file_watcher_thread = None
         self._stop_watching = False
         
+        # Delayed backup mechanism
+        self._backup_timer = None
+        self._backup_delay = 10.0  # 10 seconds delay
+        
         # Load initial settings
         self._load_settings()
         
@@ -256,16 +260,39 @@ class SettingsManager:
             
             logger.info(f"💾 SETTINGS: Settings saved successfully")
             
-            # Automatically backup settings when they change
-            try:
-                self._backup_settings()
-            except Exception as e:
-                logger.warning(f"⚠️ SETTINGS: Failed to backup settings: {e}")
+            # Schedule delayed backup instead of immediate backup
+            self._schedule_delayed_backup()
             
             return True
         except Exception as e:
             logger.error(f"❌ SETTINGS: Failed to save settings: {e}")
             return False
+    
+    def _schedule_delayed_backup(self) -> None:
+        """Schedule a delayed backup to avoid race conditions."""
+        # Cancel any existing backup timer
+        if self._backup_timer:
+            self._backup_timer.cancel()
+        
+        # Create a new timer for delayed backup
+        self._backup_timer = threading.Timer(self._backup_delay, self._delayed_backup)
+        self._backup_timer.daemon = True
+        self._backup_timer.start()
+        logger.info(f"⏰ SETTINGS: Scheduled delayed backup in {self._backup_delay} seconds")
+    
+    def _delayed_backup(self) -> None:
+        """Perform the actual backup after the delay."""
+        try:
+            logger.info(f"💾 SETTINGS: Performing delayed backup...")
+            success = self._backup_settings()
+            if success:
+                logger.info(f"✅ SETTINGS: Delayed backup completed successfully")
+            else:
+                logger.error(f"❌ SETTINGS: Delayed backup failed")
+        except Exception as e:
+            logger.error(f"❌ SETTINGS: Error during delayed backup: {e}")
+        finally:
+            self._backup_timer = None
     
     def _backup_settings(self) -> bool:
         try:
@@ -461,6 +488,12 @@ class SettingsManager:
     def stop(self) -> None:
         """Stop the settings manager."""
         self._stop_watching = True
+        
+        # Cancel any pending backup timer
+        if self._backup_timer:
+            self._backup_timer.cancel()
+            self._backup_timer = None
+        
         if self._file_watcher_thread:
             self._file_watcher_thread.join(timeout=1)
         logger.info("✅ Settings manager stopped")
