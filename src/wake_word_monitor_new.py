@@ -123,8 +123,15 @@ class WakeWordMonitor_new:
             
             # Create and initialize detector
             detector = WakeWordDetector()
+            
+            # ENHANCED DEBUGGING: Log the exact config being passed
+            logger.info(f"🔧 INITIALIZATION DEBUG for {model_name}:")
+            logger.info(f"   Config keys: {list(detector_config.keys())}")
+            logger.info(f"   Wake word config: {detector_config.get('wake_word', {})}")
+            
             if not detector.initialize(detector_config):
                 logger.error(f"❌ Failed to initialize detector for model: {model_name}")
+                logger.error(f"   Config that failed: {detector_config}")
                 return False
             
             # Store the detector
@@ -134,6 +141,7 @@ class WakeWordMonitor_new:
             logger.info(f"   Wake word: {detector.get_wake_word_name()}")
             logger.info(f"   Sample rate: {detector.get_sample_rate()}")
             logger.info(f"   Frame length: {detector.get_frame_length()}")
+            logger.info(f"   Is ready: {detector.is_ready()}")
             logger.info(f"   Active detectors count: {len(self.active_detectors)}")
             logger.info(f"   Active detectors keys: {list(self.active_detectors.keys())}")
             
@@ -163,21 +171,21 @@ class WakeWordMonitor_new:
             }
         }
         
-        # Add wakeword_models list with active model paths
+        # CRITICAL FIX: Use custom_model_path instead of wakeword_models to match working implementation
         if 'file_paths' in model_config:
             # Check for ONNX file first, then TFLite
             if 'onnx' in model_config['file_paths']:
-                detector_config['wake_word']['wakeword_models'] = [model_config['file_paths']['onnx']]
+                detector_config['wake_word']['custom_model_path'] = model_config['file_paths']['onnx']
                 logger.info(f"🔧 Using ONNX model for {model_name}: {model_config['file_paths']['onnx']}")
             elif 'tflite' in model_config['file_paths']:
-                detector_config['wake_word']['wakeword_models'] = [model_config['file_paths']['tflite']]
+                detector_config['wake_word']['custom_model_path'] = model_config['file_paths']['tflite']
                 logger.info(f"🔧 Using TFLite model for {model_name}: {model_config['file_paths']['tflite']}")
         
         logger.info(f"🔧 Detector config for {model_name}:")
         logger.info(f"   Engine: {detector_config['wake_word']['engine']}")
         logger.info(f"   Sensitivity: {detector_config['wake_word']['sensitivity']:.3f}")
         logger.info(f"   Threshold: {detector_config['wake_word']['threshold']:.3f}")
-        logger.info(f"   Wakeword models: {detector_config['wake_word'].get('wakeword_models', [])}")
+        logger.info(f"   Custom model path: {detector_config['wake_word'].get('custom_model_path', 'None')}")
         logger.info(f"   Audio section: {list(detector_config['audio'].keys())}")
         logger.info(f"   Detection section: {list(detector_config['detection'].keys())}")
         logger.info(f"   Buffer section: {list(detector_config['buffer'].keys())}")
@@ -290,12 +298,24 @@ class WakeWordMonitor_new:
         if current_time - self.last_detection_time < self.global_settings['cooldown']:
             return False
         
+        # ENHANCED DEBUGGING: Track confidence for troubleshooting
+        if not hasattr(self, '_confidence_check_counter'):
+            self._confidence_check_counter = 0
+        self._confidence_check_counter += 1
+        
         # Process through all active detectors
         for model_name, detector in self.active_detectors.items():
             try:
                 if detector.is_ready():
                     # Process audio directly with numpy array (same as working implementation)
                     detection_result = detector.process_audio(audio_data)
+                    
+                    # Log confidence every 100 chunks for debugging
+                    if self._confidence_check_counter % 100 == 0:
+                        confidence = 0.0
+                        if hasattr(detector.engine, 'get_latest_confidence'):
+                            confidence = detector.engine.get_latest_confidence()
+                        logger.info(f"🔍 CONFIDENCE DEBUG - {model_name}: {confidence:.6f} (detection={detection_result})")
                     
                     if detection_result:
                         logger.info(f"🎯 WAKE WORD DETECTED by model '{model_name}'!")

@@ -1,0 +1,78 @@
+# Fixing Wake Word Detection in `WakeWordMonitor_new`
+
+## Overview
+This document summarizes the issue with `WakeWordMonitor_new`, which fails to detect wake words, unlike the working `CustomModelMonitor`. The analysis compares their wake word model creation and usage, references openWakeWord documentation, and provides targeted fixes for an expert developer.
+
+## Problem
+- **Working Code (`CustomModelMonitor`)**: Uses `custom_model_path` to configure a single wake word model, successfully detecting wake words.
+- **Failing Code (`WakeWordMonitor_new`)**: Uses `wakeword_models` for multiple models, likely causing a configuration mismatch with `WakeWordDetector`.
+- **Likely Cause**: `WakeWordDetector` expects `custom_model_path`, not `wakeword_models`, based on the first code and openWakeWord conventions.
+
+## Key Differences
+| Aspect                | `CustomModelMonitor`                | `WakeWordMonitor_new`               | Issue                                  |
+|-----------------------|-------------------------------------|-------------------------------------|----------------------------------------|
+| Model Path Key        | `custom_model_path`                | `wakeword_models`                  | Likely mismatch with expected key      |
+| Number of Models      | Single model                       | Multiple models                    | Potential conflicts in multi-model setup|
+| Configuration         | Simple, wake word-focused          | Complex, with extra sections       | Extra sections may confuse detector    |
+| Audio Processing      | Single detector                    | Loops through detectors            | Failure in any detector stops detection|
+
+## Research Insights
+- **openWakeWord Documentation** ([GitHub](https://github.com/dscripka/openWakeWord), [PyPI](https://pypi.org/project/openwakeword/)):
+  - Model instantiation uses `wakeword_models=["path/to/model.tflite"]` or ONNX files.
+  - Audio must be 16-bit 16kHz PCM, processed in frames (e.g., 80ms).
+- **Other Libraries** ([Picovoice](https://picovoice.ai/blog/python-wake-word-detection-tutorial/), [Spokestack](https://www.spokestack.io/docs/concepts/wake-word/)): Similar audio requirements, emphasizing single-model simplicity.
+
+## Recommended Fixes
+1. **Replace `wakeword_models` with `custom_model_path`**:
+   - In `_create_detector_config`, update:
+     ```python
+     # From
+     detector_config['wake_word']['wakeword_models'] = [model_config['file_paths']['onnx']]
+     # To
+     detector_config['wake_word']['custom_model_path'] = model_config['file_paths']['onnx']
+     ```
+   - Apply similarly for TFLite files.
+
+2. **Test with Single Model**:
+   - Modify `_load_active_models` to load one model:
+     ```python
+     def _load_active_models(self):
+         active_models = self.get_active_models()
+         if active_models:
+             self._load_single_model(active_models[0])
+     ```
+
+3. **Add Debugging Logs**:
+   - Log initialization:
+     ```python
+     if detector.initialize(detector_config):
+         logger.info(f"✅ Detector initialized for {model_name}")
+     else:
+         logger.error(f"❌ Failed to initialize detector for {model_name}")
+     ```
+   - Log audio processing:
+     ```python
+     detection_result = detector.process_audio(audio_data)
+     logger.info(f"Processed audio for {model_name}: Detection = {detection_result}")
+     ```
+
+4. **Verify Model File Paths**:
+   - Log and check paths:
+     ```python
+     logger.info(f"Loading model for {model_name}: {model_config['file_paths']}")
+     ```
+
+5. **Ensure Audio Format**:
+   - Confirm `audio_data` is 16-bit 16kHz PCM in the audio pipeline.
+
+## Why It Works
+- Aligning with `CustomModelMonitor`’s use of `custom_model_path` ensures compatibility with `WakeWordDetector`.
+- Single-model testing and detailed logging isolate and diagnose issues, matching openWakeWord’s recommended setup.
+
+## References
+- [openWakeWord GitHub](https://github.com/dscripka/openWakeWord)
+- [openWakeWord PyPI](https://pypi.org/project/openwakeword/)
+- [Picovoice Blog](https://picovoice.ai/blog/python-wake-word-detection-tutorial/)
+- [Spokestack Docs](https://www.spokestack.io/docs/concepts/wake-word/)
+
+*Date: July 14, 2025, 08:26 PM CEST*
