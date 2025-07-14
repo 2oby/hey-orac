@@ -372,6 +372,19 @@ class OpenWakeWordEngine(WakeWordEngine):
             # Get predictions from model
             predictions = self.model.predict(audio_chunk)
             
+            # Log confidence values periodically (every 100 chunks)
+            if hasattr(self, '_confidence_log_counter'):
+                self._confidence_log_counter += 1
+            else:
+                self._confidence_log_counter = 0
+            
+            if self._confidence_log_counter % 100 == 0:
+                if isinstance(predictions, dict):
+                    for model_name, confidence in predictions.items():
+                        logger.info(f"🔍 Confidence check - {model_name}: {confidence:.6f} (threshold: {self.threshold:.6f})")
+                else:
+                    logger.info(f"🔍 Confidence check - Raw predictions: {predictions}")
+            
             # Process predictions
             detected = False
             detection_model = None
