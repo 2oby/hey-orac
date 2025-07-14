@@ -205,11 +205,11 @@ threshold = 0.3  # 30% - far too high
 threshold = 0.00001  # 0.001% - works with default models
 ```
 
-**Confidence Score Analysis**:
+**Confidence Score Analysis** (from actual testing):
 - Silence: `~0.000001` (baseline noise)
-- Ambient audio: `0.000017` - `0.000037` (normal baseline)
-- Actual speech: May reach `0.0001` - `0.001` (still very low)
-- Wake words: Typically `0.00005` - `0.0005` when properly spoken
+- Ambient audio: `0.000017` - `0.000037` (normal baseline)  
+- **Highest observed**: `0.000049` (hey_mycroft with synthetic noise)
+- **NOTE**: No actual wake words tested yet - these are baseline/quiet room values
 
 **Recommended Thresholds by Model**:
 - `hey_mycroft`: `0.00005` (most reliable)
