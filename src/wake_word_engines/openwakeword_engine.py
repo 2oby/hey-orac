@@ -63,31 +63,42 @@ class OpenWakeWordEngine(WakeWordEngine):
             logger.info(f"🔧 Model Sensitivity: {self.sensitivity:.3f} (internal model parameter)")
             logger.info(f"🔧 Detection Threshold: {self.threshold:.6f} (confidence level to trigger)")
             
-            # Check if custom model is specified
-            custom_model_path = config.get('custom_model_path')
+            # Check if wakeword_models are specified
+            wakeword_models = config.get('wakeword_models', [])
             
-            if custom_model_path and os.path.exists(custom_model_path):
-                # Validate model file before loading
-                if not self._validate_model_file(custom_model_path):
-                    logger.error(f"❌ Model file validation failed: {custom_model_path}")
+            if wakeword_models and len(wakeword_models) > 0:
+                # Validate all model files before loading
+                valid_models = []
+                for model_path in wakeword_models:
+                    if os.path.exists(model_path):
+                        if self._validate_model_file(model_path):
+                            valid_models.append(model_path)
+                            logger.info(f"✅ Validated model: {model_path}")
+                        else:
+                            logger.error(f"❌ Model file validation failed: {model_path}")
+                    else:
+                        logger.warning(f"⚠️ Model file not found: {model_path}")
+                
+                if not valid_models:
+                    logger.error("❌ No valid model files found")
                     return False
                 
-                # Extract model name from file path
-                model_name = os.path.splitext(os.path.basename(custom_model_path))[0]
+                # Extract model name from first file path
+                model_name = os.path.splitext(os.path.basename(valid_models[0]))[0]
                 self.wake_word_name = model_name
                 logger.info(f"🔍 Using custom model name: {model_name}")
                 
                 # Try loading with different configurations
-                logger.info(f"🔍 Attempting to load custom model: {custom_model_path}")
+                logger.info(f"🔍 Attempting to load {len(valid_models)} custom models: {valid_models}")
                 
                 # First attempt: Try with inference_framework specified
                 try:
                     logger.info("🔍 Attempt 1: Loading with inference_framework='onnx'")
                     self.model = openwakeword.Model(
-                        wakeword_model_paths=[custom_model_path],
+                        wakeword_model_paths=valid_models,
                         inference_framework="onnx"  # Explicitly specify ONNX
                     )
-                    logger.info("✅ Model loaded successfully with ONNX framework")
+                    logger.info("✅ Models loaded successfully with ONNX framework")
                 except Exception as e1:
                     logger.warning(f"⚠️ Attempt 1 failed: {e1}")
                     
@@ -95,9 +106,9 @@ class OpenWakeWordEngine(WakeWordEngine):
                     try:
                         logger.info("🔍 Attempt 2: Loading without class mapping")
                         self.model = openwakeword.Model(
-                            wakeword_model_paths=[custom_model_path]
+                            wakeword_model_paths=valid_models
                         )
-                        logger.info("✅ Model loaded successfully without class mapping")
+                        logger.info("✅ Models loaded successfully without class mapping")
                     except Exception as e2:
                         logger.warning(f"⚠️ Attempt 2 failed: {e2}")
                         
@@ -105,12 +116,12 @@ class OpenWakeWordEngine(WakeWordEngine):
                         try:
                             logger.info("🔍 Attempt 3: Loading with class mapping")
                             self.model = openwakeword.Model(
-                                wakeword_model_paths=[custom_model_path],
+                                wakeword_model_paths=valid_models,
                                 class_mapping_dicts=[{0: self.wake_word_name}],
                                 vad_threshold=0.0,
                                 enable_speex_noise_suppression=False
                             )
-                            logger.info("✅ Model loaded successfully with class mapping")
+                            logger.info("✅ Models loaded successfully with class mapping")
                         except Exception as e3:
                             logger.error(f"❌ All loading attempts failed")
                             logger.error(f"   Error 1: {e1}")
@@ -127,9 +138,6 @@ class OpenWakeWordEngine(WakeWordEngine):
                     return False
                     
             else:
-                if custom_model_path:
-                    logger.warning(f"⚠️ Custom model path specified but file not found: {custom_model_path}")
-                
                 logger.info("🔍 Loading pre-trained models")
                 self.model = openwakeword.Model(
                     vad_threshold=0.0,

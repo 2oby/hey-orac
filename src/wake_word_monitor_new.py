@@ -58,15 +58,14 @@ class WakeWordMonitor_new:
             'cooldown': self.settings_manager.get('wake_word.cooldown', 1.5),
             'engine': self.settings_manager.get('wake_word.engine', 'openwakeword'),
             'model_path': self.settings_manager.get('wake_word.model_path', ''),
-            'custom_model_path': self.settings_manager.get('wake_word.custom_model_path', '')
-            # Removed keyword since it's not needed for custom models
+            'wakeword_models': []  # Will be populated with active model paths
         }
         
         logger.info(f"🔧 Global Configuration:")
         logger.info(f"   Cooldown: {self.global_settings['cooldown']}s")
         logger.info(f"   Engine: {self.global_settings['engine']}")
         logger.info(f"   Model Path: {self.global_settings['model_path']}")
-        logger.info(f"   Custom Model Path: {self.global_settings['custom_model_path']}")
+        logger.info(f"   Wakeword Models: {len(self.global_settings['wakeword_models'])} models")
     
     def _build_model_configs(self):
         """Build configuration for each discovered model."""
@@ -164,21 +163,21 @@ class WakeWordMonitor_new:
             }
         }
         
-        # Add custom model path if available
+        # Add wakeword_models list with active model paths
         if 'file_paths' in model_config:
             # Check for ONNX file first, then TFLite
             if 'onnx' in model_config['file_paths']:
-                detector_config['wake_word']['custom_model_path'] = model_config['file_paths']['onnx']
+                detector_config['wake_word']['wakeword_models'] = [model_config['file_paths']['onnx']]
                 logger.info(f"🔧 Using ONNX model for {model_name}: {model_config['file_paths']['onnx']}")
             elif 'tflite' in model_config['file_paths']:
-                detector_config['wake_word']['custom_model_path'] = model_config['file_paths']['tflite']
+                detector_config['wake_word']['wakeword_models'] = [model_config['file_paths']['tflite']]
                 logger.info(f"🔧 Using TFLite model for {model_name}: {model_config['file_paths']['tflite']}")
         
         logger.info(f"🔧 Detector config for {model_name}:")
         logger.info(f"   Engine: {detector_config['wake_word']['engine']}")
         logger.info(f"   Sensitivity: {detector_config['wake_word']['sensitivity']:.3f}")
         logger.info(f"   Threshold: {detector_config['wake_word']['threshold']:.3f}")
-        logger.info(f"   Custom model path: {detector_config['wake_word'].get('custom_model_path', 'None')}")
+        logger.info(f"   Wakeword models: {detector_config['wake_word'].get('wakeword_models', [])}")
         logger.info(f"   Audio section: {list(detector_config['audio'].keys())}")
         logger.info(f"   Detection section: {list(detector_config['detection'].keys())}")
         logger.info(f"   Buffer section: {list(detector_config['buffer'].keys())}")

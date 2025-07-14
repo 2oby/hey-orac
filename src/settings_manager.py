@@ -72,7 +72,6 @@ class SettingsManager:
                 "sensitivity": 0.8,
                 "threshold": 0.001,  # FIX #4: Lowered to 0.001 for debugging
                 "access_key": "",
-                "custom_model_path": "third_party/openwakeword/custom_models/Hay--compUta_v_lrg.onnx",
                 "models": {
                     "Hay--compUta_v_lrg": {
                         "sensitivity": 0.8,
