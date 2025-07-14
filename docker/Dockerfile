@@ -103,5 +103,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 # Make startup script executable
 RUN chmod +x src/startup.sh
 
-# Default command - run the startup script for Option 3: Web Backend as a Service
-CMD ["src/startup.sh"] 
+# Default command - run the test script for OpenWakeWord testing
+CMD ["/app/venv/bin/python", "src/main_test.py"] 
