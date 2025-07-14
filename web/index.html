@@ -775,7 +775,7 @@
                 <div class="slider-group">
                     <label class="slider-label">RMS Filter</label>
                     <input type="range" class="slider" id="rmsFilter" min="0" max="100" step="1" value="50">
-                    <span class="slider-value" id="rmsFilterValue">10.0</span>
+                    <span class="slider-value" id="rmsFilterValue">50</span>
                 </div>
                 
                 <!-- Remove Debounce slider and label -->
@@ -895,8 +895,12 @@
                 
                 // Set global sliders from config
                 if (config.global) {
+                    console.log(`🔧 DEBUG: Config global object:`, config.global);
+                    console.log(`🔧 DEBUG: config.global["rms_filter"] =`, config.global["rms_filter"]);
+                    console.log(`🔧 DEBUG: typeof config.global["rms_filter"] =`, typeof config.global["rms_filter"]);
+                    
                     // Load RMS filter from the correct setting
-                    const rmsFilterValue = config.global["rms_filter"] || 10;
+                    const rmsFilterValue = config.global["rms_filter"] || 50;
                     console.log(`🔧 DEBUG: Loading RMS filter - Raw value: ${rmsFilterValue}`);
                     const sliderValue = rmsToSlider(rmsFilterValue);
                     console.log(`🔧 DEBUG: Loading RMS filter - Value: ${rmsFilterValue}, Slider: ${sliderValue}`);
@@ -912,6 +916,12 @@
                     // Test the conversion for debugging
                     console.log(`🔧 DEBUG: Testing rmsToSlider conversion:`);
                     debugRmsConversion(rmsFilterValue);
+                    
+                    // Simple test cases
+                    console.log(`🔧 DEBUG: Testing edge cases:`);
+                    console.log(`  rmsToSlider(0) = ${rmsToSlider(0)}`);
+                    console.log(`  rmsToSlider(50) = ${rmsToSlider(50)}`);
+                    console.log(`  rmsToSlider(5000) = ${rmsToSlider(5000)}`);
                 }
                 
                 // Per-model sensitivity and threshold are now handled in model cards
@@ -1187,7 +1197,12 @@
           const norm = (rmsValue - minRms) / (maxRms - minRms);
           // invert the curve
           const ratio = Math.log(norm * (base - 1) + 1) / Math.log(base);
-          return Math.round(ratio * 100);
+          const result = Math.round(ratio * 100);
+          
+          // Debug logging for troubleshooting
+          console.log(`🔧 rmsToSlider(${rmsValue}): norm=${norm}, ratio=${ratio}, result=${result}`);
+          
+          return result;
         }
         
         // Debug function to test conversion
