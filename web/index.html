@@ -900,7 +900,7 @@
                     console.log(`🔧 DEBUG: typeof config.global["rms_filter"] =`, typeof config.global["rms_filter"]);
                     
                     // Load RMS filter from the correct setting
-                    const rmsFilterValue = config.global["rms_filter"] || 50;
+                    const rmsFilterValue = (config.global["rms_filter"] !== undefined) ? config.global["rms_filter"] : 50;
                     console.log(`🔧 DEBUG: Loading RMS filter - Raw value: ${rmsFilterValue}`);
                     const sliderValue = rmsToSlider(rmsFilterValue);
                     console.log(`🔧 DEBUG: Loading RMS filter - Value: ${rmsFilterValue}, Slider: ${sliderValue}`);
