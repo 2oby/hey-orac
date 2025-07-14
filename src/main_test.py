@@ -385,7 +385,7 @@ def main():
         # Stage 3: Integrated test
         logger.info("📋 Stage 3: Running integrated wake word detection test...")
         
-        if not integrated_test.run_integrated_test(duration_seconds=300):  # 5 minutes for interactive testing
+        if not integrated_test.run_integrated_test(duration_seconds=30):  # 30 seconds for quick testing
             logger.error("❌ Integrated test failed")
             return 1
         
