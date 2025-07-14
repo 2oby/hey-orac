@@ -52,16 +52,20 @@ class OpenWakeWordEngine(WakeWordEngine):
             logger.info(f"   Frame length: {self.get_frame_length()} samples ✓")
             logger.info(f"   Expected chunk duration: {self.get_frame_length() / self.sample_rate * 1000:.1f}ms ✓")
             
-            # Get sensitivity and threshold from config
-            self.sensitivity = config.get('sensitivity', 0.8)
-            self.threshold = config.get('threshold', 0.001)
+            # HARDCODED VALUES FOR TESTING - bypass settings system
+            # We were getting confidence 0.000837, so let's set threshold much lower
+            self.sensitivity = 0.8
+            self.threshold = 0.0001  # Much lower than the 0.000837 we were seeing
             
-            # Get audio processing settings from config
-            self.low_audio_threshold = config.get('low_audio_threshold', 1000)
-            self.amplification_factor = config.get('amplification_factor', 10)
+            # Aggressive amplification for low audio levels
+            self.low_audio_threshold = 50  # Trigger amplification earlier  
+            self.amplification_factor = 200  # Much stronger amplification
             
-            logger.info(f"🔧 Model Sensitivity: {self.sensitivity:.3f} (internal model parameter)")
-            logger.info(f"🔧 Detection Threshold: {self.threshold:.6f} (confidence level to trigger)")
+            logger.info("🔧 HARDCODED TESTING VALUES:")
+            logger.info(f"   Sensitivity: {self.sensitivity:.3f} (hardcoded)")
+            logger.info(f"   Threshold: {self.threshold:.6f} (hardcoded - much lower for testing)")
+            logger.info(f"   Low audio threshold: {self.low_audio_threshold} (hardcoded)")
+            logger.info(f"   Amplification factor: {self.amplification_factor} (hardcoded)")
             
             # Check if wakeword_models are specified or custom_model_path
             wakeword_models = config.get('wakeword_models', [])
