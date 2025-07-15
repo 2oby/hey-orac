@@ -6,9 +6,8 @@ Uses AudioManager for robust audio device handling.
 
 import sys
 import os
-# Force unbuffered output
-sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
-sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0)
+# Use environment variable for unbuffered output instead
+os.environ['PYTHONUNBUFFERED'] = '1'
 
 import openwakeword
 from openwakeword.model import Model
@@ -58,10 +57,14 @@ try:
 
     # Initialize the OpenWakeWord model, loading all pre-trained models
     print("DEBUG: About to create Model()", flush=True)
-    model = Model()
-    print("DEBUG: Model created successfully", flush=True)
-    logger.info("OpenWakeWord model initialized")
-    print("DEBUG: After model initialized log", flush=True)
+    try:
+        model = Model()
+        print("DEBUG: Model created successfully", flush=True)
+        logger.info("OpenWakeWord model initialized")
+        print("DEBUG: After model initialized log", flush=True)
+    except Exception as e:
+        print(f"ERROR: Model creation failed: {e}", flush=True)
+        raise
     
     # Force log flush
     sys.stdout.flush()
