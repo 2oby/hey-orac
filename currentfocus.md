@@ -1,31 +1,29 @@
-# Current Focus: Test Wake Word Detection Functionality
+# Current Focus: Wake Word Detection Confidence Score Analysis
 
-## Problem SOLVED ✅
-The wake word detection loop is now working! The issue was an unbuffered I/O ValueError that prevented script execution.
+## System Status ✅
+All technical infrastructure is fully operational and models are loaded successfully.
 
 ## What's Working
-- ✅ Docker container builds and runs successfully
-- ✅ USB microphone (SH-04) detected correctly
+- ✅ Docker container builds and runs successfully  
+- ✅ USB microphone (SH-04) detected correctly at 100% gain (15.60dB)
 - ✅ Audio stream creation successful (2560 bytes per read)
-- ✅ OpenWakeWord model loading (6 models: alexa, hey_mycroft, hey_jarvis, hey_rhasspy, timer, weather)
+- ✅ OpenWakeWord models loaded: ['alexa', 'hey_mycroft', 'hey_jarvis', 'hey_rhasspy', '1_minute_timer', '5_minute_timer', '10_minute_timer', '20_minute_timer', '30_minute_timer', '1_hour_timer', 'weather']
 - ✅ Container health checks passing
-- ✅ Main detection loop processing audio chunks continuously
-- ✅ Audio volume detection working (0.0001-0.0002 amplitude levels)
+- ✅ Main detection loop processing audio chunks continuously  
+- ✅ Audio volume detection working (0.0001-0.0002 amplitude levels with max gain)
+- ✅ Full confidence score logging implemented
 
-## Current Testing Phase
-Now that the technical infrastructure is working, need to test actual wake word detection:
+## Current Issue: Very Low Confidence Scores
+The models are running but confidence scores are extremely low even with speech:
+- Typical scores: 0.000001-0.000005 range
+- Detection thresholds lowered to 0.1, 0.05, 0.01 but still no triggers
+- Need to investigate why confidence scores remain so low
 
-1. **Test wake word triggers**: Try speaking each available wake word near the Pi
-   - "Alexa"
-   - "Hey Mycroft" 
-   - "Hey Jarvis"
-   - "Hey Rhasspy"
-   - "Timer"
-   - "Weather"
-
-2. **Monitor detection logs**: Watch for detection events above threshold (currently 0.3)
-
-3. **Validate detection accuracy**: Ensure genuine detections vs false positives
+## Current Investigation
+1. **Audio Quality**: Check if 16kHz mono audio preprocessing is correct
+2. **Model Expectations**: Verify models expect the current audio format  
+3. **Volume Normalization**: Confirm audio amplitude normalization is appropriate
+4. **Speech Testing**: Test with very clear, loud wake word pronunciation
 
 ## Monitoring Commands
 - Real-time logs: `ssh pi "cd ~/WakeWordTest && docker-compose logs -f wake-word-test"`

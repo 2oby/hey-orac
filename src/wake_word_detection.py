@@ -107,8 +107,8 @@ try:
                 logger.warning("No audio data read from stream")
                 continue
 
-            # Convert bytes to numpy array for OpenWakeWord
-            audio_data = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32767.0
+            # Convert bytes to numpy array for OpenWakeWord (using proper normalization like old working code)
+            audio_data = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
 
             # Log every 100 chunks to show we're processing audio
             chunk_count += 1
