@@ -51,9 +51,26 @@ try:
     # Initialize the OpenWakeWord model, loading all pre-trained models
     model = Model()
     logger.info("OpenWakeWord model initialized")
+    
+    # Force log flush
+    import sys
+    sys.stdout.flush()
+
+    # Test audio stream first
+    logger.info("🧪 Testing audio stream...")
+    sys.stdout.flush()
+    try:
+        test_data = stream.read(1280, exception_on_overflow=False)
+        logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
+        sys.stdout.flush()
+    except Exception as e:
+        logger.error(f"❌ Audio stream test failed: {e}")
+        sys.stdout.flush()
+        raise
 
     # Continuously listen to the audio stream and detect wake words
     logger.info("🎤 Starting wake word detection loop...")
+    sys.stdout.flush()
     chunk_count = 0
     while True:
         try:
