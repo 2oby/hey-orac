@@ -46,8 +46,8 @@ else
     echo -e "${YELLOW}Committing with message: $COMMIT_MSG${NC}"
     git commit -m "$COMMIT_MSG"
     
-    echo -e "${YELLOW}Pushing to origin/main${NC}"
-    git push origin main
+    echo -e "${YELLOW}Pushing to origin/wake-word-test${NC}"
+    git push origin wake-word-test
 fi
 
 # Get current commit hash and branch
