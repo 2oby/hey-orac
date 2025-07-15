@@ -12,7 +12,7 @@ from audio_utils import AudioManager  # Import the AudioManager class
 
 # Configure logging for debugging
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
@@ -53,6 +53,8 @@ try:
     logger.info("OpenWakeWord model initialized")
 
     # Continuously listen to the audio stream and detect wake words
+    logger.info("🎤 Starting wake word detection loop...")
+    chunk_count = 0
     while True:
         try:
             # Read one chunk of audio data (1280 samples)
@@ -64,6 +66,11 @@ try:
             # Convert bytes to numpy array for OpenWakeWord
             audio_data = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32767.0
 
+            # Log every 100 chunks to show we're processing audio
+            chunk_count += 1
+            if chunk_count % 100 == 0:
+                logger.info(f"📊 Processed {chunk_count} audio chunks, latest volume: {np.abs(audio_data).mean():.4f}")
+
             # Pass the audio data to the model for wake word prediction
             prediction = model.predict(audio_data)
         except Exception as e:
@@ -72,9 +79,12 @@ try:
 
         # Check predictions for each pre-trained model
         for wakeword, score in prediction.items():
-            # If the score exceeds 0.5, consider it a wake word detection
-            if score > 0.5:
-                logger.info(f"Wake word '{wakeword}' detected with score {score}")
+            # If the score exceeds 0.3, consider it a wake word detection (lowered for testing)
+            if score > 0.3:
+                logger.info(f"🚨 Wake word '{wakeword}' detected with score {score}")
+            # Log any score above 0.1 for debugging
+            elif score > 0.1:
+                logger.debug(f"🔍 Weak signal for '{wakeword}': {score:.3f}")
 
 except KeyboardInterrupt:
     # Handle graceful shutdown on Ctrl+C
