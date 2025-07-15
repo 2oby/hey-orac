@@ -106,6 +106,14 @@ try:
 
             # Pass the audio data to the model for wake word prediction
             prediction = model.predict(audio_data)
+            
+            # Log max confidence scores after each processed chunk
+            if chunk_count % 100 == 0:
+                max_scores = {word: score for word, score in prediction.items() if score > 0.001}
+                if max_scores:
+                    logger.debug(f"🎯 Max confidence scores: {max_scores}")
+                else:
+                    logger.debug(f"🎯 Max confidence scores: all below 0.001")
         except Exception as e:
             logger.error(f"Error processing audio data: {e}")
             continue
