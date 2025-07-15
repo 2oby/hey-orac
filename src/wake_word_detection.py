@@ -61,6 +61,7 @@ try:
         model = Model()
         print("DEBUG: Model created successfully", flush=True)
         logger.info("OpenWakeWord model initialized")
+        logger.info(f"Available models: {list(model.prediction_buffer.keys())}")
         print("DEBUG: After model initialized log", flush=True)
     except Exception as e:
         print(f"ERROR: Model creation failed: {e}", flush=True)
@@ -120,12 +121,15 @@ try:
 
         # Check predictions for each pre-trained model
         for wakeword, score in prediction.items():
-            # If the score exceeds 0.3, consider it a wake word detection (lowered for testing)
-            if score > 0.3:
+            # If the score exceeds 0.1, consider it a wake word detection (lowered for testing)
+            if score > 0.1:
                 logger.info(f"🚨 Wake word '{wakeword}' detected with score {score}")
-            # Log any score above 0.1 for debugging
-            elif score > 0.1:
+            # Log any score above 0.05 for debugging
+            elif score > 0.05:
                 logger.debug(f"🔍 Weak signal for '{wakeword}': {score:.3f}")
+            # Log any score above 0.01 for very weak signals
+            elif score > 0.01:
+                logger.debug(f"🔍 Very weak signal for '{wakeword}': {score:.3f}")
 
 except KeyboardInterrupt:
     # Handle graceful shutdown on Ctrl+C
