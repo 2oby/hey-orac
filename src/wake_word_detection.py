@@ -28,6 +28,10 @@ logger = logging.getLogger(__name__)
 # This ensures models like "alexa", "hey jarvis", etc., are available
 openwakeword.utils.download_models()
 
+# Get list of downloaded models
+downloaded_models = openwakeword.utils.get_model_list()
+logger.info(f"Downloaded models: {downloaded_models}")
+
 try:
     # Initialize AudioManager for audio device handling
     audio_manager = AudioManager()
