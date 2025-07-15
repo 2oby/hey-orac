@@ -57,15 +57,20 @@ try:
         raise RuntimeError("Failed to start audio stream")
 
     # Initialize the OpenWakeWord model, loading all pre-trained models
+    print("DEBUG: About to create Model()", flush=True)
     model = Model()
+    print("DEBUG: Model created successfully", flush=True)
     logger.info("OpenWakeWord model initialized")
+    print("DEBUG: After model initialized log", flush=True)
     
     # Force log flush
-    import sys
     sys.stdout.flush()
+    print("DEBUG: After sys.stdout.flush()", flush=True)
 
     # Test audio stream first
+    print("DEBUG: About to test audio stream", flush=True)
     logger.info("🧪 Testing audio stream...")
+    print("DEBUG: After audio stream test log", flush=True)
     sys.stdout.flush()
     try:
         test_data = stream.read(1280, exception_on_overflow=False)
