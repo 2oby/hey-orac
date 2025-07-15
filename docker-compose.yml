@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  wake-word-test:
+    build: .
+    container_name: wake-word-test
+    restart: unless-stopped
+    
+    # Audio device access
+    devices:
+      - /dev/snd:/dev/snd
+    
+    # Privileged mode for audio hardware access
+    privileged: true
+    
+    # Volume mounts
+    volumes:
+      - ./logs:/app/logs
+      - ./recordings:/app/recordings
+      - /tmp:/tmp
+      # Mount custom models if needed
+      - ./third_party/openwakeword/custom_models:/app/third_party/openwakeword/custom_models
+    
+    # Environment variables
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ALSA_CARD=1
+      - AUDIO_DEVICE=/dev/snd
+      - PULSE_RUNTIME_PATH=/tmp
+    
+    # Network mode for easier debugging
+    network_mode: host
+    
+    # Health check
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import openwakeword; print('OK')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    
+    # Resource limits (adjust for your Pi)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M

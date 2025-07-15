@@ -1,0 +1,18 @@
+# Example configuration for using custom Porcupine models
+# Copy this configuration to src/config.yaml and update the paths
+
+wake_word:
+  engine: "porcupine"
+  keyword: "hey_orac"                    # Your custom wake word name
+  sensitivities:
+    "hey_orac": 0.6                     # Model sensitivity (0.0-1.0) - internal model parameter
+  thresholds:
+    "hey_orac": 0.5                     # Detection threshold (0.0-1.0) - confidence level to trigger detection
+  model_path: "/app/third_party/porcupine/custom_models/hey_orac.ppn"
+  access_key: "your_picovoice_access_key_here"
+
+# Alternative: Use different model
+# model_path: "/app/third_party/porcupine/custom_models/orac.ppn"
+
+# To use the default model in models/porcupine/, use:
+# model_path: "/app/models/porcupine/orac.ppn" 

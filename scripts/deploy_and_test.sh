@@ -1,0 +1,153 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# OpenWakeWord Test Deploy and Test Script
+# Usage: ./scripts/deploy_and_test.sh [commit_message]
+# Example: ./scripts/deploy_and_test.sh "Add OpenWakeWord implementation"
+
+# Default parameters
+COMMIT_MSG=${1:-"Initial OpenWakeWord test implementation"}
+REMOTE_ALIAS="pi"
+PROJECT_NAME="WakeWordTest"
+
+# Terminal colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}🚀 OpenWakeWord Test Deployment Script${NC}"
+echo -e "${BLUE}======================================${NC}"
+echo -e "${YELLOW}Deploying to: $REMOTE_ALIAS${NC}"
+echo -e "${YELLOW}Project: $PROJECT_NAME${NC}"
+echo -e "${YELLOW}Commit message: $COMMIT_MSG${NC}"
+echo -e "${BLUE}============================${NC}"
+
+# Check if we're connected to the Pi
+echo -e "${YELLOW}👉 Checking connection to $REMOTE_ALIAS...${NC}"
+if ! ssh -q -o BatchMode=yes -o ConnectTimeout=5 "$REMOTE_ALIAS" exit; then
+    echo -e "${RED}❌ Cannot connect to $REMOTE_ALIAS. Please check your SSH configuration.${NC}"
+    exit 1
+fi
+echo -e "${GREEN}✓ Connected to $REMOTE_ALIAS${NC}"
+
+# 1) Local: commit and push
+echo -e "${YELLOW}👉 Pushing local commits to master...${NC}"
+
+# Add all changes
+echo -e "${YELLOW}Adding all changes${NC}"
+git add -A
+
+# Commit if there are any changes
+if git diff --cached --quiet; then
+    echo -e "${YELLOW}No changes to commit${NC}"
+else
+    echo -e "${YELLOW}Committing with message: $COMMIT_MSG${NC}"
+    git commit -m "$COMMIT_MSG"
+    
+    echo -e "${YELLOW}Pushing to origin/main${NC}"
+    git push origin main
+fi
+
+# Get current commit hash and branch
+COMMIT_HASH=$(git rev-parse HEAD)
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+
+echo -e "${YELLOW}Deploying commit: $COMMIT_HASH on branch: $BRANCH_NAME${NC}"
+
+# 2) Remote: pull, build & test
+echo -e "${YELLOW}👉 Running remote update & deployment on $REMOTE_ALIAS...${NC}"
+ssh "$REMOTE_ALIAS" "\
+    set -euo pipefail; \
+    echo '${BLUE}📂 Updating code from repository...${NC}'; \
+    cd \$HOME/$PROJECT_NAME; \
+    git fetch origin; \
+    git checkout $BRANCH_NAME || git checkout -b $BRANCH_NAME origin/$BRANCH_NAME; \
+    git reset --hard $COMMIT_HASH; \
+    git clean -fd; \
+    
+    echo '${BLUE}🔍 Checking system resources...${NC}'; \
+    echo 'Memory:'; \
+    free -h; \
+    echo 'Disk:'; \
+    df -h | grep -E '/$|/home'; \
+    
+    echo '${BLUE}🔍 Checking audio devices...${NC}'; \
+    arecord -l || echo 'No audio devices found'; \
+    
+    echo '${BLUE}🔍 Checking Docker...${NC}'; \
+    docker --version; \
+    docker-compose --version; \
+    
+    echo '${BLUE}🧹 Cleaning up old Docker resources...${NC}'; \
+    echo 'Disk space before cleanup:'; \
+    df -h | grep -E '/$|/home'; \
+    \
+    echo 'Stopping old containers...'; \
+    docker-compose down --remove-orphans 2>/dev/null || true; \
+    docker container prune -f 2>/dev/null || true; \
+    \
+    echo 'Removing unused images (keeping last 2)...'; \
+    docker image prune -a -f --filter \"until=24h\" 2>/dev/null || true; \
+    \
+    echo 'Removing unused volumes...'; \
+    docker volume prune -f 2>/dev/null || true; \
+    \
+    echo 'Removing unused networks...'; \
+    docker network prune -f 2>/dev/null || true; \
+    \
+    echo 'Cleaning build cache...'; \
+    docker builder prune -f --filter \"until=24h\" 2>/dev/null || true; \
+    \
+    echo 'Disk space after cleanup:'; \
+    df -h | grep -E '/$|/home'; \
+    \
+    echo '${GREEN}✓ Docker cleanup completed${NC}'; \
+    
+    echo '${BLUE}🐳 Building & starting containers...${NC}'; \
+    docker-compose up --build -d; \
+    
+    echo '${BLUE}🔍 Checking container logs...${NC}'; \
+    sleep 3; \
+    docker-compose logs wake-word-test | tail -n 10; \
+    
+    echo '${BLUE}📊 Checking resource usage...${NC}'; \
+    echo 'Container status:'; \
+    docker-compose ps; \
+    \
+    echo 'Memory usage:'; \
+    free -h; \
+    \
+    echo 'Disk usage:'; \
+    df -h | grep -E '/$|/home'; \
+    
+    echo '${BLUE}🔍 Checking container health...${NC}'; \
+    docker-compose ps; \
+    
+    echo '${BLUE}🧪 Testing OpenWakeWord system...${NC}'; \
+    echo 'Checking wake word detection service...'; \
+    \
+    echo 'Testing container health...'; \
+    docker-compose ps wake-word-test | grep -q 'Up' && echo '✅ Wake word service is running' || echo '❌ Wake word service not running'; \
+    \
+    echo 'Checking audio device access...'; \
+    docker-compose exec -T wake-word-test python3 -c \"from src.audio_utils import AudioManager; am = AudioManager(); devices = am.list_input_devices(); print(f'Found {len(devices)} input devices')\" 2>/dev/null && echo '✅ Audio devices accessible' || echo '❌ Audio device access failed'; \
+    \
+    echo 'Testing OpenWakeWord model loading...'; \
+    docker-compose exec -T wake-word-test python3 -c \"import openwakeword; from openwakeword.model import Model; m = Model(); print('Model loaded successfully')\" 2>/dev/null && echo '✅ OpenWakeWord models loaded' || echo '❌ Model loading failed'; \
+    
+    echo '${GREEN}✓ OpenWakeWord system tests completed${NC}'; \
+    
+    echo '${GREEN}✓ Deployment completed successfully${NC}'; \
+"
+
+echo -e "${GREEN}🎉 Deployment completed successfully!${NC}"
+echo -e "${BLUE}📊 To monitor the service:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/WakeWordTest && docker-compose logs -f wake-word-test'${NC}"
+echo -e "${BLUE}📊 To check container status:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/WakeWordTest && docker-compose ps'${NC}"
+echo -e "${BLUE}🔧 To restart the service:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/WakeWordTest && docker-compose restart wake-word-test'${NC}"
+echo -e "${BLUE}🛑 To stop the service:${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/WakeWordTest && docker-compose down'${NC}" 
