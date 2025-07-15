@@ -72,6 +72,29 @@ try:
             logger.info(f"Loaded models: {list(model.models.keys()) if model.models else 'None'}")
         logger.info(f"Prediction buffer keys: {list(model.prediction_buffer.keys())}")
         
+        # Enhanced model verification - test with dummy audio like old working code
+        logger.info("🔍 Testing model with dummy audio to verify initialization...")
+        test_audio = np.zeros(1280, dtype=np.float32)
+        try:
+            test_predictions = model.predict(test_audio)
+            logger.info(f"✅ Model test successful - prediction type: {type(test_predictions)}")
+            logger.info(f"   Test prediction content: {test_predictions}")
+            logger.info(f"   Test prediction keys: {list(test_predictions.keys())}")
+            
+            # Check prediction_buffer after first prediction (like old working code)
+            if hasattr(model, 'prediction_buffer'):
+                logger.info(f"✅ Prediction buffer populated after test prediction")
+                logger.info(f"   Prediction buffer keys: {list(model.prediction_buffer.keys())}")
+                for key, scores in model.prediction_buffer.items():
+                    latest_score = scores[-1] if scores else 'N/A'
+                    logger.info(f"     Model '{key}': {len(scores)} scores, latest: {latest_score}")
+            else:
+                logger.warning("⚠️ Prediction buffer not available after test prediction")
+                
+        except Exception as e:
+            logger.error(f"❌ Error testing model after creation: {e}")
+            raise
+        
         print("DEBUG: After model initialized log", flush=True)
     except Exception as e:
         print(f"ERROR: Model creation failed: {e}", flush=True)
@@ -126,17 +149,34 @@ try:
             logger.error(f"Error processing audio data: {e}")
             continue
 
-        # Check predictions for each pre-trained model
+        # Enhanced wake word detection logic like old working code
+        max_confidence = 0.0
+        best_model = None
+        
+        # Find the highest confidence score
         for wakeword, score in prediction.items():
-            # If the score exceeds 0.1, consider it a wake word detection (lowered for testing)
-            if score > 0.1:
-                logger.info(f"🚨 Wake word '{wakeword}' detected with score {score}")
-            # Log any score above 0.05 for debugging
-            elif score > 0.05:
-                logger.debug(f"🔍 Weak signal for '{wakeword}': {score:.3f}")
-            # Log any score above 0.01 for very weak signals
-            elif score > 0.01:
-                logger.debug(f"🔍 Very weak signal for '{wakeword}': {score:.3f}")
+            if score > max_confidence:
+                max_confidence = score
+                best_model = wakeword
+        
+        # Check against appropriate threshold (using 0.5 like old working code)
+        detection_threshold = 0.5
+        if max_confidence >= detection_threshold:
+            logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
+            logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+        else:
+            # Enhanced debugging - log more frequent confidence updates
+            if chunk_count % 50 == 0:  # Every 50 chunks instead of 100
+                logger.debug(f"🎯 Best confidence: {max_confidence:.6f} from '{best_model}' (threshold: {detection_threshold:.6f})")
+                logger.debug(f"   All scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+            
+            # Also check for moderate confidence levels for debugging
+            if max_confidence > 0.1:
+                logger.info(f"🔍 Moderate confidence detected: {best_model} = {max_confidence:.6f}")
+            elif max_confidence > 0.05:
+                logger.debug(f"🔍 Weak signal: {best_model} = {max_confidence:.6f}")
+            elif max_confidence > 0.01:
+                logger.debug(f"🔍 Very weak signal: {best_model} = {max_confidence:.6f}")
 
 except KeyboardInterrupt:
     # Handle graceful shutdown on Ctrl+C
