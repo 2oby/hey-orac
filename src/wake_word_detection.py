@@ -61,11 +61,17 @@ try:
     # Initialize the OpenWakeWord model, loading all pre-trained models
     print("DEBUG: About to create Model()", flush=True)
     try:
-        # Use default model loading to get all built-in models
-        model = Model()
+        # Use default model loading - leave wakeword_models empty to load all pre-trained models
+        logger.info("Creating Model with default settings to load all pre-trained models...")
+        model = Model(inference_framework='tflite')  # Explicitly use tflite
         print("DEBUG: Model created successfully", flush=True)
-        logger.info("OpenWakeWord model initialized with built-in models")
+        logger.info("OpenWakeWord model initialized")
+        
+        # Check what models are actually loaded
+        if hasattr(model, 'models'):
+            logger.info(f"Loaded models: {list(model.models.keys()) if model.models else 'None'}")
         logger.info(f"Prediction buffer keys: {list(model.prediction_buffer.keys())}")
+        
         print("DEBUG: After model initialized log", flush=True)
     except Exception as e:
         print(f"ERROR: Model creation failed: {e}", flush=True)
