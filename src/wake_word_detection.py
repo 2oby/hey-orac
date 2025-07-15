@@ -28,9 +28,8 @@ logger = logging.getLogger(__name__)
 # This ensures models like "alexa", "hey jarvis", etc., are available
 openwakeword.utils.download_models()
 
-# Get list of downloaded models
-downloaded_models = openwakeword.utils.get_model_list()
-logger.info(f"Downloaded models: {downloaded_models}")
+# Try to explicitly load specific models
+logger.info("Attempting to load pre-trained models...")
 
 try:
     # Initialize AudioManager for audio device handling
@@ -62,14 +61,23 @@ try:
     # Initialize the OpenWakeWord model, loading all pre-trained models
     print("DEBUG: About to create Model()", flush=True)
     try:
-        model = Model()
+        # Try explicit model loading with specific models
+        model = Model(wakeword_models=["alexa", "hey_jarvis"])
         print("DEBUG: Model created successfully", flush=True)
         logger.info("OpenWakeWord model initialized")
         logger.info(f"Available models: {list(model.prediction_buffer.keys())}")
         print("DEBUG: After model initialized log", flush=True)
     except Exception as e:
         print(f"ERROR: Model creation failed: {e}", flush=True)
-        raise
+        logger.error(f"Full error details: {e}")
+        # Try without specific models as fallback
+        try:
+            logger.info("Trying to load without specific models...")
+            model = Model()
+            logger.info(f"Fallback model available models: {list(model.prediction_buffer.keys())}")
+        except Exception as e2:
+            print(f"ERROR: Fallback model creation also failed: {e2}", flush=True)
+            raise
     
     # Force log flush
     sys.stdout.flush()
