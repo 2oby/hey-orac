@@ -61,23 +61,15 @@ try:
     # Initialize the OpenWakeWord model, loading all pre-trained models
     print("DEBUG: About to create Model()", flush=True)
     try:
-        # Try explicit model loading with specific models
-        model = Model(wakeword_models=["alexa", "hey_jarvis"])
+        # Use default model loading to get all built-in models
+        model = Model()
         print("DEBUG: Model created successfully", flush=True)
-        logger.info("OpenWakeWord model initialized")
-        logger.info(f"Available models: {list(model.prediction_buffer.keys())}")
+        logger.info("OpenWakeWord model initialized with built-in models")
+        logger.info(f"Prediction buffer keys: {list(model.prediction_buffer.keys())}")
         print("DEBUG: After model initialized log", flush=True)
     except Exception as e:
         print(f"ERROR: Model creation failed: {e}", flush=True)
-        logger.error(f"Full error details: {e}")
-        # Try without specific models as fallback
-        try:
-            logger.info("Trying to load without specific models...")
-            model = Model()
-            logger.info(f"Fallback model available models: {list(model.prediction_buffer.keys())}")
-        except Exception as e2:
-            print(f"ERROR: Fallback model creation also failed: {e2}", flush=True)
-            raise
+        raise
     
     # Force log flush
     sys.stdout.flush()
