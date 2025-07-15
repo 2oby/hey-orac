@@ -1,28 +1,39 @@
-# Current Focus: Wake Word Detection Loop Not Starting
+# Current Focus: Test Wake Word Detection Functionality
 
-## Problem
-The OpenWakeWord container starts successfully, but the main wake word detection loop never begins execution. The script hangs after "OpenWakeWord model initialized" message.
+## Problem SOLVED ✅
+The wake word detection loop is now working! The issue was an unbuffered I/O ValueError that prevented script execution.
 
 ## What's Working
 - ✅ Docker container builds and runs successfully
 - ✅ USB microphone (SH-04) detected correctly
-- ✅ Audio stream creation successful
+- ✅ Audio stream creation successful (2560 bytes per read)
 - ✅ OpenWakeWord model loading (6 models: alexa, hey_mycroft, hey_jarvis, hey_rhasspy, timer, weather)
 - ✅ Container health checks passing
+- ✅ Main detection loop processing audio chunks continuously
+- ✅ Audio volume detection working (0.0001-0.0002 amplitude levels)
 
-## Current Investigation
-1. **Debug prints not appearing**: Added extensive debug print statements but they're not showing in logs
-2. **Model creation timing**: Direct Model() test works fine (0.23s), but hangs in main script
-3. **Code deployment verification**: Need to confirm debug code is actually in running container
+## Current Testing Phase
+Now that the technical infrastructure is working, need to test actual wake word detection:
 
-## Immediate Next Steps
-1. Verify the latest code changes are actually deployed in the container
-2. Check if there's a Docker layer caching issue preventing code updates
-3. Test running the script manually inside the container to see raw output
-4. Consider the possibility that logging is being redirected or buffered differently
+1. **Test wake word triggers**: Try speaking each available wake word near the Pi
+   - "Alexa"
+   - "Hey Mycroft" 
+   - "Hey Jarvis"
+   - "Hey Rhasspy"
+   - "Timer"
+   - "Weather"
 
-## Key Debugging Points
-- Script execution stops after line: `logger.info("OpenWakeWord model initialized")`
-- No debug prints appear despite being added with `flush=True`
-- Container remains healthy and responsive
-- High CPU usage (18%) suggests tight loop or blocking operation
+2. **Monitor detection logs**: Watch for detection events above threshold (currently 0.3)
+
+3. **Validate detection accuracy**: Ensure genuine detections vs false positives
+
+## Monitoring Commands
+- Real-time logs: `ssh pi "cd ~/WakeWordTest && docker-compose logs -f wake-word-test"`
+- Recent activity: `ssh pi "cd ~/WakeWordTest && docker-compose logs --tail=50 wake-word-test"`
+- Container status: `ssh pi "cd ~/WakeWordTest && docker-compose ps"`
+
+## Next Steps
+1. Test wake word detection by speaking trigger words
+2. Adjust detection threshold if needed based on results  
+3. Document successful detection events
+4. Consider adding audio level monitoring or recording capabilities

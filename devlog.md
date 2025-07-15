@@ -37,9 +37,21 @@
 - Tried unbuffered output, forced log flushing, and stream testing
 - Current status: Container healthy, audio accessible, but main detection loop not executing
 
+## 2025-07-15 19:10 - BREAKTHROUGH: Wake Word Detection Loop Working!
+- **Root cause identified**: Unbuffered I/O code was causing ValueError preventing script execution
+- **Fix applied**: Replaced `sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)` with `os.environ['PYTHONUNBUFFERED'] = '1'`
+- **Result**: Script now executes completely through detection loop
+- **Current status**: 
+  - ✅ Container builds and runs successfully
+  - ✅ USB microphone detection working
+  - ✅ Audio stream creation successful (2560 bytes per read)
+  - ✅ OpenWakeWord model initialization working
+  - ✅ Main detection loop processing audio chunks (200+ processed)
+  - ✅ Audio volume detection working (0.0001-0.0002 levels)
+
 ## Current State
 - ✅ Docker container building and running
-- ✅ USB microphone detection and audio stream creation
-- ✅ OpenWakeWord model loading (6 models available)
-- ❌ Main wake word detection loop not executing (hangs after model init)
-- 🔍 Next steps: Investigate why script execution stops after model initialization
+- ✅ USB microphone detection and audio stream creation  
+- ✅ OpenWakeWord model loading (6 models: alexa, hey_mycroft, hey_jarvis, hey_rhasspy, timer, weather)
+- ✅ Main wake word detection loop executing and processing audio
+- 🔍 Next steps: Test actual wake word detection by speaking trigger words
