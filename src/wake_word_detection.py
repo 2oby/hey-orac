@@ -45,13 +45,14 @@ try:
     logger.info(f"Using USB microphone: {usb_mic.name} (index {usb_mic.index})")
 
     # Start audio stream with parameters suitable for OpenWakeWord
-    # - Sample rate: 16000 Hz (required by OpenWakeWord)
-    # - Channels: 1 (mono) for compatibility
+    # - Sample rate: 16000 Hz (required by OpenWakeWord)  
+    # - Channels: 2 (stereo) to match microphone capabilities, then convert to mono
     # - Chunk size: 1280 samples (80 ms at 16000 Hz) for optimal efficiency
+    # Note: Microphone has 2 input channels, so read as stereo then process to mono
     stream = audio_manager.start_stream(
         device_index=usb_mic.index,
         sample_rate=16000,
-        channels=1,
+        channels=2,  # Read as stereo to match microphone capabilities
         chunk_size=1280
     )
     if not stream:
@@ -130,13 +131,28 @@ try:
                 logger.warning("No audio data read from stream")
                 continue
 
-            # Convert bytes to numpy array for OpenWakeWord (using proper normalization like old working code)
-            audio_data = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
+            # Convert bytes to numpy array - now handling stereo input
+            audio_array = np.frombuffer(data, dtype=np.int16)
+            
+            # Convert stereo to mono by averaging the channels (like old working code)
+            if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
+                # Reshape to separate left and right channels, then average
+                stereo_data = audio_array.reshape(-1, 2)
+                audio_data = np.mean(stereo_data, axis=1).astype(np.float32) / 32768.0
+                logger.debug(f"Converted stereo ({len(audio_array)} samples) to mono ({len(audio_data)} samples)")
+            else:
+                # Already mono
+                audio_data = audio_array.astype(np.float32) / 32768.0
 
             # Log every 100 chunks to show we're processing audio
             chunk_count += 1
             if chunk_count % 100 == 0:
-                logger.info(f"📊 Processed {chunk_count} audio chunks, latest volume: {np.abs(audio_data).mean():.4f}")
+                audio_volume = np.abs(audio_data).mean()
+                logger.info(f"📊 Processed {chunk_count} audio chunks")
+                logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}")
+                logger.info(f"   Raw data size: {len(data)} bytes, samples: {len(audio_array)}")
+                if len(audio_array) > 1280:
+                    logger.info(f"   ✅ Stereo→Mono conversion active")
 
             # Pass the audio data to the model for wake word prediction
             prediction = model.predict(audio_data)
