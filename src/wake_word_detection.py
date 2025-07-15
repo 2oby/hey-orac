@@ -4,6 +4,12 @@ OpenWakeWord script for detecting wake words from a USB microphone on a Raspberr
 Uses AudioManager for robust audio device handling.
 """
 
+import sys
+import os
+# Force unbuffered output
+sys.stdout = os.fdopen(sys.stdout.fileno(), 'w', 0)
+sys.stderr = os.fdopen(sys.stderr.fileno(), 'w', 0)
+
 import openwakeword
 from openwakeword.model import Model
 import logging
@@ -13,7 +19,9 @@ from audio_utils import AudioManager  # Import the AudioManager class
 # Configure logging for debugging
 logging.basicConfig(
     level=logging.DEBUG,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout,
+    force=True
 )
 logger = logging.getLogger(__name__)
 
