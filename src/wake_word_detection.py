@@ -138,11 +138,12 @@ try:
             if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
                 # Reshape to separate left and right channels, then average
                 stereo_data = audio_array.reshape(-1, 2)
-                audio_data = np.mean(stereo_data, axis=1).astype(np.float32) / 32768.0
+                # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
+                audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
                 logger.debug(f"Converted stereo ({len(audio_array)} samples) to mono ({len(audio_data)} samples)")
             else:
-                # Already mono
-                audio_data = audio_array.astype(np.float32) / 32768.0
+                # Already mono - CRITICAL FIX: no normalization!
+                audio_data = audio_array.astype(np.float32)
 
             # Log every 100 chunks to show we're processing audio
             chunk_count += 1
@@ -175,8 +176,8 @@ try:
                 max_confidence = score
                 best_model = wakeword
         
-        # Check against lowered threshold for testing (temporarily reduced from 0.5)
-        detection_threshold = 0.01
+        # Check against proper threshold (like old working code)
+        detection_threshold = 0.5
         if max_confidence >= detection_threshold:
             logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
             logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
