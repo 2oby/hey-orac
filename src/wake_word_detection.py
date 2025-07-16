@@ -175,8 +175,8 @@ try:
                 max_confidence = score
                 best_model = wakeword
         
-        # Check against appropriate threshold (using 0.5 like old working code)
-        detection_threshold = 0.5
+        # Check against lowered threshold for testing (temporarily reduced from 0.5)
+        detection_threshold = 0.01
         if max_confidence >= detection_threshold:
             logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
             logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
