@@ -8,22 +8,20 @@ tflite-runtime>=2.7.0; platform_machine=='x86_64'
 
 # Audio processing
 pyaudio>=0.2.11
-soundfile>=0.10.0
-librosa>=0.9.0
+# soundfile>=0.10.0               # Removed for M1 - not needed for basic detection
+# librosa>=0.9.0                  # Removed for M1 - heavy dependency, not needed
 
-# Web framework and API
-flask>=3.0.0
-flask-socketio>=5.3.0
-gevent>=24.0.0
+# Configuration and utilities (minimal for M1)
+# flask>=3.0.0                    # Removed for M1 - add back in M3/M4
+# flask-socketio>=5.3.0           # Removed - was causing gevent build issues
+# gevent>=24.0.0                  # Removed - heavy compilation on ARM64
+# structlog>=24.0.0               # Removed for M1 - using basic logging
+# jsonschema>=4.20.0              # Removed for M1 - add back in M2
+# prometheus-client>=0.19.0       # Removed for M1 - add back in M2
 
-# Configuration and utilities
-structlog>=24.0.0
-jsonschema>=4.20.0
-prometheus-client>=0.19.0
-
-# System utilities
-requests>=2.25.0
-pyyaml>=6.0
+# System utilities (minimal for M1)
+# requests>=2.25.0                # Removed for M1 - add back when streaming is needed
+# pyyaml>=6.0                     # Removed for M1 - not using YAML config yet
 
 # Optional but recommended for better performance
 scipy>=1.7.0
