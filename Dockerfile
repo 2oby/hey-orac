@@ -1,5 +1,5 @@
 # Multi-stage build for Raspberry Pi
-FROM python:3.11-slim-bullseye as builder
+FROM python:3.9-slim-bullseye as builder
 
 # Install system dependencies for audio and OpenWakeWord
 RUN apt-get update && apt-get install -y \
@@ -70,7 +70,7 @@ ENV ALSA_CARD=1
 ENV AUDIO_DEVICE=/dev/snd
 
 # Add runtime stage
-FROM python:3.11-slim-bullseye as runtime
+FROM python:3.9-slim-bullseye as runtime
 
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -82,7 +82,7 @@ RUN apt-get update && apt-get install -y \
 
 # Copy from builder
 WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 COPY --from=builder /app /app
 
 # Set environment variables

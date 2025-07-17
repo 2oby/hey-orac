@@ -96,3 +96,37 @@
   └── config/              # Configuration
   ```
 - **Next Steps**: Begin M1 - Implement baseline wake detection with ring buffer
+
+## 2025-07-17 20:45 - M1 Baseline Wake Detection Implemented
+- **Objective**: Implement proper audio capture with ring buffer and wake detection classes
+- **Key Components Created**:
+  1. ✅ **RingBuffer class** (src/hey_orac/audio/ring_buffer.py)
+     - Thread-safe circular buffer for 10s of audio
+     - Efficient array-based storage
+     - Pre-roll retrieval capability
+  2. ✅ **AudioCapture class** (src/hey_orac/audio/microphone.py)
+     - Automatic USB microphone detection
+     - PyAudio callback-based capture
+     - Continuous writing to ring buffer
+     - RMS level monitoring
+  3. ✅ **SpeechEndpointer class** (src/hey_orac/audio/endpointing.py)
+     - RMS-based silence detection
+     - Configurable thresholds and durations
+     - Grace period handling
+  4. ✅ **WakeDetector class** (src/hey_orac/models/wake_detector.py)
+     - OpenWakeWord model management
+     - Per-model threshold configuration
+     - Detection cooldown to prevent duplicates
+     - Performance metrics tracking
+  5. ✅ **HeyOracApplication** (src/hey_orac/app.py)
+     - Main application orchestrator
+     - Coordinates all components
+     - Status reporting
+  6. ✅ **Test script** (src/test_m1.py)
+     - Standalone test for M1 components
+     - Tests "hey jarvis" detection
+- **Technical Design Alignment**:
+  - Follows modular architecture from spec
+  - Ring buffer supports pre-roll as required
+  - Clean separation of concerns
+- **Next Steps**: Deploy to Pi and test with real audio

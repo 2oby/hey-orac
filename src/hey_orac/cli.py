@@ -23,19 +23,26 @@ def run_server(args):
     logger = logging.getLogger(__name__)
     logger.info("Starting Hey ORAC wake-word detection server...")
     
-    # TODO: Import and start the main application
-    # from hey_orac.app import Application
-    # app = Application(config_path=args.config)
-    # app.run()
+    # Import and start the main application
+    from hey_orac.app import HeyOracApplication
+    app = HeyOracApplication(config_path=args.config)
+    
+    if not app.start():
+        logger.error("Failed to start application")
+        sys.exit(1)
     
     logger.info("Server started. Press Ctrl+C to stop.")
     try:
-        # Placeholder for main application loop
-        import time
+        # Keep running until interrupted
         while True:
-            time.sleep(1)
+            # Log status periodically
+            import time
+            time.sleep(30)
+            status = app.get_status()
+            logger.info(f"Application status: {status}")
     except KeyboardInterrupt:
         logger.info("Shutting down server...")
+        app.stop()
 
 
 def main():
