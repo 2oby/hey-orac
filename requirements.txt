@@ -20,7 +20,7 @@ pyaudio>=0.2.11
 # prometheus-client>=0.19.0       # Removed for M1 - add back in M2
 
 # System utilities (minimal for M1)
-# requests>=2.25.0                # Removed for M1 - add back when streaming is needed
+requests>=2.25.0                # Required by OpenWakeWord for model downloads
 # pyyaml>=6.0                     # Removed for M1 - not using YAML config yet
 
 # Optional but recommended for better performance
