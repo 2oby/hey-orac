@@ -28,6 +28,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Install OpenWakeWord without dependencies, then handle tflite-runtime
+RUN pip install --no-cache-dir --no-deps openwakeword==0.6.0 && \
+    (pip install --no-cache-dir tflite-runtime || pip install --no-cache-dir tensorflow>=2.10.0)
+
 # Copy project files for installation
 COPY pyproject.toml .
 COPY README.md .
