@@ -41,8 +41,8 @@ def main():
         inference_framework='tflite'
     )
     
-    # Set detection threshold
-    wake_detector.set_threshold('hey_jarvis', 0.5)
+    # Set detection threshold - lower for testing
+    wake_detector.set_threshold('hey_jarvis', 0.1)  # Lower threshold for testing
     
     # Start audio capture
     if not audio_capture.start():
@@ -67,6 +67,16 @@ def main():
                 
                 # Process for wake word
                 detection = wake_detector.process_audio(audio_chunk)
+                
+                # Log confidence scores every 100 chunks for debugging
+                if chunk_count % 100 == 0:
+                    # Get the latest raw predictions from the wake detector
+                    if hasattr(wake_detector.model, 'prediction_buffer'):
+                        latest_scores = {}
+                        for model_name, scores in wake_detector.model.prediction_buffer.items():
+                            if scores:
+                                latest_scores[model_name] = scores[-1]
+                        logger.info(f"Latest confidence scores: {latest_scores}")
                 
                 if detection:
                     detection_count += 1
