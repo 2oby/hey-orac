@@ -1,0 +1,45 @@
+{
+  "models": {
+    "hey_jarvis": {
+      "enabled": true,
+      "threshold": 0.5,
+      "type": "onnx",
+      "path": "openwakeword/hey_jarvis.onnx"
+    },
+    "alexa": {
+      "enabled": false,
+      "threshold": 0.5,
+      "type": "onnx",
+      "path": "openwakeword/alexa.onnx"
+    }
+  },
+  "audio": {
+    "device_index": -1,
+    "sample_rate": 16000,
+    "chunk_size": 1280,
+    "ring_buffer_seconds": 10,
+    "silence_threshold": 0.01,
+    "silence_duration": 0.3,
+    "max_recording_seconds": 15,
+    "pre_roll_seconds": 1.0
+  },
+  "transport": {
+    "endpoint": "http://localhost:8080/stream",
+    "timeout": 30,
+    "retry_count": 3,
+    "backoff_factor": 2.0,
+    "tls_enabled": false,
+    "bearer_token": null
+  },
+  "web": {
+    "host": "0.0.0.0",
+    "port": 8000,
+    "debug": false,
+    "cors_origins": ["*"]
+  },
+  "logging": {
+    "level": "INFO",
+    "format": "json",
+    "file": null
+  }
+}

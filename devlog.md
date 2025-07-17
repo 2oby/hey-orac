@@ -1,4 +1,4 @@
-# OpenWakeWord Test Development Log
+# Hey ORAC Wake-Word Module Development Log
 
 ## 2025-07-15 18:30 - Initial Project Setup
 - Created project structure for minimal OpenWakeWord test on Raspberry Pi
@@ -67,3 +67,32 @@
 - ✅ Main wake word detection loop executing and processing audio correctly
 - ⚠️ Confidence scores still extremely low (0.000005 vs needed 0.5) with ambient audio
 - 🎯 **READY FOR TESTING**: System technically sound, needs actual wake word testing with human speech
+
+## 2025-07-17 - M0 Project Bootstrap Completed
+- **Objective**: Restructure project following Technical Design specification
+- **Key Changes**:
+  1. ✅ Created proper Python package structure (src/hey_orac/ with submodules)
+  2. ✅ Set up modern Python packaging with pyproject.toml
+  3. ✅ Added comprehensive .gitignore file
+  4. ✅ Created GitHub Actions CI workflow for testing and Docker builds
+  5. ✅ Set up pytest infrastructure with fixtures
+  6. ✅ Updated Dockerfile to multi-stage build with Python 3.11
+  7. ✅ Created README.md with project documentation
+  8. ✅ Added CLI entry point (hey-orac command)
+  9. ✅ Created configuration template (settings.json.template)
+- **Project Structure Now Matches Technical Design**:
+  ```
+  hey-orac/
+  ├── .github/workflows/    # CI/CD
+  ├── src/hey_orac/        # Main package
+  │   ├── audio/           # Audio capture components
+  │   ├── config/          # Settings management
+  │   ├── models/          # Wake-word models
+  │   ├── transport/       # Audio streaming
+  │   ├── web/             # API/WebSocket
+  │   └── utils/           # Utilities
+  ├── tests/               # Test suites
+  ├── models/              # Model storage
+  └── config/              # Configuration
+  ```
+- **Next Steps**: Begin M1 - Implement baseline wake detection with ring buffer

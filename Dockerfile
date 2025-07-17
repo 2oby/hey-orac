@@ -1,5 +1,5 @@
 # Multi-stage build for Raspberry Pi
-FROM python:3.9-slim-bullseye as base
+FROM python:3.11-slim-bullseye as builder
 
 # Install system dependencies for audio and OpenWakeWord
 RUN apt-get update && apt-get install -y \
@@ -24,13 +24,17 @@ RUN apt-get update && apt-get install -y \
 # Set up working directory
 WORKDIR /app
 
-# Copy requirements and install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy source code
+# Copy project files for installation
+COPY pyproject.toml .
+COPY README.md .
 COPY src/ ./src/
+
+# Install the package
+RUN pip install --no-cache-dir -e .
+
+# Copy additional resources
 COPY third_party/ ./third_party/
+COPY models/ ./models/
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/recordings
@@ -57,5 +61,26 @@ ENV PYTHONPATH=/app
 ENV ALSA_CARD=1
 ENV AUDIO_DEVICE=/dev/snd
 
-# Default command
-CMD ["python3", "src/wake_word_detection.py"]
+# Add runtime stage
+FROM python:3.11-slim-bullseye as runtime
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y \
+    alsa-utils \
+    libasound2 \
+    libportaudio2 \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy from builder
+WORKDIR /app
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /app /app
+
+# Set environment variables
+ENV PYTHONPATH=/app
+ENV PYTHONUNBUFFERED=1
+ENV ALSA_CARD=1
+
+# Default command - use the installed CLI
+CMD ["hey-orac", "run"]
