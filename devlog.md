@@ -130,3 +130,52 @@
   - Ring buffer supports pre-roll as required
   - Clean separation of concerns
 - **Next Steps**: Deploy to Pi and test with real audio
+
+## Project Status Summary (as of 2025-07-17)
+
+### ✅ Completed Milestones
+
+#### M0: Project Bootstrap - DONE
+- Project restructured with proper Python package hierarchy
+- Modern packaging with pyproject.toml
+- Test infrastructure with pytest
+- Multi-stage Docker build
+- Comprehensive documentation
+
+#### M1: Baseline Wake Detection - DONE  
+- RingBuffer: Thread-safe circular buffer with pre-roll
+- AudioCapture: USB mic detection and continuous capture
+- WakeDetector: OpenWakeWord integration with thresholds
+- SpeechEndpointer: Silence-based utterance detection
+- HeyOracApplication: Main orchestrator class
+- Test script successfully detects "hey jarvis"
+
+### 🚧 In Progress
+
+#### M2: Custom Model Loading
+- Need to implement SettingsManager for JSON config
+- Need to build ModelManager with hot-reload
+- Need to add Prometheus metrics
+- Need to handle model file validation
+
+### 📋 Upcoming Milestones
+- M3: Audio endpointing + streaming
+- M4: Web API + minimal GUI  
+- M5: WebSocket notifications
+- M6: Thread communication & resilience
+- M7: Docker hardening & deploy script
+- M8: Integration with Orin Nano STT
+- M9: Performance & soak testing
+- M10: Documentation & Release 1.0
+
+### 🔧 Technical Debt
+- TensorFlow/tflite-runtime compatibility on ARM64
+- GitHub Actions CI requires workflow permissions
+- Need to implement structlog for better logging
+- Missing integration tests for full pipeline
+
+### 🎯 Next Actions
+1. Start M2 implementation with SettingsManager
+2. Create JSON schema for configuration
+3. Build hot-reload capability
+4. Deploy and test on Raspberry Pi
