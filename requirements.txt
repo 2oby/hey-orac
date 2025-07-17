@@ -2,12 +2,22 @@
 openwakeword==0.6.0
 numpy<2.0.0,>=1.21.0
 onnxruntime>=1.10.0
-tflite-runtime>=2.7.0
+tflite-runtime>=2.14.0
 
 # Audio processing
 pyaudio>=0.2.11
 soundfile>=0.10.0
 librosa>=0.9.0
+
+# Web framework and API
+flask>=3.0.0
+flask-socketio>=5.3.0
+gevent>=24.0.0
+
+# Configuration and utilities
+structlog>=24.0.0
+jsonschema>=4.20.0
+prometheus-client>=0.19.0
 
 # System utilities
 requests>=2.25.0

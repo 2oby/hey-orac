@@ -24,13 +24,17 @@ RUN apt-get update && apt-get install -y \
 # Set up working directory
 WORKDIR /app
 
+# Copy requirements first
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
 # Copy project files for installation
 COPY pyproject.toml .
 COPY README.md .
 COPY src/ ./src/
 
-# Install the package
-RUN pip install --no-cache-dir -e .
+# Install the package without dependencies
+RUN pip install --no-cache-dir --no-deps -e .
 
 # Copy additional resources
 COPY third_party/ ./third_party/
