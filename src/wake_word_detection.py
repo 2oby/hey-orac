@@ -287,8 +287,8 @@ def test_pipeline_with_audio(model, audio_data):
             timestamp = (i * chunk_size) / 16000
             logger.info(f"   📊 Time: {timestamp:.2f}s, RMS: {rms:.4f}, Best: {best_model} = {max_confidence:.6f}")
         
-        # Detection logic (lowered threshold for custom model testing)
-        detection_threshold = 0.15
+        # Detection logic (very low threshold for custom model testing)
+        detection_threshold = 0.1
         if max_confidence >= detection_threshold:
             timestamp = (i * chunk_size) / 16000
             logger.info(f"🎯 WAKE WORD DETECTED at {timestamp:.2f}s! Confidence: {max_confidence:.6f} - Source: {best_model}")
