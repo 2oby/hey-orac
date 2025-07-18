@@ -483,7 +483,6 @@ def main():
                     stereo_data = audio_array.reshape(-1, 2)
                     # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
                     audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                    logger.debug(f"Converted stereo ({len(audio_array)} samples) to mono ({len(audio_data)} samples)")
                 else:
                     # Already mono - CRITICAL FIX: no normalization!
                     audio_data = audio_array.astype(np.float32)
