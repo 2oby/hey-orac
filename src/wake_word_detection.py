@@ -332,34 +332,47 @@ def main():
                 logger.error("❌ Failed to load test audio. Exiting.")
                 return
             
-            # Initialize the OpenWakeWord model for testing
-            logger.info("Creating Model for pipeline testing...")
-            # Test custom model: Hay--compUta_v_lrg.tflite
-            custom_model_path = '/app/models/Hay--compUta_v_lrg.tflite'
-            logger.info(f"🔧 Loading custom model: {custom_model_path}")
-            
-            # Check if model file exists
+            # Test all three custom models individually
             import os
-            if os.path.exists(custom_model_path):
-                logger.info(f"✅ Model file found at: {custom_model_path}")
-            else:
-                logger.error(f"❌ Model file NOT found at: {custom_model_path}")
-                # List contents of models directory
-                models_dir = '/app/models'
-                if os.path.exists(models_dir):
-                    logger.info(f"📁 Contents of {models_dir}:")
-                    for f in os.listdir(models_dir):
-                        logger.info(f"   - {f}")
+            custom_models = [
+                '/app/models/Hay--compUta_v_lrg.tflite',
+                '/app/models/hey-CompUter_lrg.tflite', 
+                '/app/models/Hey_computer.tflite'
+            ]
             
-            # First test without class mapping to see if we can detect the basename
-            model = openwakeword.Model(
-                wakeword_models=[custom_model_path],
-                vad_threshold=0.5,
-                enable_speex_noise_suppression=False
-            )
+            all_detected_words = []
             
-            # Run pipeline test
-            detected_words = test_pipeline_with_audio(model, audio_data)
+            for custom_model_path in custom_models:
+                logger.info(f"🔧 Testing custom model: {custom_model_path}")
+                
+                # Check if model file exists
+                if os.path.exists(custom_model_path):
+                    logger.info(f"✅ Model file found at: {custom_model_path}")
+                else:
+                    logger.error(f"❌ Model file NOT found at: {custom_model_path}")
+                    continue
+                
+                # Load model without class mapping to see basename detection
+                logger.info("Creating Model for pipeline testing...")
+                model = openwakeword.Model(
+                    wakeword_models=[custom_model_path],
+                    vad_threshold=0.5,
+                    enable_speex_noise_suppression=False
+                )
+                
+                # Run pipeline test for this model
+                logger.info(f"🧪 TESTING {os.path.basename(custom_model_path)} with recorded audio...")
+                detected_words = test_pipeline_with_audio(model, audio_data)
+                
+                if detected_words:
+                    logger.info(f"✅ Model {os.path.basename(custom_model_path)} detected {len(detected_words)} wake words.")
+                    all_detected_words.extend([(model_name, *detection) for model_name, *detection in [(os.path.basename(custom_model_path), *word) for word in detected_words]])
+                else:
+                    logger.info(f"ℹ️  Model {os.path.basename(custom_model_path)} detected no wake words.")
+                
+                logger.info("=" * 60)
+            
+            detected_words = all_detected_words
             
             if detected_words:
                 logger.info(f"✅ Pipeline test completed. Found {len(detected_words)} wake word detections.")
