@@ -287,8 +287,8 @@ def test_pipeline_with_audio(model, audio_data):
             timestamp = (i * chunk_size) / 16000
             logger.info(f"   📊 Time: {timestamp:.2f}s, RMS: {rms:.4f}, Best: {best_model} = {max_confidence:.6f}")
         
-        # Detection logic (same threshold as live)
-        detection_threshold = 0.3
+        # Detection logic (lowered threshold for custom model testing)
+        detection_threshold = 0.15
         if max_confidence >= detection_threshold:
             timestamp = (i * chunk_size) / 16000
             logger.info(f"🎯 WAKE WORD DETECTED at {timestamp:.2f}s! Confidence: {max_confidence:.6f} - Source: {best_model}")
@@ -351,9 +351,9 @@ def main():
                     for f in os.listdir(models_dir):
                         logger.info(f"   - {f}")
             
+            # First test without class mapping to see if we can detect the basename
             model = openwakeword.Model(
                 wakeword_models=[custom_model_path],
-                class_mapping_dicts=[{0: "hay_computa"}],
                 vad_threshold=0.5,
                 enable_speex_noise_suppression=False
             )
