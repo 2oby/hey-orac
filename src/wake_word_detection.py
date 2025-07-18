@@ -43,7 +43,7 @@ def parse_arguments():
 def generate_timestamp_filename():
     """Generate filename with timestamp."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return f"wake_word_test_{timestamp}.wav"
+    return f"/app/recordings/wake_word_test_{timestamp}.wav"
 
 def record_test_audio(audio_manager, usb_mic, model, filename='test_recording.wav'):
     """Record 10 seconds of test audio with countdown and metadata generation."""
