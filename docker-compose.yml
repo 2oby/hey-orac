@@ -21,6 +21,8 @@ services:
       - /tmp:/tmp
       # Mount custom models if needed
       - ./third_party/openwakeword/custom_models:/app/third_party/openwakeword/custom_models
+      # Cache downloaded OpenWakeWord models
+      - ./model_cache:/root/.local/share/openwakeword
     
     # Environment variables
     environment:
