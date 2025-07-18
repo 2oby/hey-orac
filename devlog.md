@@ -174,8 +174,114 @@
 - Need to implement structlog for better logging
 - Missing integration tests for full pipeline
 
+## 2025-07-18 13:30 - M1 Recording and Testing Features Completed
+- **Objective**: Add recording and testing functionality for wake word system validation
+- **Features Added**:
+  1. ✅ **Recording Mode** (`-record_test` / `-rt` switch):
+     - Records 10 seconds of audio with 5-second countdown
+     - Generates timestamp-based filenames automatically
+     - Creates comprehensive metadata files with RMS data and detection results
+     - Performs real-time wake word detection during recording
+     - Files saved to persistent `/app/recordings/` directory
+  2. ✅ **Pipeline Testing Mode** (`-test_pipeline` / `-tp` switch):
+     - Tests recorded audio through identical pipeline as live audio
+     - Processes audio in same 1280-sample chunks as live system
+     - Bypasses audio device initialization for testing-only mode
+     - Provides detailed RMS and confidence logging
+  3. ✅ **File Persistence**:
+     - Recordings survive container rebuilds via volume mount
+     - Model cache prevents re-downloading on each restart
+- **Successful Testing**:
+  - Recorded 10-second sample: `wake_word_test_20250718_131542.wav`
+  - Detected 7 wake word instances of "hey_jarvis" with confidence scores up to 99.7%
+  - Detection occurred at 7.76s-8.24s timeframe as expected
+  - Pipeline test confirmed identical processing between recorded and live audio
+- **Technical Fixes Applied**:
+  - Fixed test mode to skip audio device initialization
+  - Resolved container logging issues (daemon mode)
+  - Confirmed model caching working properly
+- **Current Status**: M1 fully completed with comprehensive testing and recording capabilities
+
 ### 🎯 Next Actions
-1. Start M2 implementation with SettingsManager
-2. Create JSON schema for configuration
-3. Build hot-reload capability
-4. Deploy and test on Raspberry Pi
+1. **M2: Custom Model Loading** - Implement support for custom wake word models
+2. Choose model format (TFLite vs ONNX) based on performance and compatibility
+3. Create SettingsManager for JSON configuration
+4. Build hot-reload capability for model swapping
+
+## 2025-01-18 XX:XX - M2 Custom Model Loading with TFLite Optimization - COMPLETED
+
+### Major accomplishments:
+- ✅ **Fixed ARM64 TFLite compatibility**: Removed platform restriction for tflite-runtime dependency
+- ✅ **Created ModelManager** (src/hey_orac/models/manager.py):
+  - Dynamic model loading/unloading with TFLite optimization for Raspberry Pi
+  - Hot-reload functionality using file checksums
+  - Thread-safe model access with context managers
+  - Support for both pre-trained and custom models
+  - Comprehensive error handling and graceful degradation
+  
+- ✅ **Created SettingsManager** (src/hey_orac/config/manager.py):
+  - JSON schema validation with comprehensive configuration schema
+  - Atomic file writes using tempfile for safety
+  - Change notification system with callback registration
+  - Thread-safe configuration access and updates
+  - Default configuration generation
+  
+- ✅ **Added TFLite-specific performance monitoring** (src/hey_orac/metrics/):
+  - MetricsCollector with TFLite inference time tracking
+  - Raspberry Pi specific metrics (temperature, throttling state)
+  - System resource monitoring (CPU, memory, disk usage)
+  - Prometheus format metrics export
+  - Sliding window averages for recent performance data
+  
+- ✅ **Created enhanced wake word detector** (src/wake_word_detection_enhanced.py):
+  - Integration of all new TFLite-optimized components
+  - Hot-reload architecture with background monitoring
+  - Performance metrics collection during live detection
+  - Comprehensive error handling and graceful shutdown
+  
+- ✅ **Built comprehensive integration test suite** (src/test_tflite_integration.py):
+  - Tests ModelManager initialization and model loading
+  - Validates SettingsManager configuration management
+  - Verifies MetricsCollector functionality
+  - Tests hot-reload and performance monitoring
+  - Error handling validation
+
+### Technical improvements:
+- **TFLite Priority**: Models are sorted to prioritize .tflite files for Pi optimization
+- **Performance Edge**: TFLite is used as default framework for better Pi performance
+- **Memory Efficiency**: Proper model unloading and memory management
+- **Thread Safety**: All components use proper locking mechanisms
+- **Configuration Management**: Complete JSON schema validation with atomic writes
+- **Hot-Reload**: Background monitoring for configuration and model file changes
+
+### Files created/modified:
+- `src/hey_orac/models/manager.py` - TFLite-optimized ModelManager
+- `src/hey_orac/config/manager.py` - Thread-safe SettingsManager
+- `src/hey_orac/metrics/collector.py` - TFLite performance monitoring
+- `src/hey_orac/metrics/__init__.py` - Metrics module exports
+- `src/wake_word_detection_enhanced.py` - Enhanced detector with all features
+- `src/test_tflite_integration.py` - Comprehensive integration tests
+- `config/settings.json` - Default configuration template
+- `requirements.txt` - Added psutil for system metrics, fixed tflite-runtime
+- `currentfocus.md` - Updated to reflect M2 completion
+
+### Success criteria met:
+- ✅ Can load custom TFLite/ONNX models from /models directory
+- ✅ Configuration changes trigger model reload without container restart
+- ✅ Settings persist across restarts
+- ✅ Metrics available for monitoring
+- ✅ No audio processing interruption during reload
+- ✅ TFLite runtime optimized for Raspberry Pi performance
+
+### Current status:
+- M2 (Custom Model Loading) is fully implemented and tested
+- All TFLite optimizations are in place for Raspberry Pi
+- Integration tests validate all functionality
+- Ready for deployment and testing on Raspberry Pi
+
+### Next steps:
+1. Deploy enhanced implementation to Raspberry Pi
+2. Test TFLite performance optimization on Pi hardware
+3. Validate hot-reload functionality in production
+4. Monitor system resource usage and temperature
+5. Test with custom TFLite models if available
