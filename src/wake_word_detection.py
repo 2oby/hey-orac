@@ -338,6 +338,20 @@ def main():
             # Test custom model: Hay--compUta_v_lrg.tflite
             custom_model_path = '/app/models/Hay--compUta_v_lrg.tflite'
             logger.info(f"🔧 Loading custom model: {custom_model_path}")
+            
+            # Check if model file exists
+            import os
+            if os.path.exists(custom_model_path):
+                logger.info(f"✅ Model file found at: {custom_model_path}")
+            else:
+                logger.error(f"❌ Model file NOT found at: {custom_model_path}")
+                # List contents of models directory
+                models_dir = '/app/models'
+                if os.path.exists(models_dir):
+                    logger.info(f"📁 Contents of {models_dir}:")
+                    for f in os.listdir(models_dir):
+                        logger.info(f"   - {f}")
+            
             model = Model(
                 wakeword_models=[custom_model_path],
                 inference_framework='tflite',
