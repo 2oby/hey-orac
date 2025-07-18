@@ -340,9 +340,11 @@ def main():
                 logger.error(f"❌ Custom model not found: {args.custom_model}")
                 return
             
-            model = Model(
-                wakeword_models=[args.custom_model],
-                inference_framework='tflite'
+            model = openwakeword.Model(
+                wakeword_model_paths=[args.custom_model],
+                class_mapping_dicts=[{0: "hay_computa"}],
+                vad_threshold=0.5,
+                enable_speex_noise_suppression=False
             )
             
             # Run pipeline test
@@ -384,9 +386,11 @@ def main():
                 logger.error(f"❌ Custom model not found: {args.custom_model}")
                 return
             
-            model = Model(
-                wakeword_models=[args.custom_model],
-                inference_framework='tflite'
+            model = openwakeword.Model(
+                wakeword_model_paths=[args.custom_model],
+                class_mapping_dicts=[{0: "hay_computa"}],
+                vad_threshold=0.5,
+                enable_speex_noise_suppression=False
             )
             
             success, metadata = record_test_audio(audio_manager, usb_mic, model, audio_filename)
@@ -417,9 +421,11 @@ def main():
             return
         
         try:
-            model = Model(
-                wakeword_models=[args.custom_model],
-                inference_framework='tflite'
+            model = openwakeword.Model(
+                wakeword_model_paths=[args.custom_model],
+                class_mapping_dicts=[{0: "hay_computa"}],
+                vad_threshold=0.5,
+                enable_speex_noise_suppression=False
             )
             logger.info("✅ Custom TFLite model loaded successfully")
             
