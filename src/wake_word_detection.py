@@ -390,9 +390,8 @@ def main():
             
             # Initialize model for recording (needed for real-time detection)
             logger.info("Creating Model for recording with real-time detection...")
-            model = Model(
-                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
-                inference_framework='tflite'
+            model = openwakeword.Model(
+                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft']
             )
             
             success, metadata = record_test_audio(audio_manager, usb_mic, model, audio_filename)
@@ -422,9 +421,8 @@ def main():
         try:
             # Load specific wake word models including 'hey jarvis'
             logger.info("Creating Model with specific wake word models...")
-            model = Model(
-                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
-                inference_framework='tflite'
+            model = openwakeword.Model(
+                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft']
             )
             print("DEBUG: Model created successfully", flush=True)
             logger.info("OpenWakeWord model initialized")
