@@ -345,3 +345,37 @@
 3. Optimize detection thresholds based on model performance
 4. Test with live microphone input
 5. Compare model performance characteristics
+
+## 2025-07-18 19:06 - Custom Model Loading Fix Implementation
+
+### Problem Identified:
+- **Root Cause**: OpenWakeWord API breaking changes broke custom model loading
+- **Issue 1**: Import statement using `from openwakeword.model import Model` instead of `openwakeword.Model`
+- **Issue 2**: Missing `class_mapping_dicts` parameter caused model to return basename keys instead of mapped labels
+- **Issue 3**: Redundant `inference_framework='tflite'` parameter (TFLite is default)
+- **Impact**: Custom models loaded but detections returned wrong labels, causing matching failures
+
+### Fix Implementation:
+1. **Fixed Import Statement**: Changed `from openwakeword.model import Model` to `import openwakeword`
+2. **Restored Label Mapping**: Added `class_mapping_dicts=[{0: "hay_computa"}]` parameter
+3. **Cleaned Up Parameters**: Removed redundant `inference_framework='tflite'`
+4. **Fixed All Model References**: Updated all `Model()` calls to `openwakeword.Model()`
+
+### Files Modified:
+- `src/wake_word_detection.py` - Fixed custom model loading in test pipeline mode
+- Fixed lines 354-359 (test pipeline section) and lines 393-396, 425-428 (recording/live modes)
+
+### Deployment Status:
+- **Phase 1**: ✅ Import and parameter fixes implemented  
+- **Phase 2**: ✅ All Model references updated to openwakeword.Model
+- **Phase 3**: 🔄 Container rebuild in progress (forced rebuild with --no-cache)
+
+### Expected Result:
+- Custom model should load with proper label mapping
+- Detection should return "hay_computa" instead of model basename
+- Pipeline test should detect custom wake phrase with high confidence
+
+### Current Status:
+- Code changes committed and pushed to wake-word-test branch
+- Waiting for Docker container rebuild to complete on Raspberry Pi
+- Ready to test custom model loading once deployment finishes
