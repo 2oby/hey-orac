@@ -320,7 +320,37 @@ def main():
     logger.info("Attempting to load pre-trained models...")
 
     try:
-        # Initialize AudioManager for audio device handling
+        # Handle test pipeline mode FIRST - don't need audio manager for testing
+        if args.test_pipeline:
+            # Use default filename if not provided
+            if args.audio_file is None:
+                logger.error("❌ No audio file specified for testing. Use -audio_file parameter.")
+                return
+            
+            # Load the recorded audio
+            audio_data = load_test_audio(args.audio_file)
+            if audio_data is None:
+                logger.error("❌ Failed to load test audio. Exiting.")
+                return
+            
+            # Initialize the OpenWakeWord model for testing
+            logger.info("Creating Model for pipeline testing...")
+            model = Model(
+                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
+                inference_framework='tflite'
+            )
+            
+            # Run pipeline test
+            detected_words = test_pipeline_with_audio(model, audio_data)
+            
+            if detected_words:
+                logger.info(f"✅ Pipeline test completed. Found {len(detected_words)} wake word detections.")
+            else:
+                logger.info("ℹ️  Pipeline test completed. No wake words detected.")
+            
+            return
+
+        # Initialize AudioManager for audio device handling (only if not testing)
         audio_manager = AudioManager()
         logger.info("AudioManager initialized")
 
@@ -352,36 +382,6 @@ def main():
                 logger.info("✅ Recording completed successfully. Exiting.")
             else:
                 logger.error("❌ Recording failed. Exiting.")
-            return
-        
-        # Handle test pipeline mode
-        if args.test_pipeline:
-            # Use default filename if not provided
-            if args.audio_file is None:
-                logger.error("❌ No audio file specified for testing. Use -audio_file parameter.")
-                return
-            
-            # Load the recorded audio
-            audio_data = load_test_audio(args.audio_file)
-            if audio_data is None:
-                logger.error("❌ Failed to load test audio. Exiting.")
-                return
-            
-            # Initialize the OpenWakeWord model for testing
-            logger.info("Creating Model for pipeline testing...")
-            model = Model(
-                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
-                inference_framework='tflite'
-            )
-            
-            # Run pipeline test
-            detected_words = test_pipeline_with_audio(model, audio_data)
-            
-            if detected_words:
-                logger.info(f"✅ Pipeline test completed. Found {len(detected_words)} wake word detections.")
-            else:
-                logger.info("ℹ️  Pipeline test completed. No wake words detected.")
-            
             return
 
         # Start audio stream with parameters suitable for OpenWakeWord
