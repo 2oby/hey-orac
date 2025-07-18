@@ -288,7 +288,7 @@ def test_pipeline_with_audio(model, audio_data):
             logger.info(f"   📊 Time: {timestamp:.2f}s, RMS: {rms:.4f}, Best: {best_model} = {max_confidence:.6f}")
         
         # Detection logic (very low threshold for custom model testing)
-        detection_threshold = 0.1
+        detection_threshold = 0.05
         if max_confidence >= detection_threshold:
             timestamp = (i * chunk_size) / 16000
             logger.info(f"🎯 WAKE WORD DETECTED at {timestamp:.2f}s! Confidence: {max_confidence:.6f} - Source: {best_model}")
@@ -342,8 +342,8 @@ def main():
             
             all_detected_words = []
             
-            for custom_model_path in custom_models:
-                logger.info(f"🔧 Testing custom model: {custom_model_path}")
+            for i, custom_model_path in enumerate(custom_models):
+                logger.info(f"🔧 Testing custom model {i+1}/{len(custom_models)}: {custom_model_path}")
                 
                 # Check if model file exists
                 if os.path.exists(custom_model_path):
@@ -354,21 +354,25 @@ def main():
                 
                 # Load model without class mapping to see basename detection
                 logger.info("Creating Model for pipeline testing...")
-                model = openwakeword.Model(
-                    wakeword_models=[custom_model_path],
-                    vad_threshold=0.5,
-                    enable_speex_noise_suppression=False
-                )
-                
-                # Run pipeline test for this model
-                logger.info(f"🧪 TESTING {os.path.basename(custom_model_path)} with recorded audio...")
-                detected_words = test_pipeline_with_audio(model, audio_data)
-                
-                if detected_words:
-                    logger.info(f"✅ Model {os.path.basename(custom_model_path)} detected {len(detected_words)} wake words.")
-                    all_detected_words.extend([(model_name, *detection) for model_name, *detection in [(os.path.basename(custom_model_path), *word) for word in detected_words]])
-                else:
-                    logger.info(f"ℹ️  Model {os.path.basename(custom_model_path)} detected no wake words.")
+                try:
+                    model = openwakeword.Model(
+                        wakeword_models=[custom_model_path],
+                        vad_threshold=0.5,
+                        enable_speex_noise_suppression=False
+                    )
+                    
+                    # Run pipeline test for this model
+                    logger.info(f"🧪 TESTING {os.path.basename(custom_model_path)} with recorded audio...")
+                    detected_words = test_pipeline_with_audio(model, audio_data)
+                    
+                    if detected_words:
+                        logger.info(f"✅ Model {os.path.basename(custom_model_path)} detected {len(detected_words)} wake words.")
+                        all_detected_words.extend([(os.path.basename(custom_model_path), *word) for word in detected_words])
+                    else:
+                        logger.info(f"ℹ️  Model {os.path.basename(custom_model_path)} detected no wake words.")
+                    
+                except Exception as e:
+                    logger.error(f"❌ Error testing model {custom_model_path}: {e}")
                 
                 logger.info("=" * 60)
             
