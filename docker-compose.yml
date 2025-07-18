@@ -4,7 +4,7 @@ services:
   wake-word-test:
     build: .
     container_name: wake-word-test
-    command: python3 /app/src/test_m1.py
+    command: python3 /app/src/wake_word_detection.py
     restart: unless-stopped
     
     # Audio device access
