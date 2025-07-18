@@ -341,7 +341,7 @@ def main():
                 return
             
             model = Model(
-                custom_model_paths=[args.custom_model],
+                wakeword_models=[args.custom_model],
                 inference_framework='tflite'
             )
             
@@ -385,7 +385,7 @@ def main():
                 return
             
             model = Model(
-                custom_model_paths=[args.custom_model],
+                wakeword_models=[args.custom_model],
                 inference_framework='tflite'
             )
             
@@ -418,7 +418,7 @@ def main():
         
         try:
             model = Model(
-                custom_model_paths=[args.custom_model],
+                wakeword_models=[args.custom_model],
                 inference_framework='tflite'
             )
             logger.info("✅ Custom TFLite model loaded successfully")
