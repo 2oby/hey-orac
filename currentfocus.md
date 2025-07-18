@@ -33,6 +33,65 @@
 
 ### ✅ Current Focus: M2 - Custom Model Loading - COMPLETED
 
+## 🎉 M2 MILESTONE ACHIEVED - Custom TFLite Models Successfully Deployed!
+
+### ✅ **All Success Criteria Met:**
+- ✅ Can load custom TFLite/ONNX models from /models directory
+- ✅ Configuration changes trigger model reload without container restart
+- ✅ Settings persist across restarts
+- ✅ Metrics available for monitoring
+- ✅ No audio processing interruption during reload
+- ✅ TFLite runtime optimized for Raspberry Pi performance
+
+### 🎯 **Current Status:**
+- **All three custom models deployed**: `Hay--compUta_v_lrg.tflite`, `Hey_computer.tflite`, `hey-CompUter_lrg.tflite`
+- **TFLite optimization confirmed**: Using XNNPACK delegate for ARM64 performance
+- **Detection verified**: Successfully detected "Hey Computer" phrase in recorded audio
+- **Best performing model identified**: `Hay--compUta_v_lrg.tflite` shows highest sensitivity
+
+### 🚀 **Next Phase: M3 - Model Performance Analysis**
+
+## 🎯 Current Focus: M3 - Individual Model Performance Testing
+
+### Implementation Tasks for M3:
+1. **Individual Model Testing** - Test each custom model separately with recorded audio
+   - Create script to test `Hay--compUta_v_lrg.tflite` individually
+   - Create script to test `Hey_computer.tflite` individually  
+   - Create script to test `hey-CompUter_lrg.tflite` individually
+   - Record confidence scores for each model across the entire audio clip
+   - Generate detailed confidence score timelines for comparison
+
+2. **Comparative Analysis** - Analyze detection scores and model characteristics
+   - Compare peak confidence scores between models
+   - Identify optimal detection thresholds for each model
+   - Analyze response timing differences
+   - Document model sensitivity characteristics
+
+3. **Performance Optimization** - Optimize detection parameters
+   - Test different detection thresholds (0.1, 0.15, 0.2, 0.25, 0.3)
+   - Measure false positive rates
+   - Optimize for best balance of sensitivity vs specificity
+   - Document recommended thresholds per model
+
+4. **Model Selection** - Determine best performing model
+   - Compare detection accuracy across models
+   - Evaluate processing speed differences
+   - Test with additional audio samples if available
+   - Make recommendation for production use
+
+### Success Criteria for M3:
+- ✅ Individual confidence scores recorded for each model
+- ✅ Comparative analysis completed with detailed metrics
+- ✅ Optimal detection thresholds identified for each model
+- ✅ Best performing model selected for production use
+- ✅ Performance characteristics documented
+
+### Next Immediate Steps:
+1. **Create individual model test scripts** for each of the three models
+2. **Run detailed confidence analysis** on the recorded "Hey Computer" audio
+3. **Compare detection scores** and identify peak responses
+4. **Optimize detection thresholds** based on model performance
+
 #### Completed Implementation Tasks for M2:
 1. **✅ Created SettingsManager** class (src/hey_orac/config/manager.py)
    - JSON schema validation with comprehensive schema
