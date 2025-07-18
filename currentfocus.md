@@ -86,11 +86,35 @@
 - ✅ Best performing model selected for production use
 - ✅ Performance characteristics documented
 
+### 📊 M3 Test Results - Individual Model Performance Analysis
+
+#### Test Run #1: hey_jarvis (Default Model) - COMPLETED ✅
+- **Test Date**: 2025-07-18 17:04:48
+- **Audio File**: recordings/wake_word_test_20250718_131542.wav (9.60 seconds)
+- **Peak Confidence**: **0.996765** (99.67%)
+- **Total Detections**: 7 wake words detected
+- **Detection Timeline**:
+  - 7.76s: 0.441979 (44.20%)
+  - 7.84s: 0.319685 (31.97%)
+  - 7.92s: 0.989650 (98.97%)
+  - 8.00s: 0.976523 (97.65%)
+  - 8.08s: **0.996765** (99.67%) ← **HIGHEST**
+  - 8.16s: 0.993032 (99.30%)
+  - 8.24s: 0.849759 (84.98%)
+- **Performance**: Excellent detection with high confidence scores clustered around 8-second mark
+
+#### Test Run #2: Custom TFLite Models - IN PROGRESS 🔄
+- **Current Status**: Need to test the three custom models individually
+- **Models to Test**:
+  - `Hay--compUta_v_lrg.tflite` (Priority: High)
+  - `Hey_computer.tflite` (Priority: High)  
+  - `hey-CompUter_lrg.tflite` (Priority: High)
+
 ### Next Immediate Steps:
-1. **Create individual model test scripts** for each of the three models
-2. **Run detailed confidence analysis** on the recorded "Hey Computer" audio
-3. **Compare detection scores** and identify peak responses
-4. **Optimize detection thresholds** based on model performance
+1. **✅ COMPLETED**: Run baseline test with default model (hey_jarvis) → **Peak: 99.67%**
+2. **🔄 IN PROGRESS**: Test individual custom models with same audio clip
+3. **⏳ PENDING**: Compare detection scores and identify peak responses
+4. **⏳ PENDING**: Optimize detection thresholds based on model performance
 
 #### Completed Implementation Tasks for M2:
 1. **✅ Created SettingsManager** class (src/hey_orac/config/manager.py)
