@@ -407,47 +407,19 @@ def main():
                 audio_filename = args.audio_file
             
             # Initialize model for recording (needed for real-time detection)
-            if args.load_all_models:
-                logger.info("Creating Model for recording with ALL custom TFLite models...")
-                custom_models = [
-                    '/app/models/Hay--compUta_v_lrg.tflite',
-                    '/app/models/Hey_computer.tflite',
-                    '/app/models/hey-CompUter_lrg.tflite'
-                ]
-                
-                # Check which models exist
-                available_models = []
-                for model_path in custom_models:
-                    if os.path.exists(model_path):
-                        available_models.append(model_path)
-                        logger.info(f"📁 Found model: {os.path.basename(model_path)}")
-                    else:
-                        logger.warning(f"⚠️ Model not found: {model_path}")
-                
-                if not available_models:
-                    logger.error("❌ No custom models found")
-                    return
-                
-                model = openwakeword.Model(
-                    wakeword_models=available_models,
-                    vad_threshold=0.5,
-                    enable_speex_noise_suppression=False
-                )
-                logger.info(f"✅ Loaded {len(available_models)} custom models")
-            else:
-                logger.info("Creating Model for recording with single custom TFLite model...")
-                logger.info(f"📁 Loading custom model: {args.custom_model}")
-                
-                # Check if custom model exists
-                if not os.path.exists(args.custom_model):
-                    logger.error(f"❌ Custom model not found: {args.custom_model}")
-                    return
-                
-                model = openwakeword.Model(
-                    wakeword_models=[args.custom_model],
-                    vad_threshold=0.5,
-                    enable_speex_noise_suppression=False
-                )
+            logger.info("Creating Model for recording with custom TFLite model...")
+            logger.info(f"📁 Loading custom model: {args.custom_model}")
+            
+            # Check if custom model exists
+            if not os.path.exists(args.custom_model):
+                logger.error(f"❌ Custom model not found: {args.custom_model}")
+                return
+            
+            model = openwakeword.Model(
+                wakeword_models=[args.custom_model],
+                vad_threshold=0.5,
+                enable_speex_noise_suppression=False
+            )
             
             success, metadata = record_test_audio(audio_manager, usb_mic, model, audio_filename)
             if success:
@@ -467,54 +439,22 @@ def main():
             logger.error("Failed to start audio stream. Exiting.")
             raise RuntimeError("Failed to start audio stream")
 
-        # Initialize the OpenWakeWord model with custom TFLite model(s)
-        if args.load_all_models:
-            logger.info("🔧 Creating Model with ALL custom TFLite models...")
-            custom_models = [
-                '/app/models/Hay--compUta_v_lrg.tflite',
-                '/app/models/Hey_computer.tflite',
-                '/app/models/hey-CompUter_lrg.tflite'
-            ]
-            
-            # Check which models exist
-            available_models = []
-            for model_path in custom_models:
-                if os.path.exists(model_path):
-                    available_models.append(model_path)
-                    logger.info(f"📁 Found model: {os.path.basename(model_path)}")
-                else:
-                    logger.warning(f"⚠️ Model not found: {model_path}")
-            
-            if not available_models:
-                logger.error("❌ No custom models found")
-                return
-            
-            try:
-                model = openwakeword.Model(
-                    wakeword_models=available_models,
-                    vad_threshold=0.5,
-                    enable_speex_noise_suppression=False
-                )
-                logger.info(f"✅ Loaded {len(available_models)} custom TFLite models successfully")
-            except Exception as e:
-                logger.error(f"❌ Model creation failed: {e}")
-                raise
-        else:
-            logger.info("🔧 Creating Model with single custom TFLite model...")
-            logger.info(f"📁 Loading custom model: {args.custom_model}")
-            
-            # Check if custom model exists
-            if not os.path.exists(args.custom_model):
-                logger.error(f"❌ Custom model not found: {args.custom_model}")
-                return
-            
-            try:
-                model = openwakeword.Model(
-                    wakeword_models=[args.custom_model],
-                    vad_threshold=0.5,
-                    enable_speex_noise_suppression=False
-                )
-                logger.info("✅ Custom TFLite model loaded successfully")
+        # Initialize the OpenWakeWord model with custom TFLite model
+        logger.info("🔧 Creating Model with custom TFLite model...")
+        logger.info(f"📁 Loading custom model: {args.custom_model}")
+        
+        # Check if custom model exists
+        if not os.path.exists(args.custom_model):
+            logger.error(f"❌ Custom model not found: {args.custom_model}")
+            return
+        
+        try:
+            model = openwakeword.Model(
+                wakeword_models=[args.custom_model],
+                vad_threshold=0.5,
+                enable_speex_noise_suppression=False
+            )
+            logger.info("✅ Custom TFLite model loaded successfully")
             
             # Test model with dummy audio
             logger.info("🔍 Testing custom model with dummy audio...")
@@ -591,4 +531,35 @@ def main():
                 detection_threshold = 0.3
                 if max_confidence >= detection_threshold:
                     detection_count += 1
-               
+                    logger.info(f"🎯 CUSTOM WAKE WORD DETECTED! '{best_model}' with confidence {max_confidence:.6f}")
+                    logger.info(f"   Threshold: {detection_threshold:.3f}")
+                    logger.info(f"   All scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+                else:
+                    # Log moderate confidence for debugging
+                    if max_confidence > 0.1:
+                        logger.info(f"🔍 Moderate confidence: {best_model} = {max_confidence:.6f}")
+                    elif chunk_count % 50 == 0:  # Periodic status
+                        logger.debug(f"🔍 Best confidence: {best_model} = {max_confidence:.6f}")
+
+            except Exception as e:
+                logger.error(f"Error processing audio data: {e}")
+                continue
+
+    except KeyboardInterrupt:
+        logger.info("Stopping audio stream and terminating...")
+        if stream:
+            stream.stop_stream()
+            stream.close()
+        if 'audio_manager' in locals():
+            audio_manager.__del__()
+
+    except Exception as e:
+        logger.error(f"Error during execution: {e}")
+        if 'stream' in locals() and stream:
+            stream.stop_stream()
+            stream.close()
+        if 'audio_manager' in locals():
+            audio_manager.__del__()
+
+if __name__ == "__main__":
+    main()
