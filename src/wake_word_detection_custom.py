@@ -341,8 +341,7 @@ def main():
                 return
             
             model = openwakeword.Model(
-                wakeword_model_paths=[args.custom_model],
-                class_mapping_dicts=[{0: "hay_computa"}],
+                wakeword_models=[args.custom_model],
                 vad_threshold=0.5,
                 enable_speex_noise_suppression=False
             )
@@ -387,8 +386,7 @@ def main():
                 return
             
             model = openwakeword.Model(
-                wakeword_model_paths=[args.custom_model],
-                class_mapping_dicts=[{0: "hay_computa"}],
+                wakeword_models=[args.custom_model],
                 vad_threshold=0.5,
                 enable_speex_noise_suppression=False
             )
@@ -422,8 +420,7 @@ def main():
         
         try:
             model = openwakeword.Model(
-                wakeword_model_paths=[args.custom_model],
-                class_mapping_dicts=[{0: "hay_computa"}],
+                wakeword_models=[args.custom_model],
                 vad_threshold=0.5,
                 enable_speex_noise_suppression=False
             )
