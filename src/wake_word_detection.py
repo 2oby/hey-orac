@@ -343,7 +343,7 @@ def main():
             # Initialize model for recording (needed for real-time detection)
             logger.info("Creating Model for recording with real-time detection...")
             model = Model(
-                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft', 'hey_computer'],
+                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
                 inference_framework='tflite'
             )
             
@@ -370,7 +370,7 @@ def main():
             # Initialize the OpenWakeWord model for testing
             logger.info("Creating Model for pipeline testing...")
             model = Model(
-                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft', 'hey_computer'],
+                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
                 inference_framework='tflite'
             )
             
@@ -405,7 +405,7 @@ def main():
             # Load specific wake word models including 'hey jarvis'
             logger.info("Creating Model with specific wake word models...")
             model = Model(
-                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft', 'hey_computer'],
+                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
                 inference_framework='tflite'
             )
             print("DEBUG: Model created successfully", flush=True)
