@@ -21,6 +21,11 @@
 - ✅ Created HeyOracApplication orchestrator
 - ✅ Built test script for "hey jarvis" model testing
 - ✅ Proper logging infrastructure in place
+- ✅ **Added recording and testing functionality:**
+  - Recording mode: `-record_test` or `-rt` records 10 seconds with countdown
+  - Test pipeline mode: `-test_pipeline` or `-tp` tests recorded audio through full pipeline
+  - Recorded audio enters pipeline at exact same point as live microphone audio
+  - RMS data logging and confidence score verification included
 
 ### 🎯 Current Focus: M2 - Custom Model Loading
 

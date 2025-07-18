@@ -6,6 +6,11 @@ Uses AudioManager for robust audio device handling.
 
 import sys
 import os
+import argparse
+import time
+import wave
+import json
+from datetime import datetime
 # Use environment variable for unbuffered output instead
 os.environ['PYTHONUNBUFFERED'] = '1'
 
@@ -24,9 +29,290 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def parse_arguments():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(description='OpenWakeWord test script')
+    parser.add_argument('-record_test', '-rt', action='store_true', 
+                       help='Record 10 seconds of audio for testing')
+    parser.add_argument('-test_pipeline', '-tp', action='store_true',
+                       help='Test pipeline with recorded audio file')
+    parser.add_argument('-audio_file', default=None,
+                       help='Audio file to use for testing (default: auto-generate timestamp)')
+    return parser.parse_args()
+
+def generate_timestamp_filename():
+    """Generate filename with timestamp."""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return f"wake_word_test_{timestamp}.wav"
+
+def record_test_audio(audio_manager, usb_mic, model, filename='test_recording.wav'):
+    """Record 10 seconds of test audio with countdown and metadata generation."""
+    logger.info("🎤 RECORDING MODE: Recording 10 seconds of test audio...")
+    
+    # Metadata collection
+    metadata = {
+        "recording_info": {
+            "timestamp": datetime.now().isoformat(),
+            "filename": filename,
+            "duration_seconds": 10,
+            "sample_rate": 16000,
+            "channels": 2,
+            "chunk_size": 1280,
+            "microphone_info": {
+                "name": usb_mic.name,
+                "index": usb_mic.index
+            }
+        },
+        "rms_data": [],
+        "detection_results": {
+            "wake_words_detected": [],
+            "total_detections": 0,
+            "confidence_scores": []
+        }
+    }
+    
+    # Start audio stream for recording
+    stream = audio_manager.start_stream(
+        device_index=usb_mic.index,
+        sample_rate=16000,
+        channels=2,
+        chunk_size=1280
+    )
+    
+    if not stream:
+        logger.error("Failed to start audio stream for recording")
+        return False, None
+    
+    # Countdown
+    logger.info("📡 Starting countdown...")
+    for i in range(5, 0, -1):
+        logger.info(f"   {i}...")
+        time.sleep(1)
+    
+    logger.info("🔴 RECORDING...")
+    sys.stdout.flush()
+    
+    # Record audio data and process in real-time
+    frames = []
+    chunks_per_second = 16000 // 1280  # ~12.5 chunks per second
+    total_chunks = chunks_per_second * 10  # 10 seconds
+    
+    for i in range(total_chunks):
+        try:
+            data = stream.read(1280, exception_on_overflow=False)
+            if data:
+                frames.append(data)
+                
+                # Convert to audio data for real-time processing
+                audio_array = np.frombuffer(data, dtype=np.int16)
+                if len(audio_array) > 1280:  # Stereo
+                    stereo_data = audio_array.reshape(-1, 2)
+                    audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                else:
+                    audio_data = audio_array.astype(np.float32)
+                
+                # Calculate RMS
+                rms = np.sqrt(np.mean(audio_data**2))
+                timestamp = i / chunks_per_second
+                
+                # Store RMS data
+                metadata["rms_data"].append({
+                    "timestamp": timestamp,
+                    "rms": float(rms)
+                })
+                
+                # Process through model for real-time detection
+                prediction = model.predict(audio_data)
+                
+                # Find highest confidence
+                max_confidence = 0.0
+                best_model = None
+                
+                for wakeword, score in prediction.items():
+                    if score > max_confidence:
+                        max_confidence = score
+                        best_model = wakeword
+                
+                # Store confidence scores
+                confidence_entry = {
+                    "timestamp": timestamp,
+                    "scores": {k: float(v) for k, v in prediction.items()},
+                    "best_model": best_model,
+                    "max_confidence": float(max_confidence)
+                }
+                metadata["detection_results"]["confidence_scores"].append(confidence_entry)
+                
+                # Check for wake word detection
+                detection_threshold = 0.3
+                if max_confidence >= detection_threshold:
+                    detection = {
+                        "timestamp": timestamp,
+                        "wake_word": best_model,
+                        "confidence": float(max_confidence),
+                        "all_scores": {k: float(v) for k, v in prediction.items()}
+                    }
+                    metadata["detection_results"]["wake_words_detected"].append(detection)
+                    logger.info(f"🎯 DETECTED during recording at {timestamp:.2f}s: {best_model} = {max_confidence:.6f}")
+                
+                # Progress indicator
+                if i % (chunks_per_second * 2) == 0:  # Every 2 seconds
+                    seconds_elapsed = i // chunks_per_second
+                    logger.info(f"   Recording... {seconds_elapsed}/10 seconds (RMS: {rms:.4f})")
+                
+        except Exception as e:
+            logger.error(f"Error during recording: {e}")
+            break
+    
+    # Stop recording
+    stream.stop_stream()
+    stream.close()
+    
+    # Update metadata with final results
+    metadata["detection_results"]["total_detections"] = len(metadata["detection_results"]["wake_words_detected"])
+    
+    # Save to WAV file
+    logger.info(f"💾 Saving recording to {filename}...")
+    try:
+        with wave.open(filename, 'wb') as wf:
+            wf.setnchannels(2)  # Stereo
+            wf.setsampwidth(2)  # 16-bit
+            wf.setframerate(16000)
+            wf.writeframes(b''.join(frames))
+        
+        logger.info(f"✅ Recording saved successfully to {filename}")
+        
+        # Save metadata file
+        metadata_filename = filename.replace('.wav', '_metadata.json')
+        with open(metadata_filename, 'w') as f:
+            json.dump(metadata, f, indent=2)
+        
+        logger.info(f"📊 Metadata saved to {metadata_filename}")
+        
+        # Log summary
+        total_detections = metadata["detection_results"]["total_detections"]
+        avg_rms = np.mean([entry["rms"] for entry in metadata["rms_data"]])
+        
+        logger.info(f"📈 Recording Summary:")
+        logger.info(f"   Duration: 10 seconds")
+        logger.info(f"   Average RMS: {avg_rms:.4f}")
+        logger.info(f"   Wake words detected: {total_detections}")
+        
+        if total_detections > 0:
+            logger.info(f"   Detections:")
+            for detection in metadata["detection_results"]["wake_words_detected"]:
+                logger.info(f"     {detection['timestamp']:.2f}s: {detection['wake_word']} (confidence: {detection['confidence']:.6f})")
+        else:
+            logger.info(f"   No wake words detected during recording")
+        
+        return True, metadata
+        
+    except Exception as e:
+        logger.error(f"❌ Error saving recording: {e}")
+        return False, None
+
+def load_test_audio(filename):
+    """Load recorded audio file and return as audio data for pipeline."""
+    logger.info(f"📂 Loading test audio from {filename}...")
+    
+    try:
+        with wave.open(filename, 'rb') as wf:
+            # Verify audio format
+            channels = wf.getnchannels()
+            sample_width = wf.getsampwidth()
+            framerate = wf.getframerate()
+            
+            logger.info(f"   Audio format: {channels} channels, {sample_width} bytes/sample, {framerate} Hz")
+            
+            if framerate != 16000:
+                logger.warning(f"⚠️  Sample rate is {framerate} Hz, expected 16000 Hz")
+            
+            # Read all frames
+            frames = wf.readframes(wf.getnframes())
+            
+            # Convert to numpy array
+            audio_array = np.frombuffer(frames, dtype=np.int16)
+            
+            # Convert stereo to mono (same as live pipeline)
+            if channels == 2:
+                stereo_data = audio_array.reshape(-1, 2)
+                audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                logger.info(f"   Converted stereo to mono: {len(audio_array)} -> {len(audio_data)} samples")
+            else:
+                audio_data = audio_array.astype(np.float32)
+                logger.info(f"   Mono audio: {len(audio_data)} samples")
+                
+            duration = len(audio_data) / 16000
+            logger.info(f"✅ Loaded {duration:.2f} seconds of audio data")
+            
+            return audio_data
+            
+    except Exception as e:
+        logger.error(f"❌ Error loading audio file: {e}")
+        return None
+
+def test_pipeline_with_audio(model, audio_data):
+    """Test the pipeline with recorded audio, processing in chunks like live audio."""
+    logger.info("🧪 TESTING PIPELINE with recorded audio...")
+    
+    chunk_size = 1280
+    total_chunks = len(audio_data) // chunk_size
+    
+    logger.info(f"   Processing {total_chunks} chunks of {chunk_size} samples each")
+    
+    detected_words = []
+    
+    for i in range(total_chunks):
+        start_idx = i * chunk_size
+        end_idx = start_idx + chunk_size
+        
+        # Extract chunk (same size as live audio)
+        chunk = audio_data[start_idx:end_idx]
+        
+        # Calculate RMS for this chunk
+        rms = np.sqrt(np.mean(chunk**2))
+        
+        # Process through model (exactly like live pipeline)
+        prediction = model.predict(chunk)
+        
+        # Find highest confidence
+        max_confidence = 0.0
+        best_model = None
+        
+        for wakeword, score in prediction.items():
+            if score > max_confidence:
+                max_confidence = score
+                best_model = wakeword
+        
+        # Log RMS and confidence every 25 chunks (~2 seconds)
+        if i % 25 == 0:
+            timestamp = (i * chunk_size) / 16000
+            logger.info(f"   📊 Time: {timestamp:.2f}s, RMS: {rms:.4f}, Best: {best_model} = {max_confidence:.6f}")
+        
+        # Detection logic (same threshold as live)
+        detection_threshold = 0.3
+        if max_confidence >= detection_threshold:
+            timestamp = (i * chunk_size) / 16000
+            logger.info(f"🎯 WAKE WORD DETECTED at {timestamp:.2f}s! Confidence: {max_confidence:.6f} - Source: {best_model}")
+            detected_words.append((timestamp, best_model, max_confidence))
+            
+        # Also log moderate confidence like live pipeline
+        elif max_confidence > 0.1:
+            timestamp = (i * chunk_size) / 16000
+            logger.info(f"🔍 Moderate confidence at {timestamp:.2f}s: {best_model} = {max_confidence:.6f}")
+    
+    # Summary
+    logger.info(f"🏁 Pipeline test completed. Detected {len(detected_words)} wake words:")
+    for timestamp, word, confidence in detected_words:
+        logger.info(f"   {timestamp:.2f}s: {word} (confidence: {confidence:.6f})")
+    
+    return detected_words
+
 # Download pre-trained OpenWakeWord models if not already present
 # This ensures models like "alexa", "hey jarvis", etc., are available
 openwakeword.utils.download_models()
+
+# Parse command line arguments
+args = parse_arguments()
 
 # Try to explicitly load specific models
 logger.info("Attempting to load pre-trained models...")
@@ -43,6 +329,58 @@ try:
         raise RuntimeError("No USB microphone detected")
 
     logger.info(f"Using USB microphone: {usb_mic.name} (index {usb_mic.index})")
+    
+    # Handle recording mode
+    if args.record_test:
+        # Generate timestamp filename if not provided
+        if args.audio_file is None:
+            audio_filename = generate_timestamp_filename()
+        else:
+            audio_filename = args.audio_file
+        
+        # Initialize model for recording (needed for real-time detection)
+        logger.info("Creating Model for recording with real-time detection...")
+        model = Model(
+            wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft', 'hey_computer'],
+            inference_framework='tflite'
+        )
+        
+        success, metadata = record_test_audio(audio_manager, usb_mic, model, audio_filename)
+        if success:
+            logger.info("✅ Recording completed successfully. Exiting.")
+        else:
+            logger.error("❌ Recording failed. Exiting.")
+        return
+    
+    # Handle test pipeline mode
+    if args.test_pipeline:
+        # Use default filename if not provided
+        if args.audio_file is None:
+            logger.error("❌ No audio file specified for testing. Use -audio_file parameter.")
+            return
+        
+        # Load the recorded audio
+        audio_data = load_test_audio(args.audio_file)
+        if audio_data is None:
+            logger.error("❌ Failed to load test audio. Exiting.")
+            return
+        
+        # Initialize the OpenWakeWord model for testing
+        logger.info("Creating Model for pipeline testing...")
+        model = Model(
+            wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft', 'hey_computer'],
+            inference_framework='tflite'
+        )
+        
+        # Run pipeline test
+        detected_words = test_pipeline_with_audio(model, audio_data)
+        
+        if detected_words:
+            logger.info(f"✅ Pipeline test completed. Found {len(detected_words)} wake word detections.")
+        else:
+            logger.info("ℹ️  Pipeline test completed. No wake words detected.")
+        
+        return
 
     # Start audio stream with parameters suitable for OpenWakeWord
     # - Sample rate: 16000 Hz (required by OpenWakeWord)  
@@ -62,9 +400,12 @@ try:
     # Initialize the OpenWakeWord model, loading all pre-trained models
     print("DEBUG: About to create Model()", flush=True)
     try:
-        # Use default model loading - leave wakeword_models empty to load all pre-trained models
-        logger.info("Creating Model with default settings to load all pre-trained models...")
-        model = Model(inference_framework='tflite')  # Explicitly use tflite
+        # Load specific wake word models including 'hey jarvis'
+        logger.info("Creating Model with specific wake word models...")
+        model = Model(
+            wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft', 'hey_computer'],
+            inference_framework='tflite'
+        )
         print("DEBUG: Model created successfully", flush=True)
         logger.info("OpenWakeWord model initialized")
         
@@ -176,8 +517,8 @@ try:
                 max_confidence = score
                 best_model = wakeword
         
-        # Check against proper threshold (like old working code)
-        detection_threshold = 0.5
+        # Use lower threshold for better detection sensitivity
+        detection_threshold = 0.3
         if max_confidence >= detection_threshold:
             logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
             logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
