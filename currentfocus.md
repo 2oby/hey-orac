@@ -126,10 +126,66 @@
 - **Framework Robustness**: Standard models show excellent cross-phrase detection capability
 - **Custom Model Insight**: Specialized TFLite models exist for "Hey Computer" but require framework integration
 
-### 🚀 **Next Phase: M4 - Production Deployment**
-- **Recommendation**: Use standard OpenWakeWord models for production (proven 99.67% accuracy)
-- **Custom Model Path**: Integrate specialized TFLite models for enhanced "Hey Computer" detection
-- **Threshold Optimization**: Current 0.3 threshold is appropriate (no false positives observed)
+### 🔧 **Current Issue: Custom Model Loading in Main Code**
+
+#### Problem Statement:
+- **Task**: Load and test three custom TFLite models using the main wake_word_detection.py script
+- **Models to Test**: 
+  - `Hay--compUta_v_lrg.tflite`
+  - `Hey_computer.tflite`  
+  - `hey-CompUter_lrg.tflite`
+- **Issue**: Custom models are not being loaded; script defaults to standard OpenWakeWord models
+
+#### Attempts Made:
+1. **Modified wake_word_detection.py** (lines 338-360):
+   ```python
+   custom_model_path = '/app/models/Hay--compUta_v_lrg.tflite'
+   logger.info(f"🔧 Loading custom model: {custom_model_path}")
+   model = Model(
+       wakeword_models=[custom_model_path],
+       inference_framework='tflite',
+       vad_threshold=0.5,
+       enable_speex_noise_suppression=False
+   )
+   ```
+
+2. **Verified**: 
+   - Models exist on Pi at `/home/2oby/WakeWordTest/models/`
+   - Docker maps this to `/app/models/` inside container
+   - Code changes are deployed correctly
+
+3. **Problem**: 
+   - No custom model loading logs appear
+   - Detection still shows "hey_jarvis" instead of custom model name
+   - OpenWakeWord may be defaulting to pre-trained models when custom path fails
+
+#### Root Cause Analysis (NEW):
+**API Breaking Change Identified**: The commit "Use updated OpenWakeWord API without deprecated parameters" broke custom model loading:
+1. **Removed `class_mapping_dicts` parameter** - Previously used to map model outputs to wake word names (e.g., `{0: "hay_computa"}`)
+2. **Changed `wakeword_model_paths` to `wakeword_models`** - Simple parameter rename
+3. **Current code issues**:
+   - Using `Model` class directly instead of `openwakeword.Model`
+   - Adding `inference_framework='tflite'` which might be unnecessary
+   - No way to specify wake word names without `class_mapping_dicts`
+
+#### Why It Broke:
+- The newer OpenWakeWord API expects custom models to have metadata embedded that specifies the wake word name
+- Without `class_mapping_dicts`, OpenWakeWord can't determine what the wake word should be called
+- Custom models were created for the older API and lack required metadata for the new API
+- API silently falls back to default models when custom model loading fails
+
+#### Potential Fixes to Try:
+1. **Fix import and class usage**: Change from `Model` to `openwakeword.Model`
+2. **Remove unnecessary parameter**: Remove `inference_framework='tflite'` 
+3. **Check for alternative naming method**: Look for new API way to specify wake word names
+4. **Verify model metadata**: Check if custom models need regeneration with proper metadata
+5. **Test with working example**: Compare with `wake_word_detection_custom.py` that successfully loads models
+6. **Consider API downgrade**: If needed, use older OpenWakeWord version that supports `class_mapping_dicts`
+
+### 🚀 **Next Phase: Debug Custom Model Loading**
+- **Action Required**: Fix main code to properly load custom TFLite models
+- **Goal**: Get confidence scores for each of the three custom models
+- **Blocker**: Need to understand why OpenWakeWord isn't loading custom model paths
 
 ### Completed Steps:
 1. **✅ COMPLETED**: Run baseline test with default model (hey_jarvis) → **Peak: 99.67%**

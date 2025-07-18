@@ -15,7 +15,6 @@ from datetime import datetime
 os.environ['PYTHONUNBUFFERED'] = '1'
 
 import openwakeword
-from openwakeword.model import Model
 import logging
 import numpy as np
 from audio_utils import AudioManager  # Import the AudioManager class
@@ -352,9 +351,9 @@ def main():
                     for f in os.listdir(models_dir):
                         logger.info(f"   - {f}")
             
-            model = Model(
+            model = openwakeword.Model(
                 wakeword_models=[custom_model_path],
-                inference_framework='tflite',
+                class_mapping_dicts=[{0: "hay_computa"}],
                 vad_threshold=0.5,
                 enable_speex_noise_suppression=False
             )
