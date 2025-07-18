@@ -335,9 +335,14 @@ def main():
             
             # Initialize the OpenWakeWord model for testing
             logger.info("Creating Model for pipeline testing...")
+            # Test custom model: Hay--compUta_v_lrg.tflite
+            custom_model_path = '/app/models/Hay--compUta_v_lrg.tflite'
+            logger.info(f"🔧 Loading custom model: {custom_model_path}")
             model = Model(
-                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
-                inference_framework='tflite'
+                wakeword_models=[custom_model_path],
+                inference_framework='tflite',
+                vad_threshold=0.5,
+                enable_speex_noise_suppression=False
             )
             
             # Run pipeline test
