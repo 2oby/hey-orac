@@ -40,7 +40,6 @@ COPY src/ ./src/
 RUN pip install --no-cache-dir --no-deps -e .
 
 # Copy additional resources
-COPY third_party/ ./third_party/
 COPY models/ ./models/
 
 # Create necessary directories
