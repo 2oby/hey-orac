@@ -17,7 +17,9 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 import openwakeword
 import logging
 import numpy as np
+import requests
 from hey_orac.audio.utils import AudioManager  # Import the AudioManager class
+from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
 
 # Configure logging for debugging
 logging.basicConfig(
@@ -115,7 +117,7 @@ class WavFileStream:
         """Compatibility method - does nothing for WAV file."""
         pass
 
-def record_test_audio(audio_manager, usb_mic, model, filename='test_recording.wav'):
+def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename='test_recording.wav'):
     """Record 10 seconds of test audio with countdown and metadata generation."""
     logger.info("🎤 RECORDING MODE: Recording 10 seconds of test audio...")
     
@@ -141,12 +143,15 @@ def record_test_audio(audio_manager, usb_mic, model, filename='test_recording.wa
         }
     }
     
-    # Start audio stream for recording
+    # Start audio stream for recording using config values
+    with settings_manager.get_config() as config:
+        audio_config = config.audio
+    
     stream = audio_manager.start_stream(
-        device_index=usb_mic.index,
-        sample_rate=16000,
-        channels=2,
-        chunk_size=1280
+        device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
+        sample_rate=audio_config.sample_rate,
+        channels=audio_config.channels,
+        chunk_size=audio_config.chunk_size
     )
     
     if not stream:
@@ -385,6 +390,20 @@ def main():
     """Main function to run the wake word detection system."""
     # Parse command line arguments
     args = parse_arguments()
+    
+    # Initialize SettingsManager (triggers auto-discovery)
+    logger.info("🔧 Initializing SettingsManager...")
+    settings_manager = SettingsManager()
+    
+    # Get configurations
+    with settings_manager.get_config() as config:
+        models_config = config.models
+        audio_config = config.audio
+        system_config = config.system
+    
+    # Configure logging level from config
+    logging.getLogger().setLevel(getattr(logging, system_config.log_level, logging.INFO))
+    logger.info(f"✅ SettingsManager initialized with {len(models_config)} models")
 
     # Try to explicitly load specific models
     logger.info("Attempting to load pre-trained models...")
@@ -403,12 +422,13 @@ def main():
                 logger.error("❌ Failed to load test audio. Exiting.")
                 return
             
-            # Test all three custom models individually
-            custom_models = [
-                '/app/models/openwakeword/Hay--compUta_v_lrg.tflite',
-                '/app/models/openwakeword/hey-CompUter_lrg.tflite', 
-                '/app/models/openwakeword/Hey_computer.tflite'
-            ]
+            # Get enabled models from configuration
+            enabled_models = [model for model in models_config if model.enabled]
+            if not enabled_models:
+                logger.warning("⚠️ No enabled models found in configuration, using all available models")
+                enabled_models = models_config
+            
+            custom_models = [model.path for model in enabled_models]
             
             all_detected_words = []
             
@@ -494,7 +514,7 @@ def main():
                 wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft']
             )
             
-            success, metadata = record_test_audio(audio_manager, usb_mic, model, audio_filename)
+            success, metadata = record_test_audio(audio_manager, usb_mic, model, settings_manager, audio_filename)
             if success:
                 logger.info("✅ Recording completed successfully. Exiting.")
             else:
@@ -503,43 +523,47 @@ def main():
 
         # Start audio stream if using microphone (skip if using WAV file)
         if not args.input_wav:
-            # Start audio stream with parameters suitable for OpenWakeWord
-            # - Sample rate: 16000 Hz (required by OpenWakeWord)  
-            # - Channels: 2 (stereo) to match microphone capabilities, then convert to mono
-            # - Chunk size: 1280 samples (80 ms at 16000 Hz) for optimal efficiency
-            # Note: Microphone has 2 input channels, so read as stereo then process to mono
+            # Start audio stream with parameters from configuration
             stream = audio_manager.start_stream(
-                device_index=usb_mic.index,
-                sample_rate=16000,
-                channels=2,  # Read as stereo to match microphone capabilities
-                chunk_size=1280
+                device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
+                sample_rate=audio_config.sample_rate,
+                channels=audio_config.channels,
+                chunk_size=audio_config.chunk_size
             )
             if not stream:
                 logger.error("Failed to start audio stream. Exiting.")
                 raise RuntimeError("Failed to start audio stream")
 
-        # Initialize the OpenWakeWord model
+        # Initialize the OpenWakeWord model with enabled models from configuration
         print("DEBUG: About to create Model()", flush=True)
         try:
-            # Always use custom model (Hay--compUta_v_lrg.tflite)
-            custom_model_path = '/app/models/openwakeword/Hay--compUta_v_lrg.tflite'
-            logger.info(f"Creating Model with custom model: {custom_model_path}")
+            # Get enabled models from configuration
+            enabled_models = [model for model in models_config if model.enabled]
+            if not enabled_models:
+                logger.error("❌ No enabled models found in configuration")
+                raise RuntimeError("No enabled models configured")
+            
+            # Use first enabled model (can be extended for multiple models later)
+            primary_model = enabled_models[0]
+            logger.info(f"Creating Model with primary model: {primary_model.name} ({primary_model.path})")
             
             # Check if model file exists
-            if os.path.exists(custom_model_path):
-                logger.info(f"✅ Custom model file found at: {custom_model_path}")
+            if os.path.exists(primary_model.path):
+                logger.info(f"✅ Model file found at: {primary_model.path}")
             else:
-                logger.error(f"❌ Custom model file NOT found at: {custom_model_path}")
-                raise FileNotFoundError(f"Custom model not found: {custom_model_path}")
+                logger.error(f"❌ Model file NOT found at: {primary_model.path}")
+                raise FileNotFoundError(f"Model not found: {primary_model.path}")
             
             model = openwakeword.Model(
-                wakeword_models=[custom_model_path],
+                wakeword_models=[primary_model.path],
                 vad_threshold=0.5,
                 enable_speex_noise_suppression=False
             )
-            # Set detection threshold
-            detection_threshold = 0.1
-            logger.info(f"Using custom model with detection threshold: {detection_threshold}")
+            
+            # Store model configs for later use (thresholds, webhooks, etc.)
+            active_model_configs = {primary_model.name: primary_model}
+            
+            logger.info(f"Using model '{primary_model.name}' with threshold: {primary_model.threshold}, sensitivity: {primary_model.sensitivity}")
             print("DEBUG: Model created successfully", flush=True)
             logger.info("OpenWakeWord model initialized")
             
@@ -661,10 +685,44 @@ def main():
                     max_confidence = score
                     best_model = wakeword
             
-            # Use the threshold set during model initialization
+            # Get threshold from the active model configuration
+            detection_threshold = primary_model.threshold
             if max_confidence >= detection_threshold:
                 logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
                 logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+                
+                # Call webhook if configured
+                if primary_model.webhook_url:
+                    try:
+                        # Prepare webhook payload
+                        webhook_data = {
+                            "wake_word": best_model,
+                            "confidence": max_confidence,
+                            "threshold": detection_threshold,
+                            "timestamp": time.time(),
+                            "model_name": primary_model.name,
+                            "all_scores": prediction
+                        }
+                        
+                        # Make webhook call
+                        logger.info(f"📞 Calling webhook: {primary_model.webhook_url}")
+                        response = requests.post(
+                            primary_model.webhook_url,
+                            json=webhook_data,
+                            timeout=5  # 5 second timeout
+                        )
+                        
+                        if response.status_code == 200:
+                            logger.info(f"✅ Webhook call successful")
+                        else:
+                            logger.warning(f"⚠️ Webhook returned status code: {response.status_code}")
+                            
+                    except requests.exceptions.Timeout:
+                        logger.error("❌ Webhook call timed out")
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"❌ Webhook call failed: {e}")
+                    except Exception as e:
+                        logger.error(f"❌ Unexpected error during webhook call: {e}")
             else:
                 # Enhanced debugging - log more frequent confidence updates
                 if chunk_count % 50 == 0:  # Every 50 chunks instead of 100
