@@ -407,7 +407,6 @@ def main():
                 return
             
             # Test all three custom models individually
-            import os
             custom_models = [
                 '/app/models/Hay--compUta_v_lrg.tflite',
                 '/app/models/hey-CompUter_lrg.tflite', 
@@ -704,7 +703,9 @@ def main():
 
     except Exception as e:
         # Log any other errors and clean up
+        import traceback
         logger.error(f"Error during execution: {e}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         if stream:
             stream.stop_stream()
             stream.close()
