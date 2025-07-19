@@ -1,0 +1,385 @@
+// WebSocket connection and real-time updates
+const API_BASE = '/api';
+let socket = null;
+let sampleModels = [];
+let currentEditingModel = null;
+let currentVolume = 0;
+let volumeHistory = [];
+let reconnectTimer = null;
+
+// Initialize WebSocket connection
+function initWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/socket.io/`;
+    
+    socket = io(wsUrl, {
+        transports: ['websocket'],
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 10
+    });
+
+    socket.on('connect', () => {
+        console.log('WebSocket connected');
+        updateConnectionStatus(true);
+        
+        // Subscribe to real-time updates
+        socket.emit('subscribe_updates');
+    });
+
+    socket.on('disconnect', () => {
+        console.log('WebSocket disconnected');
+        updateConnectionStatus(false);
+    });
+
+    socket.on('rms_update', (data) => {
+        updateVolume(data.rms);
+    });
+
+    socket.on('detection', (data) => {
+        handleDetection(data);
+    });
+
+    socket.on('status_update', (data) => {
+        updateSystemStatus(data);
+    });
+
+    socket.on('config_changed', () => {
+        loadConfig();
+    });
+}
+
+// Update connection status in UI
+function updateConnectionStatus(connected) {
+    const statusElement = document.querySelector('.connection-status');
+    if (statusElement) {
+        statusElement.textContent = connected ? 'Connected' : 'Disconnected';
+        statusElement.style.color = connected ? '#00ff41' : '#ff0000';
+    }
+}
+
+// Update system status
+function updateSystemStatus(status) {
+    const listeningElement = document.querySelector('.listening-status');
+    if (listeningElement) {
+        listeningElement.textContent = status.listening ? 'Listening' : 'Not Listening';
+    }
+
+    const activeElement = document.querySelector('.audio-status');
+    if (activeElement) {
+        activeElement.textContent = status.active ? `Active (RMS: ${currentVolume.toFixed(0)})` : 'Inactive';
+    }
+}
+
+// Handle detection events
+function handleDetection(detection) {
+    console.log('Wake word detected:', detection);
+    
+    // Find the model card
+    const modelCard = document.querySelector(`[data-model="${detection.model}"]`);
+    if (modelCard) {
+        // Add detection animation
+        modelCard.classList.add('detected');
+        setTimeout(() => modelCard.classList.remove('detected'), 1000);
+    }
+    
+    // Update last detection
+    const lastDetectionElement = document.querySelector('.last-detection');
+    if (lastDetectionElement) {
+        const time = new Date(detection.timestamp).toLocaleTimeString();
+        lastDetectionElement.textContent = `${detection.model} at ${time} (${(detection.confidence * 100).toFixed(1)}%)`;
+    }
+    
+    // Play notification sound
+    playNotificationSound();
+}
+
+// Update volume display
+function updateVolume(rms) {
+    currentVolume = rms;
+    updateVolumeDisplay();
+}
+
+// API functions
+async function loadConfig() {
+    try {
+        const response = await fetch(`${API_BASE}/config`);
+        const config = await response.json();
+        
+        // Convert config to our model format
+        sampleModels = config.models.map(model => ({
+            name: model.name,
+            active: model.enabled,
+            sensitivity: model.sensitivity,
+            threshold: model.threshold,
+            apiUrl: model.webhook_url
+        }));
+        
+        // Update global settings if available
+        if (config.system) {
+            const rmsSlider = document.getElementById('rms-filter');
+            const cooldownSlider = document.getElementById('cooldown');
+            
+            if (rmsSlider && config.system.rms_filter !== undefined) {
+                rmsSlider.value = rmsToSlider(config.system.rms_filter);
+                updateSliderDisplay('rms-filter', config.system.rms_filter);
+            }
+            
+            if (cooldownSlider && config.system.cooldown !== undefined) {
+                cooldownSlider.value = config.system.cooldown;
+                updateSliderDisplay('cooldown', config.system.cooldown);
+            }
+        }
+        
+        updateModelCards();
+    } catch (error) {
+        console.error('Error loading config:', error);
+    }
+}
+
+async function saveGlobalSettings() {
+    const rmsValue = sliderToRMS(document.getElementById('rms-filter').value);
+    const cooldownValue = parseFloat(document.getElementById('cooldown').value);
+    
+    try {
+        const response = await fetch(`${API_BASE}/config/global`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rms_filter: rmsValue,
+                cooldown: cooldownValue
+            })
+        });
+        
+        if (response.ok) {
+            console.log('Global settings saved');
+        }
+    } catch (error) {
+        console.error('Error saving global settings:', error);
+    }
+}
+
+async function toggleModel(modelName) {
+    const model = sampleModels.find(m => m.name === modelName);
+    if (!model) return;
+    
+    const newState = !model.active;
+    const endpoint = newState ? 'activate' : 'deactivate';
+    
+    try {
+        const response = await fetch(`${API_BASE}/custom-models/${modelName}/${endpoint}`, {
+            method: 'POST'
+        });
+        
+        if (response.ok) {
+            model.active = newState;
+            updateModelCards();
+        }
+    } catch (error) {
+        console.error('Error toggling model:', error);
+    }
+}
+
+async function saveModelSettings() {
+    if (!currentEditingModel) return;
+    
+    const sensitivity = parseFloat(document.getElementById('model-sensitivity').value);
+    const threshold = parseFloat(document.getElementById('model-threshold').value);
+    const apiUrl = document.getElementById('model-api-url').value;
+    
+    try {
+        const response = await fetch(`${API_BASE}/config/models/${currentEditingModel}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sensitivity: sensitivity,
+                threshold: threshold,
+                webhook_url: apiUrl
+            })
+        });
+        
+        if (response.ok) {
+            const model = sampleModels.find(m => m.name === currentEditingModel);
+            if (model) {
+                model.sensitivity = sensitivity;
+                model.threshold = threshold;
+                model.apiUrl = apiUrl;
+            }
+            closeModelSettings();
+        }
+    } catch (error) {
+        console.error('Error saving model settings:', error);
+    }
+}
+
+// UI update functions
+function updateModelCards() {
+    const grid = document.getElementById('models-grid');
+    grid.innerHTML = '';
+    
+    sampleModels.forEach(model => {
+        const card = document.createElement('div');
+        card.className = `model-card ${model.active ? 'active' : ''}`;
+        card.dataset.model = model.name;
+        card.onclick = () => toggleModel(model.name);
+        
+        card.innerHTML = `
+            <div class="model-header">
+                <h3>${model.name}</h3>
+                <span class="model-status">${model.active ? 'ACTIVE' : 'INACTIVE'}</span>
+            </div>
+            <button class="settings-btn" onclick="event.stopPropagation(); openModelSettings('${model.name}')">
+                <svg viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                </svg>
+            </button>
+        `;
+        
+        grid.appendChild(card);
+    });
+}
+
+function openModelSettings(modelName) {
+    currentEditingModel = modelName;
+    const model = sampleModels.find(m => m.name === modelName);
+    
+    if (model) {
+        document.getElementById('model-name').textContent = model.name;
+        document.getElementById('model-sensitivity').value = model.sensitivity;
+        document.getElementById('model-threshold').value = model.threshold;
+        document.getElementById('model-api-url').value = model.apiUrl || '';
+        
+        updateSliderDisplay('model-sensitivity', model.sensitivity);
+        updateSliderDisplay('model-threshold', model.threshold);
+        
+        document.getElementById('model-modal').style.display = 'flex';
+    }
+}
+
+function closeModelSettings() {
+    document.getElementById('model-modal').style.display = 'none';
+    currentEditingModel = null;
+}
+
+// RMS slider conversion functions
+function rmsToSlider(rms) {
+    if (rms <= 0) return 0;
+    if (rms >= 5000) return 100;
+    
+    const midpoint = 50;
+    const midpointRMS = 50;
+    
+    if (rms <= midpointRMS) {
+        return (rms / midpointRMS) * midpoint;
+    } else {
+        const logScale = Math.log(rms / midpointRMS) / Math.log(5000 / midpointRMS);
+        return midpoint + logScale * midpoint;
+    }
+}
+
+function sliderToRMS(sliderValue) {
+    sliderValue = parseFloat(sliderValue);
+    if (sliderValue <= 0) return 0;
+    if (sliderValue >= 100) return 5000;
+    
+    const midpoint = 50;
+    const midpointRMS = 50;
+    
+    if (sliderValue <= midpoint) {
+        return (sliderValue / midpoint) * midpointRMS;
+    } else {
+        const normalizedValue = (sliderValue - midpoint) / midpoint;
+        return midpointRMS * Math.pow(5000 / midpointRMS, normalizedValue);
+    }
+}
+
+function updateSliderDisplay(sliderId, value) {
+    const display = document.getElementById(sliderId + '-value');
+    if (display) {
+        if (sliderId === 'rms-filter') {
+            display.textContent = Math.round(value);
+        } else if (sliderId === 'cooldown') {
+            display.textContent = value.toFixed(1) + 's';
+        } else {
+            display.textContent = value.toFixed(5);
+        }
+    }
+}
+
+// Volume display
+function updateVolumeDisplay() {
+    const meter = document.getElementById('volume-meter');
+    const segments = meter.querySelectorAll('.segment');
+    const filterThreshold = parseFloat(document.getElementById('rms-filter-value').textContent);
+    
+    // Update volume history
+    volumeHistory.push(currentVolume);
+    if (volumeHistory.length > 50) volumeHistory.shift();
+    
+    // Calculate normalized volume (0-12 scale for segments)
+    const normalizedVolume = Math.min(12, (currentVolume / 5000) * 12);
+    
+    segments.forEach((segment, index) => {
+        const shouldBeActive = index < normalizedVolume;
+        segment.classList.toggle('active', shouldBeActive);
+        
+        // Update filter indicator
+        const segmentRMS = (index / 12) * 5000;
+        if (Math.abs(segmentRMS - filterThreshold) < 200) {
+            segment.style.borderColor = '#00ff41';
+        } else {
+            segment.style.borderColor = '';
+        }
+    });
+    
+    // Update audio status
+    document.querySelector('.audio-status').textContent = `Active (RMS: ${currentVolume.toFixed(0)})`;
+}
+
+// Notification sound
+function playNotificationSound() {
+    const audio = new Audio('/assets/audio/beep.mp3');
+    audio.play().catch(e => console.log('Audio play failed:', e));
+}
+
+// Initialize everything when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Load initial configuration
+    loadConfig();
+    
+    // Initialize WebSocket connection
+    initWebSocket();
+    
+    // Setup event listeners for sliders
+    document.getElementById('rms-filter').addEventListener('input', function() {
+        const rmsValue = sliderToRMS(this.value);
+        updateSliderDisplay('rms-filter', rmsValue);
+        saveGlobalSettings();
+    });
+    
+    document.getElementById('cooldown').addEventListener('input', function() {
+        updateSliderDisplay('cooldown', this.value);
+        saveGlobalSettings();
+    });
+    
+    document.getElementById('model-sensitivity').addEventListener('input', function() {
+        updateSliderDisplay('model-sensitivity', this.value);
+    });
+    
+    document.getElementById('model-threshold').addEventListener('input', function() {
+        updateSliderDisplay('model-threshold', this.value);
+    });
+    
+    // Modal close button
+    document.querySelector('.close-btn').addEventListener('click', closeModelSettings);
+    
+    // Save model settings button
+    document.querySelector('.save-btn').addEventListener('click', saveModelSettings);
+    
+    // Close modal on outside click
+    document.getElementById('model-modal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeModelSettings();
+        }
+    });
+});

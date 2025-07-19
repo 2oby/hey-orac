@@ -24,6 +24,8 @@ services:
       - ./model_cache:/root/.local/share/openwakeword
       # Mount custom TFLite models
       - ./models:/app/models
+      # Mount config directory for settings.json
+      - ./config:/app/config
     
     # Environment variables
     environment:
@@ -31,6 +33,10 @@ services:
       - ALSA_CARD=1
       - AUDIO_DEVICE=/dev/snd
       - PULSE_RUNTIME_PATH=/tmp
+    
+    # Port mappings for web GUI
+    ports:
+      - "7171:7171"
     
     # Network mode for easier debugging
     network_mode: host

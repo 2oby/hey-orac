@@ -18,13 +18,8 @@ import openwakeword
 import logging
 import numpy as np
 import requests
-import threading
-from multiprocessing import Manager, Queue
 from hey_orac.audio.utils import AudioManager  # Import the AudioManager class
 from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
-from hey_orac.web.app import create_app, socketio
-from hey_orac.web.routes import init_routes
-from hey_orac.web.broadcaster import WebSocketBroadcaster
 
 # Configure logging for debugging
 logging.basicConfig(
@@ -396,20 +391,6 @@ def main():
     # Parse command line arguments
     args = parse_arguments()
     
-    # Initialize shared data structures for web GUI
-    manager = Manager()
-    shared_data = manager.dict({
-        'rms': 0.0,
-        'is_listening': False,
-        'is_active': False,
-        'status': 'Starting...',
-        'last_detection': None,
-        'recent_detections': [],
-        'config_changed': False,
-        'status_changed': True
-    })
-    event_queue = Queue(maxsize=100)
-    
     # Initialize SettingsManager (triggers auto-discovery)
     logger.info("🔧 Initializing SettingsManager...")
     settings_manager = SettingsManager()
@@ -637,35 +618,6 @@ def main():
             sys.stdout.flush()
             raise
 
-        # Initialize web server in a separate thread
-        logger.info("🌐 Starting web server on port 7171...")
-        
-        # Initialize routes with shared resources
-        init_routes(settings_manager, shared_data, event_queue)
-        
-        # Create Flask app
-        app = create_app()
-        
-        # Create and start WebSocket broadcaster
-        broadcaster = WebSocketBroadcaster(socketio, shared_data, event_queue)
-        broadcaster.start()
-        
-        # Start Flask-SocketIO server in a separate thread
-        web_thread = threading.Thread(
-            target=socketio.run,
-            args=(app,),
-            kwargs={'host': '0.0.0.0', 'port': 7171, 'debug': False}
-        )
-        web_thread.daemon = True
-        web_thread.start()
-        
-        logger.info("✅ Web server started successfully")
-        
-        # Update shared data
-        shared_data['status'] = 'Connected'
-        shared_data['is_active'] = True
-        shared_data['status_changed'] = True
-        
         # Continuously listen to the audio stream and detect wake words
         logger.info("🎤 Starting wake word detection loop...")
         sys.stdout.flush()
@@ -702,19 +654,12 @@ def main():
                         # Already mono - CRITICAL FIX: no normalization!
                         audio_data = audio_array.astype(np.float32)
 
-                # Calculate RMS for web GUI display
-                rms = np.sqrt(np.mean(audio_data**2))
-                shared_data['rms'] = float(rms)
-                
-                # Update listening state
-                shared_data['is_listening'] = True
-                
                 # Log every 100 chunks to show we're processing audio
                 chunk_count += 1
                 if chunk_count % 100 == 0:
                     audio_volume = np.abs(audio_data).mean()
                     logger.info(f"📊 Processed {chunk_count} audio chunks")
-                    logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}, RMS: {rms:.4f}")
+                    logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}")
                     logger.info(f"   Raw data size: {len(data)} bytes, samples: {len(audio_array)}")
                     if len(audio_array) > 1280:
                         logger.info(f"   ✅ Stereo→Mono conversion active")
@@ -745,23 +690,6 @@ def main():
             if max_confidence >= detection_threshold:
                 logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
                 logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
-                
-                # Add detection event to queue for web GUI
-                detection_event = {
-                    'type': 'detection',
-                    'model': best_model,
-                    'confidence': float(max_confidence),
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
-                }
-                
-                # Update shared data
-                shared_data['last_detection'] = detection_event
-                
-                # Add to event queue if not full
-                try:
-                    event_queue.put_nowait(detection_event)
-                except:
-                    pass  # Queue full, skip
                 
                 # Call webhook if configured
                 if primary_model.webhook_url:
