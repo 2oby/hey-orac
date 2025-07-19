@@ -17,7 +17,7 @@ os.environ['PYTHONUNBUFFERED'] = '1'
 import openwakeword
 import logging
 import numpy as np
-from audio_utils import AudioManager  # Import the AudioManager class
+from .audio.utils import AudioManager  # Import the AudioManager class
 
 # Configure logging for debugging
 logging.basicConfig(

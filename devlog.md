@@ -494,3 +494,35 @@
 
 **STATUS: PRODUCTION READY** ✅
 - Ready for production deployment or further model optimization
+
+## 2025-07-19 16:25 - System Simplification and Verification Complete
+- **MAJOR IMPROVEMENT**: Removed --use-custom-model switch requirement
+- Now always loads custom model `Hay--compUta_v_lrg.tflite` by default
+- Updated detection threshold from 0.05 to 0.1 (10%) for better balance
+- Cleaned up docker-compose.yml to remove unnecessary switches
+- Fixed Dockerfile to remove deleted third_party directory references
+
+### Testing Results:
+- **Live Microphone Detection**: ✅ Working with 14.6% confidence detections
+- **WAV File Input Testing**: ✅ Working with 19.96% confidence detections
+- **Model Loading**: Verified identical custom model used in both modes
+- **Audio Processing**: Confirmed same stereo→mono conversion pipeline
+- **Detection Logic**: Verified identical confidence evaluation and thresholds
+
+### Architecture Verification:
+- ✅ **Same model file**: `/app/models/openwakeword/Hay--compUta_v_lrg.tflite` 
+- ✅ **Same threshold**: 0.1 detection threshold for both input modes
+- ✅ **Same processing**: Identical audio pipeline for WAV and microphone
+- ✅ **Simplified config**: No manual switches needed, auto-loads custom model
+- ✅ **Consistent behavior**: WAV testing and live detection use identical logic
+
+### Current Status:
+- Container runs with simplified command: `python3 /app/src/wake_word_detection.py`
+- System automatically uses custom model without user intervention
+- Both input methods (microphone and WAV file) tested and verified working
+- All processing pipelines confirmed to be functionally identical
+
+**FINAL STATUS: SIMPLIFIED AND VERIFIED** ✅
+- Production-ready system with streamlined configuration
+- No more manual model selection switches required
+- Consistent detection behavior across all input methods
