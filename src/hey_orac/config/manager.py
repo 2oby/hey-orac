@@ -552,6 +552,14 @@ class SettingsManager:
                     logger.error(f"Error creating config for model {model_path}: {e}")
             
             if new_models:
+                # Check if we have any enabled models already
+                has_enabled_models = any(model.enabled for model in self._config.models)
+                
+                # If no models are currently enabled, enable the first new model found
+                if not has_enabled_models and new_models:
+                    new_models[0].enabled = True
+                    logger.info(f"🎯 Enabled first discovered model: {new_models[0].name} (no other models were enabled)")
+                
                 # Add new models to configuration
                 self._config.models.extend(new_models)
                 
