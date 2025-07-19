@@ -37,12 +37,85 @@ def parse_arguments():
                        help='Test pipeline with recorded audio file')
     parser.add_argument('-audio_file', default=None,
                        help='Audio file to use for testing (default: auto-generate timestamp)')
+    parser.add_argument('--input-wav', dest='input_wav', default=None,
+                       help='Use WAV file as input instead of microphone for live detection')
+    parser.add_argument('--use-custom-model', action='store_true',
+                       help='Use custom model (Hay--compUta_v_lrg.tflite) instead of built-in models')
     return parser.parse_args()
 
 def generate_timestamp_filename():
     """Generate filename with timestamp."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     return f"/app/recordings/wake_word_test_{timestamp}.wav"
+
+class WavFileStream:
+    """A class that mimics audio stream interface but reads from WAV file."""
+    def __init__(self, filename, chunk_size=1280):
+        self.chunk_size = chunk_size
+        self.filename = filename
+        self.audio_data = None
+        self.position = 0
+        self.channels = 1
+        self._load_wav_file()
+    
+    def _load_wav_file(self):
+        """Load WAV file and prepare audio data."""
+        logger.info(f"📂 Loading WAV file: {self.filename}")
+        try:
+            with wave.open(self.filename, 'rb') as wf:
+                self.channels = wf.getnchannels()
+                sample_width = wf.getsampwidth()
+                framerate = wf.getframerate()
+                
+                logger.info(f"   Audio format: {self.channels} channels, {sample_width} bytes/sample, {framerate} Hz")
+                
+                if framerate != 16000:
+                    logger.warning(f"⚠️  Sample rate is {framerate} Hz, expected 16000 Hz")
+                
+                # Read all frames
+                frames = wf.readframes(wf.getnframes())
+                
+                # Convert to numpy array (keep as int16 for now)
+                self.audio_data = np.frombuffer(frames, dtype=np.int16)
+                
+                duration = len(self.audio_data) / (framerate * self.channels)
+                logger.info(f"✅ Loaded {duration:.2f} seconds of audio data")
+                
+        except Exception as e:
+            logger.error(f"❌ Error loading WAV file: {e}")
+            raise
+    
+    def read(self, chunk_size, exception_on_overflow=False):
+        """Read a chunk of audio data, mimicking stream.read() interface."""
+        if self.position >= len(self.audio_data):
+            # Loop back to beginning when we reach the end
+            logger.info("🔄 Reached end of WAV file, looping back to beginning")
+            self.position = 0
+        
+        # Calculate how many samples to read
+        samples_to_read = chunk_size
+        if self.channels == 2:
+            samples_to_read = chunk_size * 2  # Need twice as many samples for stereo
+        
+        # Get the chunk
+        end_pos = min(self.position + samples_to_read, len(self.audio_data))
+        chunk = self.audio_data[self.position:end_pos]
+        self.position = end_pos
+        
+        # If chunk is smaller than requested (at end of file), pad with zeros
+        if len(chunk) < samples_to_read:
+            chunk = np.pad(chunk, (0, samples_to_read - len(chunk)), 'constant')
+        
+        # Convert back to bytes to match stream interface
+        return chunk.tobytes()
+    
+    def stop_stream(self):
+        """Compatibility method - does nothing for WAV file."""
+        pass
+    
+    def close(self):
+        """Compatibility method - does nothing for WAV file."""
+        pass
 
 def record_test_audio(audio_manager, usb_mic, model, filename='test_recording.wav'):
     """Record 10 seconds of test audio with countdown and metadata generation."""
@@ -385,17 +458,30 @@ def main():
             
             return
 
-        # Initialize AudioManager for audio device handling (only if not testing)
-        audio_manager = AudioManager()
-        logger.info("AudioManager initialized")
+        # Initialize audio source - either WAV file or microphone
+        stream = None
+        audio_manager = None
+        usb_mic = None
+        
+        if args.input_wav:
+            # Use WAV file as input
+            logger.info(f"🎵 Using WAV file as input: {args.input_wav}")
+            if not os.path.exists(args.input_wav):
+                logger.error(f"❌ WAV file not found: {args.input_wav}")
+                return
+            stream = WavFileStream(args.input_wav)
+        else:
+            # Initialize AudioManager for audio device handling
+            audio_manager = AudioManager()
+            logger.info("AudioManager initialized")
 
-        # Find the USB microphone
-        usb_mic = audio_manager.find_usb_microphone()
-        if not usb_mic:
-            logger.error("No USB microphone found. Exiting.")
-            raise RuntimeError("No USB microphone detected")
+            # Find the USB microphone
+            usb_mic = audio_manager.find_usb_microphone()
+            if not usb_mic:
+                logger.error("No USB microphone found. Exiting.")
+                raise RuntimeError("No USB microphone detected")
 
-        logger.info(f"Using USB microphone: {usb_mic.name} (index {usb_mic.index})")
+            logger.info(f"Using USB microphone: {usb_mic.name} (index {usb_mic.index})")
         
         # Handle recording mode
         if args.record_test:
@@ -418,29 +504,55 @@ def main():
                 logger.error("❌ Recording failed. Exiting.")
             return
 
-        # Start audio stream with parameters suitable for OpenWakeWord
-        # - Sample rate: 16000 Hz (required by OpenWakeWord)  
-        # - Channels: 2 (stereo) to match microphone capabilities, then convert to mono
-        # - Chunk size: 1280 samples (80 ms at 16000 Hz) for optimal efficiency
-        # Note: Microphone has 2 input channels, so read as stereo then process to mono
-        stream = audio_manager.start_stream(
-            device_index=usb_mic.index,
-            sample_rate=16000,
-            channels=2,  # Read as stereo to match microphone capabilities
-            chunk_size=1280
-        )
-        if not stream:
-            logger.error("Failed to start audio stream. Exiting.")
-            raise RuntimeError("Failed to start audio stream")
+        # Start audio stream if using microphone (skip if using WAV file)
+        if not args.input_wav:
+            # Start audio stream with parameters suitable for OpenWakeWord
+            # - Sample rate: 16000 Hz (required by OpenWakeWord)  
+            # - Channels: 2 (stereo) to match microphone capabilities, then convert to mono
+            # - Chunk size: 1280 samples (80 ms at 16000 Hz) for optimal efficiency
+            # Note: Microphone has 2 input channels, so read as stereo then process to mono
+            stream = audio_manager.start_stream(
+                device_index=usb_mic.index,
+                sample_rate=16000,
+                channels=2,  # Read as stereo to match microphone capabilities
+                chunk_size=1280
+            )
+            if not stream:
+                logger.error("Failed to start audio stream. Exiting.")
+                raise RuntimeError("Failed to start audio stream")
 
-        # Initialize the OpenWakeWord model, loading all pre-trained models
+        # Initialize the OpenWakeWord model
         print("DEBUG: About to create Model()", flush=True)
         try:
-            # Load specific wake word models including 'hey jarvis'
-            logger.info("Creating Model with specific wake word models...")
-            model = openwakeword.Model(
-                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft']
-            )
+            if args.use_custom_model:
+                # Use custom model (Hay--compUta_v_lrg.tflite)
+                custom_model_path = '/app/models/Hay--compUta_v_lrg.tflite'
+                logger.info(f"Creating Model with custom model: {custom_model_path}")
+                
+                # Check if model file exists
+                if os.path.exists(custom_model_path):
+                    logger.info(f"✅ Custom model file found at: {custom_model_path}")
+                else:
+                    logger.error(f"❌ Custom model file NOT found at: {custom_model_path}")
+                    raise FileNotFoundError(f"Custom model not found: {custom_model_path}")
+                
+                model = openwakeword.Model(
+                    wakeword_models=[custom_model_path],
+                    vad_threshold=0.5,
+                    enable_speex_noise_suppression=False
+                )
+                # Set lower threshold for custom model
+                detection_threshold = 0.05
+                logger.info(f"Using custom model with detection threshold: {detection_threshold}")
+            else:
+                # Load built-in wake word models
+                logger.info("Creating Model with built-in wake word models...")
+                model = openwakeword.Model(
+                    wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft']
+                )
+                # Standard threshold for built-in models
+                detection_threshold = 0.3
+                logger.info(f"Using built-in models with detection threshold: {detection_threshold}")
             print("DEBUG: Model created successfully", flush=True)
             logger.info("OpenWakeWord model initialized")
             
@@ -510,15 +622,26 @@ def main():
                 # Convert bytes to numpy array - now handling stereo input
                 audio_array = np.frombuffer(data, dtype=np.int16)
                 
-                # Convert stereo to mono by averaging the channels (like old working code)
-                if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
-                    # Reshape to separate left and right channels, then average
-                    stereo_data = audio_array.reshape(-1, 2)
-                    # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
-                    audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                # Handle channel conversion based on input source
+                if args.input_wav and hasattr(stream, 'channels'):
+                    # For WAV files, check the stream's channel count
+                    if stream.channels == 2 and len(audio_array) > 1280:
+                        # Stereo WAV file - convert to mono
+                        stereo_data = audio_array.reshape(-1, 2)
+                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                    else:
+                        # Mono WAV file
+                        audio_data = audio_array.astype(np.float32)
                 else:
-                    # Already mono - CRITICAL FIX: no normalization!
-                    audio_data = audio_array.astype(np.float32)
+                    # Microphone input - use original logic
+                    if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
+                        # Reshape to separate left and right channels, then average
+                        stereo_data = audio_array.reshape(-1, 2)
+                        # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
+                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                    else:
+                        # Already mono - CRITICAL FIX: no normalization!
+                        audio_data = audio_array.astype(np.float32)
 
                 # Log every 100 chunks to show we're processing audio
                 chunk_count += 1
@@ -551,8 +674,7 @@ def main():
                     max_confidence = score
                     best_model = wakeword
             
-            # Use lower threshold for better detection sensitivity
-            detection_threshold = 0.3
+            # Use the threshold set during model initialization
             if max_confidence >= detection_threshold:
                 logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
                 logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
@@ -576,7 +698,8 @@ def main():
         if stream:
             stream.stop_stream()
             stream.close()
-        audio_manager.__del__()  # Explicitly clean up AudioManager
+        if audio_manager:
+            audio_manager.__del__()  # Explicitly clean up AudioManager
 
     except Exception as e:
         # Log any other errors and clean up
@@ -584,7 +707,8 @@ def main():
         if stream:
             stream.stop_stream()
             stream.close()
-        audio_manager.__del__()
+        if audio_manager:
+            audio_manager.__del__()
 
 if __name__ == "__main__":
     main()

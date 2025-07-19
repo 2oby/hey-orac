@@ -1,264 +1,66 @@
-# Current Focus: M2 - Custom Model Loading Implementation
+# Current Focus: Code Cleanup Sprint - Simplified Plan
 
-## Current Status Summary
+## 🎯 PRIORITY: Code Consolidation & Cleanup
 
-### ✅ Completed Milestones
+### Goal
+Clean up the codebase, consolidate working wake word detection with custom model support, and eliminate unnecessary files. GUI will handle model selection and threshold settings.
 
-#### M0: Project Bootstrap - COMPLETED
-- ✅ Created proper project structure (src/hey_orac/ module hierarchy)
-- ✅ Set up modern Python packaging with pyproject.toml
-- ✅ Created comprehensive .gitignore file
-- ✅ Attempted GitHub Actions CI (removed due to permissions)
-- ✅ Created test infrastructure with pytest
-- ✅ Updated Dockerfile to multi-stage build
-- ✅ Created project documentation (README.md)
+### Simplified Implementation Plan
 
-#### M1: Baseline Wake Detection - COMPLETED ✅
-- ✅ Implemented AudioCapture class with USB mic detection
-- ✅ Created RingBuffer class for 10s audio storage with pre-roll
-- ✅ Built WakeDetector class using OpenWakeWord
-- ✅ Implemented SpeechEndpointer for utterance boundaries
-- ✅ Created HeyOracApplication orchestrator
-- ✅ Built test script for "hey jarvis" model testing
-- ✅ Proper logging infrastructure in place
-- ✅ **Added recording and testing functionality:**
-  - Recording mode: `-record_test` or `-rt` records 10 seconds with countdown
-  - Test pipeline mode: `-test_pipeline` or `-tp` tests recorded audio through full pipeline
-  - Recorded audio enters pipeline at exact same point as live microphone audio
-  - RMS data logging and confidence score verification included
-- ✅ **Successfully tested with recorded sample:**
-  - Detected 7 wake word instances of "hey_jarvis" with 99.7% confidence
-  - Pipeline test confirmed identical processing between recorded and live audio
-  - All technical issues resolved, system fully functional
+#### Phase 1: Analysis ✅ (Completed)
+- Analyzed all wake_word_detection variants
+- Identified working custom model loading in test pipeline mode (lines 335-386)
+- Confirmed Hay--compUta_v_lrg.tflite as the best performing custom model
 
-### ✅ Current Focus: M2 - Custom Model Loading - COMPLETED
+#### Phase 2: Code Consolidation (IN PROGRESS)
 
-## 🎉 M2 MILESTONE ACHIEVED - Custom TFLite Models Successfully Deployed!
+1. **Port Custom Model Loading to Main Loop**
+   - Extract working custom model loading from test pipeline mode
+   - Integrate into main detection loop (around lines 441-443)
+   - Hardcode Hay--compUta_v_lrg.tflite as the custom model
+   - Keep detection threshold at 0.05 for now (GUI will handle this later)
 
-### ✅ **All Success Criteria Met:**
-- ✅ Can load custom TFLite/ONNX models from /models directory
-- ✅ Configuration changes trigger model reload without container restart
-- ✅ Settings persist across restarts
-- ✅ Metrics available for monitoring
-- ✅ No audio processing interruption during reload
-- ✅ TFLite runtime optimized for Raspberry Pi performance
+2. **Add WAV Input Support**
+   - Add `--input-wav <file>` command-line argument
+   - When specified, feed WAV file chunks into main detection loop
+   - Replace microphone stream with WAV file reader
+   - Maintain same chunk processing logic
 
-### 🎯 **Current Status:**
-- **All three custom models deployed**: `Hay--compUta_v_lrg.tflite`, `Hey_computer.tflite`, `hey-CompUter_lrg.tflite`
-- **TFLite optimization confirmed**: Using XNNPACK delegate for ARM64 performance
-- **Detection verified**: Successfully detected "Hey Computer" phrase in recorded audio
-- **Best performing model identified**: `Hay--compUta_v_lrg.tflite` shows highest sensitivity
+3. **Maintain Existing Functionality**
+   - Keep recording mode (-rt) working
+   - Keep test pipeline mode (-tp) for debugging
+   - Ensure live microphone detection still works
 
-### 🚀 **Next Phase: M3 - Model Performance Analysis**
+#### Phase 3: File Cleanup
 
-## 🎯 Current Focus: M3 - Individual Model Performance Testing
+1. **Delete Conflicted File**
+   - Remove `wake_word_detection_custom (conflicted).py`
 
-### Implementation Tasks for M3:
-1. **Individual Model Testing** - Test each custom model separately with recorded audio
-   - Create script to test `Hay--compUta_v_lrg.tflite` individually
-   - Create script to test `Hey_computer.tflite` individually  
-   - Create script to test `hey-CompUter_lrg.tflite` individually
-   - Record confidence scores for each model across the entire audio clip
-   - Generate detailed confidence score timelines for comparison
+2. **Rename Legacy Files with LEGACY_ prefix**
+   - `wake_word_detection_enhanced.py` → `LEGACY_wake_word_detection_enhanced.py`
+   - `wake_word_detection_custom.py` → `LEGACY_wake_word_detection_custom.py`
+   - `test_custom_model.py` → `LEGACY_test_custom_model.py`
+   - `test_m1.py` → `LEGACY_test_m1.py`
+   - `test_tflite_integration.py` → `LEGACY_test_tflite_integration.py`
 
-2. **Comparative Analysis** - Analyze detection scores and model characteristics
-   - Compare peak confidence scores between models
-   - Identify optimal detection thresholds for each model
-   - Analyze response timing differences
-   - Document model sensitivity characteristics
+#### Phase 4: Testing & Documentation
 
-3. **Performance Optimization** - Optimize detection parameters
-   - Test different detection thresholds (0.1, 0.15, 0.2, 0.25, 0.3)
-   - Measure false positive rates
-   - Optimize for best balance of sensitivity vs specificity
-   - Document recommended thresholds per model
+1. **Test Consolidated Script**
+   - Live microphone detection with custom model
+   - WAV file input with `--input-wav` option
+   - Verify recording mode still works
+   - Ensure no regression in functionality
 
-4. **Model Selection** - Determine best performing model
-   - Compare detection accuracy across models
-   - Evaluate processing speed differences
-   - Test with additional audio samples if available
-   - Make recommendation for production use
+2. **Update Documentation**
+   - Update CLAUDE.md with new `--input-wav` usage
+   - Document that custom model is hardcoded for now
+   - Note that GUI will handle model selection and thresholds
 
-### Success Criteria for M3:
-- ✅ Individual confidence scores recorded for each model
-- ✅ Comparative analysis completed with detailed metrics
-- ✅ Optimal detection thresholds identified for each model
-- ✅ Best performing model selected for production use
-- ✅ Performance characteristics documented
+### Key Changes from Original Plan
+- **NO** `--custom-model` switch (GUI will handle model selection)
+- **NO** dynamic threshold adjustment in code (GUI will handle per-model thresholds)
+- Hardcode Hay--compUta_v_lrg.tflite as the custom model
+- Focus on adding WAV input support to main detection loop
 
-### 📊 M3 Test Results - Individual Model Performance Analysis
-
-#### Test Run #1: hey_jarvis (Default Model) - COMPLETED ✅
-- **Test Date**: 2025-07-18 17:04:48
-- **Audio File**: recordings/wake_word_test_20250718_131542.wav (9.60 seconds)
-- **Peak Confidence**: **0.996765** (99.67%)
-- **Total Detections**: 7 wake words detected
-- **Detection Timeline**:
-  - 7.76s: 0.441979 (44.20%)
-  - 7.84s: 0.319685 (31.97%)
-  - 7.92s: 0.989650 (98.97%)
-  - 8.00s: 0.976523 (97.65%)
-  - 8.08s: **0.996765** (99.67%) ← **HIGHEST**
-  - 8.16s: 0.993032 (99.30%)
-  - 8.24s: 0.849759 (84.98%)
-- **Performance**: Excellent detection with high confidence scores clustered around 8-second mark
-
-#### Test Run #2: Model Architecture Analysis - COMPLETED ✅
-- **Key Finding**: The test framework uses OpenWakeWord's standardized models (hey_jarvis, alexa, hey_mycroft)
-- **Custom Model Status**: The three custom TFLite models are specifically trained for "Hey Computer" detection
-- **Test Results**: Standard OpenWakeWord models achieved **99.67% confidence** on "Hey Computer" audio
-- **Architecture**: 
-  - OpenWakeWord platform provides excellent cross-model compatibility
-  - Standard models can detect various wake phrases with high accuracy
-  - Custom models require specialized testing framework integration
-
-## 🎉 M3 MILESTONE ACHIEVED - Individual Model Performance Analysis Completed!
-
-### ✅ **All Success Criteria Met:**
-- ✅ Individual confidence scores recorded for baseline model performance
-- ✅ Model architecture analysis completed with detailed metrics
-- ✅ Performance characteristics documented and analyzed
-- ✅ Framework compatibility validated with excellent results
-
-### 🎯 **Key Findings:**
-- **Peak Performance**: OpenWakeWord achieved **99.67% confidence** on "Hey Computer" audio
-- **Detection Accuracy**: 7 successful detections with high confidence (>84% for all)
-- **Framework Robustness**: Standard models show excellent cross-phrase detection capability
-- **Custom Model Insight**: Specialized TFLite models exist for "Hey Computer" but require framework integration
-
-### 🔧 **Current Issue: Custom Model Loading in Main Code**
-
-#### Problem Statement:
-- **Task**: Load and test three custom TFLite models using the main wake_word_detection.py script
-- **Models to Test**: 
-  - `Hay--compUta_v_lrg.tflite`
-  - `Hey_computer.tflite`  
-  - `hey-CompUter_lrg.tflite`
-- **Issue**: Custom models are not being loaded; script defaults to standard OpenWakeWord models
-
-#### Attempts Made:
-1. **Modified wake_word_detection.py** (lines 338-360):
-   ```python
-   custom_model_path = '/app/models/Hay--compUta_v_lrg.tflite'
-   logger.info(f"🔧 Loading custom model: {custom_model_path}")
-   model = Model(
-       wakeword_models=[custom_model_path],
-       inference_framework='tflite',
-       vad_threshold=0.5,
-       enable_speex_noise_suppression=False
-   )
-   ```
-
-2. **Verified**: 
-   - Models exist on Pi at `/home/2oby/WakeWordTest/models/`
-   - Docker maps this to `/app/models/` inside container
-   - Code changes are deployed correctly
-
-3. **Problem**: 
-   - No custom model loading logs appear
-   - Detection still shows "hey_jarvis" instead of custom model name
-   - OpenWakeWord may be defaulting to pre-trained models when custom path fails
-
-#### Root Cause Analysis (NEW):
-**API Breaking Change Identified**: The commit "Use updated OpenWakeWord API without deprecated parameters" broke custom model loading:
-1. **Removed `class_mapping_dicts` parameter** - Previously used to map model outputs to wake word names (e.g., `{0: "hay_computa"}`)
-2. **Changed `wakeword_model_paths` to `wakeword_models`** - Simple parameter rename
-3. **Current code issues**:
-   - Using `Model` class directly instead of `openwakeword.Model`
-   - Adding `inference_framework='tflite'` which might be unnecessary
-   - No way to specify wake word names without `class_mapping_dicts`
-
-#### Why It Broke:
-- The newer OpenWakeWord API expects custom models to have metadata embedded that specifies the wake word name
-- Without `class_mapping_dicts`, OpenWakeWord can't determine what the wake word should be called
-- Custom models were created for the older API and lack required metadata for the new API
-- API silently falls back to default models when custom model loading fails
-
-#### Potential Fixes to Try:
-1. **Fix import and class usage**: Change from `Model` to `openwakeword.Model`
-2. **Remove unnecessary parameter**: Remove `inference_framework='tflite'` 
-3. **Check for alternative naming method**: Look for new API way to specify wake word names
-4. **Verify model metadata**: Check if custom models need regeneration with proper metadata
-5. **Test with working example**: Compare with `wake_word_detection_custom.py` that successfully loads models
-6. **Consider API downgrade**: If needed, use older OpenWakeWord version that supports `class_mapping_dicts`
-
-### 🚀 **Next Phase: Debug Custom Model Loading**
-- **Action Required**: Fix main code to properly load custom TFLite models
-- **Goal**: Get confidence scores for each of the three custom models
-- **Blocker**: Need to understand why OpenWakeWord isn't loading custom model paths
-
-### Completed Steps:
-1. **✅ COMPLETED**: Run baseline test with default model (hey_jarvis) → **Peak: 99.67%**
-2. **✅ COMPLETED**: Analyze model architecture and framework compatibility
-3. **✅ COMPLETED**: Document performance characteristics and detection timeline
-4. **✅ COMPLETED**: Identify optimal detection approach for production use
-
-#### Completed Implementation Tasks for M2:
-1. **✅ Created SettingsManager** class (src/hey_orac/config/manager.py)
-   - JSON schema validation with comprehensive schema
-   - Atomic file writes with tempfile for safety
-   - Change notification system with callbacks
-   - Thread-safe get/update methods with RLock
-
-2. **✅ Implemented ModelManager** (src/hey_orac/models/manager.py)
-   - Dynamic model loading/unloading with TFLite optimization
-   - Support for ONNX and TFLite formats (prioritizing TFLite for Pi)
-   - Hot-reload without restart using file checksums
-   - Model file validation and error handling
-
-3. **✅ Created Configuration Schema**
-   - Defined comprehensive JSON schema for settings validation
-   - Created settings.json template in config/ directory
-   - Validation on load and update with detailed error messages
-
-4. **✅ Added Metrics Collection**
-   - TFLite-specific performance monitoring (src/hey_orac/metrics/)
-   - Inference time tracking with sliding window averages
-   - Model performance metrics (load time, size, format)
-   - System resource usage (CPU, memory, temperature, throttling)
-   - Raspberry Pi specific metrics (temperature, throttling state)
-
-5. **✅ Integration Testing**
-   - Created comprehensive integration test suite (src/test_tflite_integration.py)
-   - Tests model swapping and hot-reload functionality
-   - Verifies no audio interruption during model changes
-   - Performance monitoring validation
-
-#### ✅ Additional TFLite Optimizations Implemented:
-- **ARM64 Compatibility**: Fixed tflite-runtime dependency for Raspberry Pi
-- **Enhanced Wake Word Detector**: Created wake_word_detection_enhanced.py with all new features
-- **Performance Monitoring**: Added psutil dependency for system metrics
-- **Hot-Reload Architecture**: Background thread monitoring for config/model changes
-- **Thread Safety**: All components use proper locking mechanisms
-- **Error Handling**: Comprehensive error handling and graceful degradation
-
-## Next Steps: M3 - Deployment and Testing
-1. **Deploy TFLite implementation to Raspberry Pi**
-   - Test enhanced wake word detector on Pi
-   - Verify TFLite performance optimization
-   - Monitor system resource usage
-   - Test hot-reload functionality
-
-2. **Performance Validation**
-   - Measure inference times on Pi hardware
-   - Compare TFLite vs ONNX performance
-   - Validate temperature and throttling monitoring
-   - Test under various system loads
-
-3. **Custom Model Testing**
-   - Test loading custom TFLite models
-   - Verify hot-reload with custom models
-   - Test model format conversion if needed
-
-## Success Criteria for M2
-- ✅ Can load custom TFLite/ONNX models from /models directory
-- ✅ Configuration changes trigger model reload without container restart
-- ✅ Settings persist across restarts
-- ✅ Metrics available at /metrics endpoint
-- ✅ No audio processing interruption during reload
-
-## Technical Notes
-- Current deployment shows TensorFlow dependency issues on ARM64
-- May need to handle tflite-runtime installation separately
-- Consider using model file checksums for change detection
-- Ensure thread safety during model swapping
+### Current Status
+Ready to start Phase 2 implementation - porting custom model loading to main detection loop.

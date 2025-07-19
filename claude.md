@@ -79,6 +79,19 @@ ssh pi "cd ~/WakeWordTest && docker-compose down && docker-compose build --no-ca
 3. **After progress**: Update `devlog.md` with timestamp and progress made
 4. **When switching focus**: Update `currentfocus.md` with new problem description
 
+## IMPORTANT: No Standalone Test Files Policy
+**NEVER create standalone test files like `test_*.py` for wake word detection testing.**
+
+**Reason**: There is only ONE microphone input device, and the main listen loop monopolizes it. Standalone test files create resource conflicts and debugging complexity.
+
+**Instead**: 
+- Use the main application code with enhanced logging for debugging
+- Add command-line switches to the main script for different input sources (WAV files, etc.)
+- Feed test data INTO the main listen loop, don't create separate pipelines
+- Use logging levels (DEBUG, INFO) to get detailed information during development
+
+**Example**: Instead of `test_custom_model.py`, add `--input-wav <file>` to `wake_word_detection.py` to feed WAV data into the main detection loop.
+
 ## Git Branch
 - **Working branch**: `wake-word-test` 
 - **Repository**: https://github.com/2oby/hey-orac/tree/wake-word-test
