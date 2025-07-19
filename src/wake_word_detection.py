@@ -37,9 +37,10 @@ def parse_arguments():
                        help='Test pipeline with recorded audio file')
     parser.add_argument('-audio_file', default=None,
                        help='Audio file to use for testing (default: auto-generate timestamp)')
-    parser.add_argument('--input-wav', dest='input_wav', default=None,
+    parser.add_argument('--input-wav', '--input_wav', dest='input_wav', default=None,
                        help='Use WAV file as input instead of microphone for live detection')
-    parser.add_argument('--use-custom-model', action='store_true',
+    parser.add_argument('--use-custom-model', '--use_custom_model', dest='use_custom_model', 
+                       action='store_true',
                        help='Use custom model (Hay--compUta_v_lrg.tflite) instead of built-in models')
     return parser.parse_args()
 
