@@ -24,6 +24,8 @@ class ModelConfig:
     framework: str = "tflite"
     enabled: bool = True
     threshold: float = 0.3
+    sensitivity: float = 0.6
+    webhook_url: str = ""
     priority: int = 1
 
 
@@ -79,6 +81,8 @@ class SettingsManager:
                         "framework": {"type": "string", "enum": ["tflite", "onnx"]},
                         "enabled": {"type": "boolean"},
                         "threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                        "sensitivity": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                        "webhook_url": {"type": "string"},
                         "priority": {"type": "integer", "minimum": 1}
                     },
                     "required": ["name", "path"]
@@ -131,21 +135,15 @@ class SettingsManager:
         # Load initial configuration
         self._load_config()
         
+        # Auto-discover and add new models
+        self._auto_discover_models()
+        
         logger.info(f"SettingsManager initialized with config: {config_path}")
     
     def _get_default_config(self) -> HeyOracConfig:
         """Get default configuration."""
         return HeyOracConfig(
-            models=[
-                ModelConfig(
-                    name="hey_jarvis",
-                    path="hey_jarvis",  # Pre-trained model
-                    framework="tflite",
-                    enabled=True,
-                    threshold=0.3,
-                    priority=1
-                )
-            ],
+            models=[],  # Start with empty models - auto-discovery will populate
             audio=AudioConfig(),
             system=SystemConfig()
         )
@@ -213,6 +211,8 @@ class SettingsManager:
                     framework=model_dict.get('framework', 'tflite'),
                     enabled=model_dict.get('enabled', True),
                     threshold=model_dict.get('threshold', 0.3),
+                    sensitivity=model_dict.get('sensitivity', 0.6),
+                    webhook_url=model_dict.get('webhook_url', ''),
                     priority=model_dict.get('priority', 1)
                 )
                 models.append(model)
@@ -451,3 +451,126 @@ class SettingsManager:
             if self._config is None:
                 return SystemConfig()
             return self._config.system
+    
+    def _discover_model_files(self) -> List[str]:
+        """
+        Discover all model files in the models directory.
+        
+        Returns:
+            List of model file paths
+        """
+        if self._config is None:
+            return []
+        
+        models_dir = Path(self._config.system.models_dir)
+        if not models_dir.exists():
+            logger.warning(f"Models directory not found: {models_dir}")
+            return []
+        
+        model_files = []
+        
+        # Search for .tflite and .onnx files in subdirectories
+        for pattern in ['**/*.tflite', '**/*.onnx']:
+            model_files.extend(models_dir.glob(pattern))
+        
+        # Convert to strings and sort (prioritize .tflite)
+        model_paths = [str(p) for p in model_files]
+        model_paths.sort(key=lambda x: (not x.endswith('.tflite'), x))
+        
+        logger.info(f"Discovered {len(model_paths)} model files: {[Path(p).name for p in model_paths]}")
+        return model_paths
+    
+    def _create_model_config_from_file(self, file_path: str, priority: int) -> ModelConfig:
+        """
+        Create a ModelConfig from a model file path with default values.
+        
+        Args:
+            file_path: Path to the model file
+            priority: Priority value for the model
+            
+        Returns:
+            ModelConfig with default values
+        """
+        file_path_obj = Path(file_path)
+        name = file_path_obj.stem
+        
+        # Determine framework from extension
+        framework = 'tflite' if file_path_obj.suffix.lower() == '.tflite' else 'onnx'
+        
+        return ModelConfig(
+            name=name,
+            path=file_path,
+            framework=framework,
+            enabled=False,  # Default to disabled for new models
+            threshold=0.3,
+            sensitivity=0.6,
+            webhook_url="",
+            priority=priority
+        )
+    
+    def _auto_discover_models(self) -> bool:
+        """
+        Automatically discover new models and add them to configuration.
+        Only adds models that are not already in the configuration.
+        
+        Returns:
+            True if new models were added, False otherwise
+        """
+        with self._lock:
+            if self._config is None:
+                logger.warning("No configuration loaded, skipping auto-discovery")
+                return False
+            
+            # Get current model paths in config
+            existing_paths = {model.path for model in self._config.models}
+            
+            # Discover all model files
+            discovered_paths = self._discover_model_files()
+            
+            # Find new models (not in existing config)
+            new_model_paths = [path for path in discovered_paths if path not in existing_paths]
+            
+            if not new_model_paths:
+                logger.info("No new models discovered")
+                return False
+            
+            logger.info(f"Found {len(new_model_paths)} new models to add to configuration")
+            
+            # Create new model configs with increasing priority
+            max_priority = max((model.priority for model in self._config.models), default=0)
+            new_models = []
+            
+            for i, model_path in enumerate(new_model_paths):
+                try:
+                    new_model = self._create_model_config_from_file(
+                        model_path, 
+                        max_priority + i + 1
+                    )
+                    new_models.append(new_model)
+                    logger.info(f"Added new model config: {new_model.name} (path: {model_path})")
+                except Exception as e:
+                    logger.error(f"Error creating config for model {model_path}: {e}")
+            
+            if new_models:
+                # Add new models to configuration
+                self._config.models.extend(new_models)
+                
+                # Save updated configuration
+                if self._save_config():
+                    logger.info(f"✅ Added {len(new_models)} new models to configuration")
+                    return True
+                else:
+                    logger.error("❌ Failed to save configuration with new models")
+                    return False
+            
+            return False
+    
+    def refresh_model_discovery(self) -> bool:
+        """
+        Manually trigger model discovery and configuration update.
+        
+        Returns:
+            True if new models were discovered and added, False otherwise
+        """
+        logger.info("🔍 Manually refreshing model discovery...")
+        return self._auto_discover_models()
