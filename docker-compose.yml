@@ -38,9 +38,6 @@ services:
     ports:
       - "7171:7171"
     
-    # Network mode for easier debugging
-    network_mode: host
-    
     # Health check
     healthcheck:
       test: ["CMD", "python3", "-c", "import openwakeword; print('OK')"]
