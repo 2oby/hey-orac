@@ -1,4 +1,0 @@
-# This file ensures the custom_models directory is preserved in git
-# Place your custom ONNX and TFLite models here:
-# - hey_orac.onnx
-# - hey_orac.tflite 

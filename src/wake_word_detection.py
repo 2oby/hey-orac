@@ -39,9 +39,6 @@ def parse_arguments():
                        help='Audio file to use for testing (default: auto-generate timestamp)')
     parser.add_argument('--input-wav', '--input_wav', dest='input_wav', default=None,
                        help='Use WAV file as input instead of microphone for live detection')
-    parser.add_argument('--use-custom-model', '--use_custom_model', dest='use_custom_model', 
-                       action='store_true',
-                       help='Use custom model (Hay--compUta_v_lrg.tflite) instead of built-in models')
     return parser.parse_args()
 
 def generate_timestamp_filename():
@@ -408,9 +405,9 @@ def main():
             
             # Test all three custom models individually
             custom_models = [
-                '/app/models/Hay--compUta_v_lrg.tflite',
-                '/app/models/hey-CompUter_lrg.tflite', 
-                '/app/models/Hey_computer.tflite'
+                '/app/models/openwakeword/Hay--compUta_v_lrg.tflite',
+                '/app/models/openwakeword/hey-CompUter_lrg.tflite', 
+                '/app/models/openwakeword/Hey_computer.tflite'
             ]
             
             all_detected_words = []
@@ -524,35 +521,25 @@ def main():
         # Initialize the OpenWakeWord model
         print("DEBUG: About to create Model()", flush=True)
         try:
-            if args.use_custom_model:
-                # Use custom model (Hay--compUta_v_lrg.tflite)
-                custom_model_path = '/app/models/Hay--compUta_v_lrg.tflite'
-                logger.info(f"Creating Model with custom model: {custom_model_path}")
-                
-                # Check if model file exists
-                if os.path.exists(custom_model_path):
-                    logger.info(f"✅ Custom model file found at: {custom_model_path}")
-                else:
-                    logger.error(f"❌ Custom model file NOT found at: {custom_model_path}")
-                    raise FileNotFoundError(f"Custom model not found: {custom_model_path}")
-                
-                model = openwakeword.Model(
-                    wakeword_models=[custom_model_path],
-                    vad_threshold=0.5,
-                    enable_speex_noise_suppression=False
-                )
-                # Set lower threshold for custom model
-                detection_threshold = 0.05
-                logger.info(f"Using custom model with detection threshold: {detection_threshold}")
+            # Always use custom model (Hay--compUta_v_lrg.tflite)
+            custom_model_path = '/app/models/openwakeword/Hay--compUta_v_lrg.tflite'
+            logger.info(f"Creating Model with custom model: {custom_model_path}")
+            
+            # Check if model file exists
+            if os.path.exists(custom_model_path):
+                logger.info(f"✅ Custom model file found at: {custom_model_path}")
             else:
-                # Load built-in wake word models
-                logger.info("Creating Model with built-in wake word models...")
-                model = openwakeword.Model(
-                    wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft']
-                )
-                # Standard threshold for built-in models
-                detection_threshold = 0.3
-                logger.info(f"Using built-in models with detection threshold: {detection_threshold}")
+                logger.error(f"❌ Custom model file NOT found at: {custom_model_path}")
+                raise FileNotFoundError(f"Custom model not found: {custom_model_path}")
+            
+            model = openwakeword.Model(
+                wakeword_models=[custom_model_path],
+                vad_threshold=0.5,
+                enable_speex_noise_suppression=False
+            )
+            # Set detection threshold
+            detection_threshold = 0.1
+            logger.info(f"Using custom model with detection threshold: {detection_threshold}")
             print("DEBUG: Model created successfully", flush=True)
             logger.info("OpenWakeWord model initialized")
             
