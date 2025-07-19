@@ -4,7 +4,7 @@ services:
   wake-word-test:
     build: .
     container_name: wake-word-test
-    command: python3 /app/src/hey_orac/wake_word_detection.py
+    command: python3 -m hey_orac.wake_word_detection
     restart: unless-stopped
     
     # Audio device access
