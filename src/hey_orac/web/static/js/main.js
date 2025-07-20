@@ -396,7 +396,7 @@ function closeModelSettings() {
     currentEditingModel = null;
 }
 
-function openVolumeSettings() {
+function openGlobalSettings() {
     // Get current values from existing elements
     const rmsValue = document.getElementById('rms-filter-value').textContent;
     const cooldownValue = document.getElementById('cooldown-value').textContent;
@@ -411,7 +411,7 @@ function openVolumeSettings() {
     document.getElementById('volume-settings-modal').classList.add('active');
 }
 
-function closeVolumeSettings() {
+function closeGlobalSettings() {
     document.getElementById('volume-settings-modal').classList.remove('active');
 }
 
