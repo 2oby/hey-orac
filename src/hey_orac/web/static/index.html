@@ -804,28 +804,7 @@
             </div>
         </div>
 
-        <!-- Settings Modal -->
-        <div class="modal-overlay" id="model-modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3 class="modal-title"><span id="model-name"></span> Settings</h3>
-                    <button class="modal-close" id="modalClose">&times;</button>
-                </div>
-                <form class="modal-form" id="settingsForm">
-                    <!-- Removed duplicate model sliders - using the ones in the actual modal -->
-                    <div class="form-group">
-                        <label class="form-label" for="model-api-url">API URL</label>
-                        <input type="url" class="form-input" id="model-api-url" 
-                               placeholder="https://api.example.com/webhook" 
-                               value="https://api.example.com/webhook">
-                    </div>
-                    <div class="modal-actions">
-                        <button type="button" class="btn" id="cancelBtn">Cancel</button>
-                        <button type="submit" class="btn btn-primary" id="saveBtn">Save</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+        <!-- Removed unused first modal (model-modal) to eliminate duplicate IDs -->
 
     <!-- Model Settings Modal -->
     <div id="model-settings-modal" class="modal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.8);">
