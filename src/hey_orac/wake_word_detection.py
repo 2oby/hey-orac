@@ -589,11 +589,18 @@ def main():
             # Load ALL enabled models
             model_paths = []
             active_model_configs = {}
+            model_name_mapping = {}  # Maps OpenWakeWord prediction keys to config names
+            
             for model_cfg in enabled_models:
                 if os.path.exists(model_cfg.path):
                     logger.info(f"✅ Loading model: {model_cfg.name} from {model_cfg.path}")
                     model_paths.append(model_cfg.path)
                     active_model_configs[model_cfg.name] = model_cfg
+                    
+                    # Create mapping for OpenWakeWord prediction key to config name
+                    base_name = os.path.basename(model_cfg.path).replace('.tflite', '').replace('.onnx', '')
+                    model_name_mapping[base_name] = model_cfg.name
+                    logger.debug(f"   Model name mapping: '{base_name}' -> '{model_cfg.name}'")
                 else:
                     logger.error(f"❌ Model file NOT found: {model_cfg.path}")
             
@@ -699,12 +706,102 @@ def main():
         shared_data['is_active'] = True
         shared_data['status_changed'] = True
         
+        # Function to reload models when configuration changes
+        def reload_models():
+            nonlocal model, active_model_configs, model_name_mapping
+            logger.info("🔄 Reloading models due to configuration change...")
+            
+            try:
+                # Get current enabled models from configuration
+                current_config = settings_manager.get_config()
+                models_config = current_config.models
+                system_config = current_config.system
+                
+                enabled_models = [model for model in models_config if model.enabled]
+                if not enabled_models:
+                    logger.warning("⚠️  No enabled models found after config change")
+                    return False
+                
+                # Build new model paths and configs
+                new_model_paths = []
+                new_active_configs = {}
+                new_name_mapping = {}
+                
+                for model_cfg in enabled_models:
+                    if os.path.exists(model_cfg.path):
+                        logger.info(f"✅ Loading model: {model_cfg.name} from {model_cfg.path}")
+                        new_model_paths.append(model_cfg.path)
+                        new_active_configs[model_cfg.name] = model_cfg
+                        
+                        # Create mapping for OpenWakeWord prediction key to config name
+                        base_name = os.path.basename(model_cfg.path).replace('.tflite', '').replace('.onnx', '')
+                        new_name_mapping[base_name] = model_cfg.name
+                        logger.debug(f"   Model name mapping: '{base_name}' -> '{model_cfg.name}'")
+                    else:
+                        logger.error(f"❌ Model file NOT found: {model_cfg.path}")
+                
+                if not new_model_paths:
+                    logger.error("No valid model files found after config change")
+                    return False
+                
+                # Create new model instance
+                logger.info(f"Creating new OpenWakeWord instance with {len(new_model_paths)} models: {list(new_active_configs.keys())}")
+                new_model = openwakeword.Model(
+                    wakeword_models=new_model_paths,
+                    vad_threshold=system_config.vad_threshold,
+                    enable_speex_noise_suppression=False
+                )
+                
+                # Test the new model
+                test_audio = np.zeros(1280, dtype=np.float32)
+                test_predictions = new_model.predict(test_audio)
+                logger.info(f"✅ New model test successful - predictions: {list(test_predictions.keys())}")
+                
+                # Replace old model and configs
+                old_model = model
+                model = new_model
+                active_model_configs = new_active_configs
+                model_name_mapping = new_name_mapping
+                
+                # Update shared data
+                shared_data['loaded_models'] = list(active_model_configs.keys())
+                shared_data['models_config'] = {name: {
+                    'enabled': True,
+                    'threshold': cfg.threshold,
+                    'webhook_url': cfg.webhook_url
+                } for name, cfg in active_model_configs.items()}
+                
+                # Clean up old model (helps with memory)
+                del old_model
+                
+                logger.info("✅ Models reloaded successfully")
+                return True
+                
+            except Exception as e:
+                logger.error(f"❌ Error reloading models: {e}")
+                return False
+        
         # Continuously listen to the audio stream and detect wake words
         logger.info("🎤 Starting wake word detection loop...")
         sys.stdout.flush()
         chunk_count = 0
+        last_config_check = time.time()
+        CONFIG_CHECK_INTERVAL = 1.0  # Check for config changes every second
+        
         while True:
             try:
+                # Check for configuration changes
+                current_time = time.time()
+                if current_time - last_config_check >= CONFIG_CHECK_INTERVAL:
+                    if shared_data.get('config_changed', False):
+                        logger.info("📢 Configuration change detected")
+                        if reload_models():
+                            shared_data['config_changed'] = False
+                            logger.info("✅ Configuration change applied")
+                        else:
+                            logger.error("❌ Failed to apply configuration change")
+                    last_config_check = current_time
+                
                 # Read one chunk of audio data (1280 samples)
                 data = stream.read(1280, exception_on_overflow=False)
                 if data is None or len(data) == 0:
@@ -781,17 +878,18 @@ def main():
             # Map OpenWakeWord model name to our config name
             config_name = None
             
-            # First try direct match
-            if best_model in active_model_configs:
+            # First check the model name mapping
+            if best_model in model_name_mapping:
+                config_name = model_name_mapping[best_model]
+            # Then try direct match (in case config name matches prediction key)
+            elif best_model in active_model_configs:
                 config_name = best_model
             else:
-                # Try to match by base filename
-                for name, config in active_model_configs.items():
-                    # OpenWakeWord uses the base filename as model name
-                    base_name = os.path.basename(config.path).replace('.tflite', '').replace('.onnx', '')
-                    if base_name == best_model or name == best_model:
-                        config_name = name
-                        break
+                # Log unmapped model for debugging
+                if best_model is not None:
+                    logger.warning(f"Could not map prediction key '{best_model}' to config name")
+                    logger.debug(f"Available mappings: {model_name_mapping}")
+                    logger.debug(f"Active configs: {list(active_model_configs.keys())}")
             
             if config_name and config_name in active_model_configs:
                 model_config = active_model_configs[config_name]

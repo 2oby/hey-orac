@@ -1,89 +1,77 @@
-# Current Focus: ✅ Settings Manager Complete - System Fully Operational
+# Current Focus: 🐛 Fix Model Switching Bug - Detection Loop Not Reloading Models
 
-## 🎉 MAJOR MILESTONE: Settings Persistence Chain Implemented (2025-07-20)
+## 🔴 CRITICAL BUG: Model Activation Changes Not Applied to Detection Engine
 
-### ✅ **COMPLETED: Full Settings Manager Implementation**
-**All critical issues resolved and system fully functional!**
+### **Bug Description:**
+When users change the active model in the GUI, wake word detections still go to "Hay--compUta_v_lrg" regardless of which model is activated/deactivated. The GUI correctly updates and the configuration is saved, but the detection engine continues using the models loaded at startup.
 
-### **What Was Fixed:**
-1. **✅ Backend Methods**: Added all missing SettingsManager methods
-   - `update_model_config()` - updates individual model settings
-   - `update_system_config()` - updates global system settings
-   - `save()` - convenience method for manual saves
-   - `get_model_config()` - retrieves individual model config
+### **Root Cause Analysis:**
+1. **Models loaded once at startup**: OpenWakeWord model object created with initially enabled models
+2. **No config change detection**: Detection loop never checks `shared_data['config_changed']` flag
+3. **Stale model state**: `active_model_configs` dictionary never updated after startup
+4. **Detection events use stale models**: Wake words trigger based on startup configuration
 
-2. **✅ Schema Expansion**: Added missing SystemConfig fields
-   - `rms_filter: float = 50.0` - audio threshold filtering
-   - `cooldown: float = 2.0` - detection cooldown period
-
-3. **✅ Frontend Integration**: Fixed all GUI interaction issues
-   - Duplicate HTML elements removed (model-modal vs model-settings-modal)
-   - Event listener targeting corrected (wrong slider elements)
-   - Element ID mismatches resolved (-value vs -display suffixes)
-   - JavaScript type conversion errors fixed (parseFloat for .toFixed)
-
-4. **✅ UI Polish**: Improved user experience
-   - Renamed "Volume Settings" → "Global Settings" for clarity
-   - Changed "Close" → "Save" button text in Global Settings
-   - Reduced console logging noise (RMS updates)
-
-### **End-to-End Validation Results:**
-- ✅ **GUI → Config**: Settings changed in web interface save to JSON file
-- ✅ **Persistence**: Settings survive application/container restarts
-- ✅ **Config → GUI**: Saved settings load correctly into interface on startup
-- ✅ **Real-time Updates**: Slider text displays update when moving sliders
-- ✅ **All Settings Work**: Model settings (sensitivity/threshold) + Global settings (RMS filter/cooldown)
-
-### **System Status: PRODUCTION READY** 🚀
-The wake word detection system now has complete, robust settings management with full persistence across restarts.
+### **Evidence Found:**
+- ✅ GUI correctly calls `/custom-models/{name}/activate` API
+- ✅ API correctly updates config and sets `config_changed = True`
+- ❌ Detection loop runs with original models loaded at startup
+- ❌ Detection events use stale `active_model_configs` dictionary
+- ❌ No mechanism to reload OpenWakeWord models during runtime
 
 ---
 
-# Previous Focus: Wake Word Detection System Operational (v0.1.4 ✅)
+## 🛠️ Implementation Tasks
 
-## ✅ LATEST UPDATE: Logging Verbosity Fixed (2025-07-20)
+### **1. Add Config Change Detection** (HIGH PRIORITY)
+- Modify detection loop in `wake_word_detection.py` to check `shared_data['config_changed']`
+- Check periodically (e.g., every loop iteration or every N seconds)
+- Trigger model reload when flag is True
 
-### Problem Solved
-- **Issue**: Excessive Socket.IO logging appearing twice per second
-- **Root Cause**: Main logging level set to DEBUG + engineio.server logging not silenced
-- **Solution Applied**:
-  - Changed main logging level from DEBUG to INFO in `wake_word_detection.py:31`
-  - Added explicit silencing of engineio.server and socketio.server loggers to WARNING level
-  - Deployed and verified logs are now clean with only periodic status updates
+### **2. Implement Model Reloading Function** (HIGH PRIORITY)
+- Create function to reload OpenWakeWord models based on current config
+- Update `active_model_configs` dictionary with current enabled models
+- Properly dispose of old model object before creating new one
+- Reset `config_changed` flag after successful reload
 
-### Result
-✅ Logs now show only relevant information every ~8 seconds instead of constant RMS broadcasts
-✅ Container performance improved with reduced log overhead
-✅ Debugging information still available but not overwhelming
+### **3. Fix Model Name Mapping** (MEDIUM PRIORITY)
+- Ensure consistent model name mapping between OpenWakeWord and config
+- Handle edge cases where model filename doesn't match config name
+- Add logging to track model name resolution
 
----
-
-## 🎯 System Status: STABLE
-
-### Current Capabilities Working:
-- ✅ Docker deployment via deploy_and_test.sh
-- ✅ Audio capture and processing
-- ✅ Wake word detection (hey_jarvis model)
-- ✅ Web interface with real-time RMS display
-- ✅ WebSocket streaming (RMS updates, detection events)
-- ✅ Clean, appropriate logging levels
-
-### Recent Fixes Completed:
-1. **WebSocket Streaming**: Fixed by removing eventlet, using threading mode
-2. **Docker Build Caching**: Resolved container running old code issues
-3. **Audio Processing**: Stereo→Mono conversion working correctly
-4. **Model Loading**: NumPy compatibility and model initialization fixed
-5. **Logging Verbosity**: Reduced excessive Socket.IO debug messages
+### **4. Test End-to-End** (HIGH PRIORITY)
+- Verify model activation/deactivation works correctly
+- Ensure wake words trigger correct model names
+- Test multiple model switches and edge cases
+- Validate memory management during model reloading
 
 ---
 
-## 🔄 Ready for Next Development Phase
+## 📝 Code Changes Required
 
-The system is now stable and ready for:
-- Custom model testing
-- Speech capture implementation
-- Additional wake word models
-- Performance optimizations
-- Feature enhancements
+### **File: `src/hey_orac/wake_word_detection.py`**
 
-**No critical issues currently blocking development.**
+1. **Add config change detection in main loop** (around line 706)
+2. **Create `reload_models()` function** to:
+   - Get current enabled models from settings
+   - Rebuild model paths list
+   - Create new OpenWakeWord model object
+   - Update active_model_configs dictionary
+3. **Fix model name mapping** in detection logic (lines 781-803)
+
+### **Expected Behavior After Fix:**
+- User toggles model in GUI
+- API updates configuration file
+- Detection loop detects config change
+- Models are reloaded with new configuration
+- Wake words trigger notifications with correct model names
+- System continues running without restart
+
+---
+
+## 🎯 Success Criteria
+
+1. **GUI model toggle** immediately affects which models are active
+2. **Wake word detections** use the correct model name in events
+3. **No false detections** from deactivated models
+4. **Smooth transitions** without audio interruption during reload
+5. **Memory stable** after multiple model switches
