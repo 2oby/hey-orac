@@ -613,7 +613,6 @@ def main():
             shared_data['models_config'] = {name: {
                 'enabled': True,
                 'threshold': cfg.threshold,
-                'sensitivity': cfg.sensitivity,
                 'webhook_url': cfg.webhook_url
             } for name, cfg in active_model_configs.items()}
             
