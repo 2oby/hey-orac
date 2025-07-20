@@ -395,7 +395,7 @@ function updateVolumeDisplay() {
     // Calculate normalized volume (0-12 scale for segments) using logarithmic scaling
     // RMS values: 0 to 5000, mapped logarithmically to 12 segments
     const maxRMS = 5000;
-    const minRMS = 0.1; // Avoid log(0)
+    const minRMS = 1; // Minimum RMS value for logarithmic scale
     const numSegments = 12;
     
     let normalizedVolume;
