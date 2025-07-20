@@ -158,15 +158,17 @@ body::before {
 
 .volume-segment {
     flex: 1;
-    background: #000000;
+    background: #90EE90;
     border: 1px solid #333;
     border-radius: 2px;
     transition: all 0.1s ease;
     position: relative;
+    opacity: 0.3;
 }
 
 .volume-segment.active {
     box-shadow: 0 0 10px currentColor;
+    opacity: 1;
 }
 
 .volume-segment.active.amber {
