@@ -80,7 +80,7 @@ function initWebSocket() {
     });
 
     socket.on('rms_update', (data) => {
-        console.log('Received RMS update:', data.rms, 'timestamp:', data.timestamp);
+        // Reduced logging for RMS updates
         updateVolume(data.rms);
     });
 
@@ -149,7 +149,7 @@ function handleDetection(detection) {
 
 // Update volume display
 function updateVolume(rms) {
-    console.log('updateVolume called with RMS:', rms);
+    // Reduced RMS logging
     currentVolume = rms;
     
     // Update the Current RMS display text
@@ -409,14 +409,12 @@ function updateVolumeDisplay() {
         // Logarithmic scaling: log(current/min) / log(max/min) * segments
         normalizedVolume = Math.log(currentVolume / minRMS) / Math.log(maxRMS / minRMS) * numSegments;
     }
-    console.log('normalizedVolume:', normalizedVolume, 'from currentVolume:', currentVolume);
+    // Reduced logging: normalizedVolume calculation
     
     segments.forEach((segment, index) => {
         const shouldBeActive = index < normalizedVolume;
         segment.classList.toggle('active', shouldBeActive);
-        if (index < 3) { // Only log first 3 segments to avoid spam
-            console.log(`Segment ${index}: shouldBeActive=${shouldBeActive}, hasActive=${segment.classList.contains('active')}`);
-        }
+        // Reduced segment logging
         
         // Update filter indicator using logarithmic scale
         const segmentPosition = index / numSegments; // 0 to 1
