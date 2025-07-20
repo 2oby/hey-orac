@@ -746,6 +746,10 @@ def main():
                 if chunk_count % 100 == 0:
                     all_scores = {word: f"{score:.6f}" for word, score in prediction.items()}
                     logger.debug(f"🎯 All confidence scores: {all_scores}")
+                    # Also log what models are in active_model_configs for debugging
+                    if chunk_count == 100:
+                        logger.debug(f"Active model configs: {list(active_model_configs.keys())}")
+                        logger.debug(f"Model paths: {[cfg.path for cfg in active_model_configs.values()]}")
             except Exception as e:
                 logger.error(f"Error processing audio data: {e}")
                 continue
@@ -763,11 +767,18 @@ def main():
             # Get threshold from the active model configuration
             # Map OpenWakeWord model name to our config name
             config_name = None
-            for name, config in active_model_configs.items():
-                # OpenWakeWord uses the base filename as model name
-                if os.path.basename(config.path).replace('.tflite', '').replace('.onnx', '') == best_model:
-                    config_name = name
-                    break
+            
+            # First try direct match
+            if best_model in active_model_configs:
+                config_name = best_model
+            else:
+                # Try to match by base filename
+                for name, config in active_model_configs.items():
+                    # OpenWakeWord uses the base filename as model name
+                    base_name = os.path.basename(config.path).replace('.tflite', '').replace('.onnx', '')
+                    if base_name == best_model or name == best_model:
+                        config_name = name
+                        break
             
             if config_name and config_name in active_model_configs:
                 model_config = active_model_configs[config_name]
@@ -775,7 +786,8 @@ def main():
             else:
                 # Fallback threshold if model not found in config
                 detection_threshold = 0.3
-                logger.warning(f"Model '{best_model}' not found in active configs, using default threshold")
+                if best_model is not None:
+                    logger.warning(f"Model '{best_model}' not found in active configs, using default threshold")
             
             if max_confidence >= detection_threshold:
                 logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")

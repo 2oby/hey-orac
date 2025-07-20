@@ -599,3 +599,37 @@ socketio.run(app, host='0.0.0.0', port=7171)
 - All original GUI features preserved and enhanced
 - WebSocket performance optimized for real-time updates
 - Ready for production deployment with maintainable codebase
+
+## 2025-01-20 08:57 - Web GUI Multi-Model Support Fixed
+- **Issue**: Web GUI not showing models or real-time data
+- **Root Cause**: Detection loop using hardcoded model instead of SettingsManager
+- **Fixed**: Complete integration with SettingsManager and shared memory
+
+### Changes Made:
+1. **Multi-Model Loading**: 
+   - Load ALL enabled models, not just the first one
+   - Auto-enable first model if none are enabled
+   - Update shared_data with loaded models info
+2. **Model Name Mapping**:
+   - Handle OpenWakeWord's model naming convention
+   - Map predictions back to config names
+   - Graceful fallback for unmapped models
+3. **API Enhancement**:
+   - Added /api/models endpoint for GUI
+   - Full model info including path and framework
+4. **WebSocket Integration**:
+   - RMS values properly broadcast at 10Hz
+   - Detection events include model name and threshold
+   - Models config shared with GUI
+
+### Technical Details:
+- Fixed model name resolution for OpenWakeWord predictions
+- Added debugging for model mapping issues
+- Improved error handling for missing models
+- Production-ready error messages
+
+**STATUS: WEB GUI FULLY FUNCTIONAL** 🎉
+- Models appear in GUI with enable/disable controls
+- Real-time RMS meter updates at 10Hz
+- Wake word detections trigger GUI notifications
+- Configuration changes persist correctly
