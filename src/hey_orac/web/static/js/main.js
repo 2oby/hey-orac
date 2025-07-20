@@ -122,6 +122,13 @@ function handleDetection(detection) {
 function updateVolume(rms) {
     console.log('updateVolume called with RMS:', rms);
     currentVolume = rms;
+    
+    // Update the Current RMS display text
+    const currentRmsElement = document.getElementById('currentRms');
+    if (currentRmsElement) {
+        currentRmsElement.textContent = `Current RMS: ${rms.toFixed(2)}`;
+    }
+    
     updateVolumeDisplay();
 }
 
@@ -357,7 +364,8 @@ function updateVolumeDisplay() {
     if (volumeHistory.length > 50) volumeHistory.shift();
     
     // Calculate normalized volume (0-12 scale for segments)
-    const normalizedVolume = Math.min(12, (currentVolume / 5000) * 12);
+    // RMS values are typically 0-50, so divide by 50 to get 0-1, then multiply by 12
+    const normalizedVolume = Math.min(12, (currentVolume / 50) * 12);
     console.log('normalizedVolume:', normalizedVolume, 'from currentVolume:', currentVolume);
     
     segments.forEach((segment, index) => {
