@@ -249,10 +249,15 @@ def register_socketio_handlers(socketio):
                 logger.info(f"DEBUG: Retrieved RMS from shared_data: {current_rms}")
                 if current_rms is not None and current_rms > 0:
                     logger.info(f"Sending immediate RMS update to {request.sid}: {current_rms}")
-                    emit('rms_update', {'rms': current_rms, 'timestamp': datetime.now().isoformat()})
+                    emit('rms_update', {'rms': current_rms, 'timestamp': datetime.utcnow().isoformat() + 'Z'})
                 else:
                     logger.info(f"DEBUG: RMS value not suitable for sending: {current_rms}")
             except Exception as e:
                 logger.warning(f"Could not send immediate RMS update: {e}")
         else:
             logger.warning("DEBUG: shared_data is None, cannot send immediate RMS update")
+    
+    @socketio.on('ping')
+    def handle_ping(data):
+        """Handle client ping to keep connection alive."""
+        emit('pong', {'timestamp': data.get('timestamp'), 'server_time': datetime.utcnow().isoformat() + 'Z'})

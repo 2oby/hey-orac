@@ -65,13 +65,13 @@ class WebSocketBroadcaster:
         """Broadcast current RMS value."""
         try:
             rms = self.shared_data.get('rms', 0.0)
-            # Log every broadcast (now only 2 per second)
-            if hasattr(self, '_rms_count'):
-                self._rms_count += 1
-            else:
-                self._rms_count = 1
+            # Log every 10th broadcast to reduce log spam
+            if not hasattr(self, '_rms_count'):
+                self._rms_count = 0
+            self._rms_count += 1
             
-            logger.info(f"Broadcasting RMS #{self._rms_count}: {rms} to room 'realtime'")
+            if self._rms_count % 10 == 0:
+                logger.info(f"Broadcasting RMS #{self._rms_count}: {rms} to room 'realtime'")
             
             self.socketio.emit('rms_update', {
                 'rms': rms,

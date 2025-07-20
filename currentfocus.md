@@ -92,19 +92,73 @@ ssh pi "cd ~/WakeWordTest && docker-compose logs --tail=30 wake-word-test | grep
 ✅ **RMS values responsive** to audio volume changes  
 ✅ **No CORS or network errors** in logs  
 
-## 🚦 Current Status - ✅ RESOLVED!
-- **Socket.IO timeouts**: ✅ Configured (server + client)
-- **Debug logging**: ✅ Working and showing immediate RMS updates
-- **Container restart**: ✅ Successful with latest code
-- **RMS Updates**: ✅ Working! Client receiving immediate + continuous updates
-- **Issue resolution**: Container restart with latest debug code fixed the problem
+## 🚦 Current Status - 🔄 PARTIALLY RESOLVED
 
-## 🎉 SOLUTION SUMMARY
-The issue was resolved by:
-1. **Container restart** - Latest code wasn't active until forced restart
-2. **Socket.IO timeout fixes** - Server and client now use matching 120s timeouts
-3. **Immediate RMS updates** - Clients now get fresh data immediately upon subscription
-4. **Debug logging** - Confirmed data flow working server → client
+### ✅ What's Working
+- **Initial RMS update**: Client receives first RMS value upon connection  
+- **Socket.IO connection**: WebSocket connects and subscribes successfully
+- **GUI display fixes**: "Current RMS" text update code added
+- **Volume bar normalization**: Math fixed (divide by 50 instead of 5000)
+- **Server-side broadcasts**: Server logs show continuous RMS broadcasts
+
+### ❌ Current Problems
+1. **No continuous updates**: Only getting initial RMS, no ongoing 2/sec updates
+2. **Console silence**: Browser console shows no rms_update events after initial
+3. **GUI stuck**: "Current RMS" displays initial value then freezes
+4. **Frequency issue**: Container restart didn't seem to apply 2/sec frequency change
+
+### 🔍 Debugging Status
+**Last known state**: 
+- Initial connection and subscription: ✅ Working
+- Immediate RMS update: ✅ Working  
+- Continuous updates: ❌ Broken again
+- Server broadcasting: ✅ Working (logs show continuous broadcasts)
+- Client receiving: ❌ Only receives first update
+
+## 🎯 Next Steps (Priority Order)
+
+### STEP 1: Verify Container Has Latest Code
+```bash
+# Check if container restarted with new frequency code
+ssh pi "cd ~/WakeWordTest && docker-compose logs --tail=20 wake-word-test | grep 'Broadcasting RMS'"
+```
+**Expected**: Should see broadcasts every ~5 seconds (0.5s interval), not every second
+
+### STEP 2: Check WebSocket Connection Stability
+```bash
+# Monitor for disconnect/reconnect cycles
+ssh pi "cd ~/WakeWordTest && timeout 15 docker-compose logs -f wake-word-test | grep -E '(Client.*connected|Client.*disconnected)'"
+```
+**Expected**: No frequent disconnections during 15 second window
+
+### STEP 3: Force Container Rebuild
+If frequency not applied:
+```bash
+ssh pi "cd ~/WakeWordTest && docker-compose down && docker-compose build --no-cache && docker-compose up -d"
+```
+
+### STEP 4: Test Fresh Browser Session
+1. **Clear browser cache**: Hard refresh (Ctrl+Shift+R)
+2. **Open dev tools**: Monitor Network tab for WebSocket activity
+3. **Check transport**: Ensure using WebSocket, not polling fallback
+
+### STEP 5: Investigate WebSocket Transport Issue
+- **Network tab**: Look for failed WebSocket connections
+- **Console errors**: Check for JavaScript errors blocking updates
+- **Socket.IO transport**: Verify not falling back to polling
+
+## 🚨 Root Cause Hypothesis
+The pattern suggests a **WebSocket transport stability issue**:
+- Initial connection works (immediate RMS received)
+- Ongoing broadcasts fail (client stops receiving)
+- Server continues broadcasting (logs show success)
+- **Likely cause**: WebSocket connection degrading after initial setup
+
+## 🔧 Immediate Actions Needed
+1. **Verify new frequency is active** in container
+2. **Monitor for connection drops** in real-time  
+3. **Test with fresh browser session** to rule out cache issues
+4. **Consider simplifying transport** to WebSocket-only mode
 
 ---
 

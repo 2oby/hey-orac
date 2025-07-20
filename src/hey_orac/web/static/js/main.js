@@ -34,11 +34,25 @@ function initWebSocket() {
         // Subscribe to real-time updates
         socket.emit('subscribe_updates');
         console.log('Subscribed to real-time updates');
+        
+        // Send periodic pings to keep connection alive
+        if (window.pingInterval) {
+            clearInterval(window.pingInterval);
+        }
+        window.pingInterval = setInterval(() => {
+            socket.emit('ping', { timestamp: Date.now() });
+        }, 10000); // Every 10 seconds
     });
 
     socket.on('disconnect', () => {
         console.log('WebSocket disconnected');
         updateConnectionStatus(false);
+        
+        // Clear ping interval
+        if (window.pingInterval) {
+            clearInterval(window.pingInterval);
+            window.pingInterval = null;
+        }
     });
 
     socket.on('connect_error', (error) => {
@@ -49,9 +63,19 @@ function initWebSocket() {
     socket.on('subscribed', (data) => {
         console.log('Successfully subscribed to updates:', data);
     });
+    
+    socket.on('pong', (data) => {
+        console.log('Received pong response:', data);
+    });
+    
+    socket.on('reconnect', (attemptNumber) => {
+        console.log('Reconnected after', attemptNumber, 'attempts');
+        // Re-subscribe after reconnection
+        socket.emit('subscribe_updates');
+    });
 
     socket.on('rms_update', (data) => {
-        console.log('Received RMS update:', data.rms, 'full data:', data);
+        console.log('Received RMS update:', data.rms, 'timestamp:', data.timestamp);
         updateVolume(data.rms);
     });
 
@@ -355,7 +379,7 @@ function updateSliderDisplay(sliderId, value) {
 function updateVolumeDisplay() {
     console.log('updateVolumeDisplay called, currentVolume:', currentVolume);
     const meter = document.getElementById('volume-meter');
-    const segments = meter.querySelectorAll('.segment');
+    const segments = meter.querySelectorAll('.volume-segment');
     console.log('Found meter element:', meter, 'segments:', segments.length);
     const filterThreshold = parseFloat(document.getElementById('rms-filter-value').textContent);
     
