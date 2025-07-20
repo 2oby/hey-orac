@@ -8,7 +8,14 @@ from flask_cors import CORS
 
 logger = logging.getLogger(__name__)
 
-socketio = SocketIO(cors_allowed_origins="*", async_mode='eventlet')
+socketio = SocketIO(
+    cors_allowed_origins="*", 
+    async_mode='eventlet',
+    ping_timeout=120,
+    ping_interval=25,
+    logger=True,
+    engineio_logger=True
+)
 
 
 def create_app(config=None):

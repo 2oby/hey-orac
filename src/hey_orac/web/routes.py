@@ -226,7 +226,11 @@ def register_socketio_handlers(socketio):
     def handle_disconnect():
         """Handle client disconnection."""
         logger.info(f"Client disconnected: {request.sid}")
+        # Get disconnect reason if available
+        disconnect_reason = getattr(request, 'disconnect_reason', 'unknown')
+        logger.info(f"Disconnect reason for {request.sid}: {disconnect_reason}")
         leave_room('updates')
+        leave_room('realtime')
     
     @socketio.on('subscribe_updates')
     def handle_subscribe():
