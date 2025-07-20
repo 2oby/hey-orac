@@ -166,14 +166,17 @@
         .volume-segment {
             flex: 1;
             background: #000000;
-            border: 1px solid #90EE90;
+            border: 1px solid #556B55;
             border-radius: 2px;
             transition: all 0.1s ease;
             position: relative;
         }
 
         .volume-segment.active {
-            box-shadow: 0 0 10px currentColor;
+            background: linear-gradient(145deg, #90EE90, #7FDD7F);
+            border-color: #90EE90;
+            color: #90EE90;
+            box-shadow: 0 0 10px rgba(144, 238, 144, 0.6);
         }
 
         .volume-segment.active.amber {
