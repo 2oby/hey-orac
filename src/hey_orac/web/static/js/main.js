@@ -443,12 +443,15 @@ function updateSliderDisplay(sliderId, value) {
     
     const display = document.getElementById(displayId);
     if (display) {
+        // Convert value to number to ensure .toFixed() works
+        const numValue = parseFloat(value);
+        
         if (sliderId === 'rms-filter') {
-            display.textContent = Math.round(value);
+            display.textContent = Math.round(numValue);
         } else if (sliderId === 'cooldown') {
-            display.textContent = value.toFixed(1) + 's';
+            display.textContent = numValue.toFixed(1) + 's';
         } else {
-            display.textContent = value.toFixed(2);  // Show 2 decimals for model settings
+            display.textContent = numValue.toFixed(2);  // Show 2 decimals for model settings
         }
     } else {
         console.warn('Display element not found:', displayId);
