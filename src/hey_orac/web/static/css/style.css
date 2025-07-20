@@ -130,16 +130,15 @@ body::before {
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-bottom: 15px;
+    margin-bottom: 0px;
     margin-top: 0px;
     width: 100%;
 }
 
-.volume-meter-header {
+.volume-meter-with-cog {
     display: flex;
-    justify-content: flex-end;
-    width: 600px;
-    margin-bottom: 0px;
+    align-items: center;
+    gap: 15px;
 }
 
 .volume-settings-cog {
