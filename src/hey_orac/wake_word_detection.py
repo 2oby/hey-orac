@@ -682,7 +682,7 @@ def main():
         web_thread = threading.Thread(
             target=socketio.run,
             args=(app,),
-            kwargs={'host': '0.0.0.0', 'port': 7171, 'debug': False}
+            kwargs={'host': '0.0.0.0', 'port': 7171, 'debug': False, 'allow_unsafe_werkzeug': True}
         )
         web_thread.daemon = True
         web_thread.start()
