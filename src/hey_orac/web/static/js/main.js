@@ -106,6 +106,9 @@ async function loadConfig() {
         const response = await fetch(`${API_BASE}/config`);
         const config = await response.json();
         
+        console.log('Loaded config:', config);
+        console.log('Models found:', config.models?.length || 0);
+        
         // Convert config to our model format
         sampleModels = config.models.map(model => ({
             name: model.name,
@@ -114,6 +117,8 @@ async function loadConfig() {
             threshold: model.threshold,
             apiUrl: model.webhook_url
         }));
+        
+        console.log('Converted models:', sampleModels);
         
         // Update global settings if available
         if (config.system) {
