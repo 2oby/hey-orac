@@ -392,9 +392,21 @@ function updateVolumeDisplay() {
     volumeHistory.push(currentVolume);
     if (volumeHistory.length > 50) volumeHistory.shift();
     
-    // Calculate normalized volume (0-12 scale for segments)
-    // RMS values are typically 0-50, so divide by 50 to get 0-1, then multiply by 12
-    const normalizedVolume = Math.min(12, (currentVolume / 50) * 12);
+    // Calculate normalized volume (0-12 scale for segments) using logarithmic scaling
+    // RMS values: 0 to 5000, mapped logarithmically to 12 segments
+    const maxRMS = 5000;
+    const minRMS = 0.1; // Avoid log(0)
+    const numSegments = 12;
+    
+    let normalizedVolume;
+    if (currentVolume <= minRMS) {
+        normalizedVolume = 0;
+    } else if (currentVolume >= maxRMS) {
+        normalizedVolume = numSegments;
+    } else {
+        // Logarithmic scaling: log(current/min) / log(max/min) * segments
+        normalizedVolume = Math.log(currentVolume / minRMS) / Math.log(maxRMS / minRMS) * numSegments;
+    }
     console.log('normalizedVolume:', normalizedVolume, 'from currentVolume:', currentVolume);
     
     segments.forEach((segment, index) => {
@@ -404,9 +416,10 @@ function updateVolumeDisplay() {
             console.log(`Segment ${index}: shouldBeActive=${shouldBeActive}, hasActive=${segment.classList.contains('active')}`);
         }
         
-        // Update filter indicator
-        const segmentRMS = (index / 12) * 5000;
-        if (Math.abs(segmentRMS - filterThreshold) < 200) {
+        // Update filter indicator using logarithmic scale
+        const segmentPosition = index / numSegments; // 0 to 1
+        const segmentRMS = minRMS * Math.pow(maxRMS / minRMS, segmentPosition);
+        if (Math.abs(segmentRMS - filterThreshold) < filterThreshold * 0.2) { // 20% tolerance
             segment.style.borderColor = '#00ff41';
         } else {
             segment.style.borderColor = '';
