@@ -37,13 +37,13 @@ class WebSocketBroadcaster:
     def _broadcast_loop(self):
         """Main broadcast loop."""
         last_rms_time = 0
-        rms_interval = 0.1  # 10 Hz
+        rms_interval = 0.5  # 2 Hz (2 times per second)
         
         while self.running:
             try:
                 current_time = time.time()
                 
-                # Broadcast RMS at 10 Hz
+                # Broadcast RMS at 2 Hz
                 if current_time - last_rms_time >= rms_interval:
                     self._broadcast_rms()
                     last_rms_time = current_time
@@ -65,14 +65,13 @@ class WebSocketBroadcaster:
         """Broadcast current RMS value."""
         try:
             rms = self.shared_data.get('rms', 0.0)
-            # Log every 50th broadcast to avoid spam
+            # Log every broadcast (now only 2 per second)
             if hasattr(self, '_rms_count'):
                 self._rms_count += 1
             else:
                 self._rms_count = 1
             
-            if self._rms_count % 50 == 0:
-                logger.info(f"Broadcasting RMS #{self._rms_count}: {rms} to room 'realtime'")
+            logger.info(f"Broadcasting RMS #{self._rms_count}: {rms} to room 'realtime'")
             
             self.socketio.emit('rms_update', {
                 'rms': rms,
