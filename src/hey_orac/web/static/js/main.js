@@ -356,9 +356,18 @@ function openModelSettings(modelName) {
     if (model) {
         console.log('Opening settings for model:', model);
         document.getElementById('model-name').textContent = model.name;
-        document.getElementById('model-sensitivity').value = model.sensitivity;
-        document.getElementById('model-threshold').value = model.threshold;
-        document.getElementById('model-api-url').value = model.apiUrl || '';
+        
+        // Set slider values and verify they were set correctly
+        const sensitivitySlider = document.getElementById('model-sensitivity');
+        const thresholdSlider = document.getElementById('model-threshold');
+        const apiUrlField = document.getElementById('model-api-url');
+        
+        sensitivitySlider.value = model.sensitivity;
+        thresholdSlider.value = model.threshold;
+        apiUrlField.value = model.apiUrl || '';
+        
+        console.log('Set sensitivity slider to:', model.sensitivity, 'actual value:', sensitivitySlider.value);
+        console.log('Set threshold slider to:', model.threshold, 'actual value:', thresholdSlider.value);
         
         updateSliderDisplay('model-sensitivity', model.sensitivity);
         updateSliderDisplay('model-threshold', model.threshold);
