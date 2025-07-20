@@ -49,6 +49,64 @@ for chunk in audio_data:
 - 16kHz mono format confirmed as requirement
 - Chunk size of 1280 samples (80ms at 16kHz) works well
 
+## 2025-07-20 14:30 - ✅ Wake Word Detection System Operational (v0.1.4)
+
+### Major Milestone: Complete Working System
+- **Tagged**: v0.1.4 "Working Detection and GUI - Pre-Settings Manager Fix"
+- **Status**: Fully operational wake word detection with web interface
+- **Deployment**: Automated via scripts/deploy_and_test.sh
+
+### Completed Capabilities:
+1. **Docker Deployment**: Automated commit → push → build → test workflow
+2. **Audio Processing**: Live microphone capture with stereo→mono conversion
+3. **Wake Word Detection**: hey_jarvis model with configurable thresholds
+4. **Web Interface**: Real-time RMS monitoring, model management GUI
+5. **WebSocket Streaming**: Live audio level display and detection events
+6. **Logging**: Clean, appropriate verbosity (fixed excessive Socket.IO logs)
+
+### Key Technical Fixes Completed:
+- ✅ WebSocket connection stability (removed eventlet, using threading)
+- ✅ Docker build caching issues (--no-cache when needed)
+- ✅ Audio device compatibility (stereo input → mono processing)
+- ✅ Model loading and NumPy compatibility
+- ✅ Excessive logging reduction (Socket.IO debug messages)
+
+### System Architecture Working:
+```
+[Pi Audio Input] → [Docker Container] → [OpenWakeWord] → [WebSocket] → [Web GUI]
+                                   ↓
+                              [Config Manager] → [JSON Settings]
+```
+
+### Current Status: Ready for Settings Persistence Enhancement
+- All core functionality operational and stable
+- Web interface responsive with real-time updates
+- Ready to implement robust settings persistence (GUI ↔ config file)
+
+## 2025-07-20 15:00 - Settings Manager Analysis & Fix Planning
+
+### Investigation Results:
+**Critical Issues Found in Settings Persistence Chain:**
+
+1. **Missing Backend Methods**: Routes call non-existent SettingsManager methods:
+   - `update_model_config()` - called by model settings API
+   - `update_system_config()` - called by global settings API  
+   - `save()` - called after config updates
+
+2. **Schema Mismatches**: Frontend expects system config fields not in current schema:
+   - `rms_filter` - for volume threshold settings
+   - `cooldown` - for detection cooldown periods
+
+3. **API Integration Gap**: Frontend JavaScript properly handles settings but backend lacks persistence methods
+
+### Settings Available for Testing:
+- **Model Settings**: threshold (0.0-1.0), sensitivity (0.0-1.0), enabled (boolean), webhook_url
+- **System Settings**: rms_filter, cooldown, log_level (needs expansion)
+- **Audio Settings**: sample_rate, channels, chunk_size
+
+### Next Phase: Settings Persistence Implementation
+**Goal**: Complete GUI ↔ config file persistence with container restart validation
+
 **STATUS: CORE FUNCTIONALITY VERIFIED** ✅
 
 ## 2025-01-18 - Automated Deployment Script

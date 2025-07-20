@@ -1,24 +1,37 @@
-# Current Focus: Settings Manager Testing & Validation
+# Current Focus: Settings Manager Implementation & Testing
 
-## 🧪 IMMEDIATE TASKS: Settings Persistence Testing
+## 🔧 IMMEDIATE TASKS: Fix Settings Persistence Chain
 
-### Test Requirements
-1. **GUI→Config**: Verify settings changed in web interface are saved to config file
-2. **Config Persistence**: Verify saved settings survive application restart  
-3. **Config→GUI**: Verify saved settings are loaded correctly into web interface on startup
-4. **End-to-End**: Complete workflow test (change setting → save → restart → verify loaded)
+### Critical Issues Identified (Analysis Complete ✅)
+1. **Missing Backend Methods**: Routes call non-existent SettingsManager methods
+2. **Schema Mismatches**: Frontend expects system config fields not in schema  
+3. **API Integration Gap**: No persistence methods for GUI settings
 
-### Testing Plan
-- [ ] Examine current settings manager implementation
-- [ ] Identify testable settings (threshold, models, etc.)
+### Implementation Tasks
+- [x] Examine current settings manager implementation
+- [x] Identify testable settings and missing methods
+- [ ] **IN PROGRESS**: Add missing methods to SettingsManager class
 - [ ] Test GUI setting changes trigger config file updates
 - [ ] Test config file changes persist through container restart
 - [ ] Test config file values populate GUI correctly on startup
-- [ ] Fix any identified issues in the settings persistence chain
+- [ ] End-to-end validation: change → save → restart → verify
+
+### Missing Methods to Implement
+```python
+def update_model_config(self, model_name: str, **updates) -> bool
+def update_system_config(self, **updates) -> bool  
+def save(self) -> bool  # convenience method
+```
+
+### Missing SystemConfig Fields
+```python
+rms_filter: float = 50.0
+cooldown: float = 2.0
+```
 
 ---
 
-# Previous Focus: Wake Word Detection System Operational
+# Previous Focus: Wake Word Detection System Operational (v0.1.4 ✅)
 
 ## ✅ LATEST UPDATE: Logging Verbosity Fixed (2025-07-20)
 

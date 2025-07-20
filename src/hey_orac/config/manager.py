@@ -49,6 +49,8 @@ class SystemConfig:
     metrics_port: int = 8000
     hot_reload_enabled: bool = True
     hot_reload_interval: float = 5.0
+    rms_filter: float = 50.0
+    cooldown: float = 2.0
 
 
 @dataclass
@@ -107,7 +109,9 @@ class SettingsManager:
                     "metrics_enabled": {"type": "boolean"},
                     "metrics_port": {"type": "integer", "minimum": 1024, "maximum": 65535},
                     "hot_reload_enabled": {"type": "boolean"},
-                    "hot_reload_interval": {"type": "number", "minimum": 1.0}
+                    "hot_reload_interval": {"type": "number", "minimum": 1.0},
+                    "rms_filter": {"type": "number", "minimum": 0.0, "maximum": 5000.0},
+                    "cooldown": {"type": "number", "minimum": 0.0, "maximum": 60.0}
                 }
             }
         },
@@ -236,7 +240,9 @@ class SettingsManager:
                 metrics_enabled=system_dict.get('metrics_enabled', True),
                 metrics_port=system_dict.get('metrics_port', 8000),
                 hot_reload_enabled=system_dict.get('hot_reload_enabled', True),
-                hot_reload_interval=system_dict.get('hot_reload_interval', 5.0)
+                hot_reload_interval=system_dict.get('hot_reload_interval', 5.0),
+                rms_filter=system_dict.get('rms_filter', 50.0),
+                cooldown=system_dict.get('cooldown', 2.0)
             )
             
             return HeyOracConfig(
@@ -582,3 +588,105 @@ class SettingsManager:
         """
         logger.info("🔍 Manually refreshing model discovery...")
         return self._auto_discover_models()
+    
+    def update_model_config(self, model_name: str, **updates) -> bool:
+        """
+        Update configuration for a specific model.
+        
+        Args:
+            model_name: Name of the model to update
+            **updates: Configuration fields to update
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        def updater(config: HeyOracConfig) -> HeyOracConfig:
+            # Find the model to update
+            for model in config.models:
+                if model.name == model_name:
+                    # Update the model with provided values
+                    if 'threshold' in updates:
+                        model.threshold = float(updates['threshold'])
+                    if 'sensitivity' in updates:
+                        model.sensitivity = float(updates['sensitivity'])
+                    if 'webhook_url' in updates:
+                        model.webhook_url = str(updates['webhook_url'])
+                    if 'enabled' in updates:
+                        model.enabled = bool(updates['enabled'])
+                    if 'framework' in updates:
+                        model.framework = str(updates['framework'])
+                    if 'priority' in updates:
+                        model.priority = int(updates['priority'])
+                    logger.info(f"Updated model '{model_name}' config: {updates}")
+                    break
+            else:
+                logger.warning(f"Model '{model_name}' not found for update")
+            
+            return config
+        
+        return self.update_config(updater)
+    
+    def update_system_config(self, **updates) -> bool:
+        """
+        Update system configuration.
+        
+        Args:
+            **updates: System configuration fields to update
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        def updater(config: HeyOracConfig) -> HeyOracConfig:
+            # Update system config with provided values
+            if 'log_level' in updates:
+                config.system.log_level = str(updates['log_level'])
+            if 'models_dir' in updates:
+                config.system.models_dir = str(updates['models_dir'])
+            if 'recordings_dir' in updates:
+                config.system.recordings_dir = str(updates['recordings_dir'])
+            if 'metrics_enabled' in updates:
+                config.system.metrics_enabled = bool(updates['metrics_enabled'])
+            if 'metrics_port' in updates:
+                config.system.metrics_port = int(updates['metrics_port'])
+            if 'hot_reload_enabled' in updates:
+                config.system.hot_reload_enabled = bool(updates['hot_reload_enabled'])
+            if 'hot_reload_interval' in updates:
+                config.system.hot_reload_interval = float(updates['hot_reload_interval'])
+            if 'rms_filter' in updates:
+                config.system.rms_filter = float(updates['rms_filter'])
+            if 'cooldown' in updates:
+                config.system.cooldown = float(updates['cooldown'])
+            
+            logger.info(f"Updated system config: {updates}")
+            return config
+        
+        return self.update_config(updater)
+    
+    def save(self) -> bool:
+        """
+        Convenience method to save current configuration to file.
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        return self._save_config()
+    
+    def get_model_config(self, model_name: str) -> Optional[ModelConfig]:
+        """
+        Get configuration for a specific model.
+        
+        Args:
+            model_name: Name of the model
+            
+        Returns:
+            ModelConfig if found, None otherwise
+        """
+        with self._lock:
+            if self._config is None:
+                return None
+            
+            for model in self._config.models:
+                if model.name == model_name:
+                    return model
+            
+            return None
