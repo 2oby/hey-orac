@@ -48,8 +48,13 @@ function initWebSocket() {
     });
 
     socket.on('rms_update', (data) => {
-        console.log('Received RMS update:', data.rms);
+        console.log('Received RMS update:', data.rms, 'full data:', data);
         updateVolume(data.rms);
+    });
+
+    // Debug: Log all Socket.IO events
+    socket.onAny((eventName, ...args) => {
+        console.log('Socket.IO event received:', eventName, args);
     });
 
     socket.on('detection', (data) => {
