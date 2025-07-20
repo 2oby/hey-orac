@@ -80,13 +80,15 @@ function initWebSocket() {
     });
 
     socket.on('rms_update', (data) => {
-        // Reduced logging for RMS updates
+        // No logging for RMS updates to reduce console noise
         updateVolume(data.rms);
     });
 
-    // Debug: Log all Socket.IO events
+    // Debug: Log all Socket.IO events (except RMS updates)
     socket.onAny((eventName, ...args) => {
-        console.log('Socket.IO event received:', eventName, args);
+        if (eventName !== 'rms_update') {
+            console.log('Socket.IO event received:', eventName, args);
+        }
     });
 
     socket.on('detection', (data) => {
@@ -170,14 +172,34 @@ async function loadConfig() {
         console.log('Loaded config:', config);
         console.log('Models found:', config.models?.length || 0);
         
-        // Convert config to our model format
-        sampleModels = config.models.map(model => ({
-            name: model.name,
-            active: model.enabled,
-            sensitivity: model.sensitivity,
-            threshold: model.threshold,
-            apiUrl: model.webhook_url
-        }));
+        // Convert config to our model format, handling duplicates by prioritizing .tflite models
+        const modelMap = new Map();
+        config.models.forEach(model => {
+            const key = model.name;
+            const convertedModel = {
+                name: model.name,
+                active: model.enabled,
+                sensitivity: model.sensitivity,
+                threshold: model.threshold,
+                apiUrl: model.webhook_url,
+                framework: model.framework,
+                path: model.path
+            };
+            
+            // If we already have this model name, prefer .tflite over .onnx
+            if (modelMap.has(key)) {
+                const existing = modelMap.get(key);
+                // Replace if current is .tflite and existing is .onnx, or if current is enabled
+                if ((model.framework === 'tflite' && existing.framework === 'onnx') || 
+                    model.enabled) {
+                    modelMap.set(key, convertedModel);
+                }
+            } else {
+                modelMap.set(key, convertedModel);
+            }
+        });
+        
+        sampleModels = Array.from(modelMap.values());
         
         console.log('Converted models:', sampleModels);
         
@@ -253,6 +275,8 @@ async function saveModelSettings() {
     const threshold = parseFloat(document.getElementById('model-threshold').value);
     const apiUrl = document.getElementById('model-api-url').value;
     
+    console.log('Saving model settings:', {model: currentEditingModel, sensitivity, threshold, apiUrl});
+    
     try {
         const response = await fetch(`${API_BASE}/config/models/${currentEditingModel}`, {
             method: 'POST',
@@ -265,13 +289,18 @@ async function saveModelSettings() {
         });
         
         if (response.ok) {
+            console.log('Model settings saved successfully');
+            // Update the local model data
             const model = sampleModels.find(m => m.name === currentEditingModel);
             if (model) {
                 model.sensitivity = sensitivity;
                 model.threshold = threshold;
                 model.apiUrl = apiUrl;
+                console.log('Updated local model:', model);
             }
             closeModelSettings();
+        } else {
+            console.error('Failed to save model settings:', response.status);
         }
     } catch (error) {
         console.error('Error saving model settings:', error);
@@ -317,9 +346,15 @@ function updateModelCards() {
 
 function openModelSettings(modelName) {
     currentEditingModel = modelName;
-    const model = sampleModels.find(m => m.name === modelName);
+    // Find the model, prioritizing active/enabled models over inactive ones
+    let model = sampleModels.find(m => m.name === modelName && m.active);
+    if (!model) {
+        // If no active model found, take the first match
+        model = sampleModels.find(m => m.name === modelName);
+    }
     
     if (model) {
+        console.log('Opening settings for model:', model);
         document.getElementById('model-name').textContent = model.name;
         document.getElementById('model-sensitivity').value = model.sensitivity;
         document.getElementById('model-threshold').value = model.threshold;
@@ -403,10 +438,9 @@ function updateSliderDisplay(sliderId, value) {
 
 // Volume display
 function updateVolumeDisplay() {
-    console.log('updateVolumeDisplay called, currentVolume:', currentVolume);
+    // Removed logging to reduce console noise
     const meter = document.getElementById('volume-meter');
     const segments = meter.querySelectorAll('.volume-segment');
-    console.log('Found meter element:', meter, 'segments:', segments.length);
     const filterThreshold = parseFloat(document.getElementById('rms-filter-value').textContent);
     
     // Update volume history
