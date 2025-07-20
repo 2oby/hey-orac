@@ -21,7 +21,10 @@ function initWebSocket() {
         transports: ['polling', 'websocket'],
         reconnection: true,
         reconnectionDelay: 1000,
-        reconnectionAttempts: 10
+        reconnectionAttempts: 10,
+        timeout: 120000,
+        pingTimeout: 120000,
+        pingInterval: 25000
     });
 
     socket.on('connect', () => {
