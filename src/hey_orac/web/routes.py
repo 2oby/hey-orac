@@ -3,6 +3,7 @@
 import logging
 import json
 from datetime import datetime
+from dataclasses import asdict
 from flask import Blueprint, jsonify, request
 from flask_socketio import emit, join_room, leave_room
 
@@ -31,8 +32,13 @@ def init_routes(sm, sd, eq):
 def get_config():
     """Get the complete configuration."""
     try:
-        config = settings_manager.get_config()
-        return jsonify(config.dict())
+        with settings_manager.get_config() as config:
+            return jsonify({
+                'models': [asdict(model) for model in config.models],
+                'audio': asdict(config.audio),
+                'system': asdict(config.system),
+                'version': config.version
+            })
     except Exception as e:
         logger.error(f"Error getting config: {e}")
         return jsonify({'error': str(e)}), 500
@@ -62,7 +68,7 @@ def get_model_config(model_name):
     try:
         model = settings_manager.get_model_config(model_name)
         if model:
-            return jsonify(model.dict())
+            return jsonify(asdict(model))
         return jsonify({'error': 'Model not found'}), 404
     except Exception as e:
         logger.error(f"Error getting model config: {e}")
