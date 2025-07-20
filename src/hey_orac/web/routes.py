@@ -239,3 +239,13 @@ def register_socketio_handlers(socketio):
         join_room('realtime')
         logger.info(f"Client {request.sid} joined 'realtime' room")
         emit('subscribed', {'status': 'subscribed to updates'})
+        
+        # Send immediate RMS update to newly subscribed client
+        if shared_data:
+            try:
+                current_rms = shared_data.get('rms', 0.0)
+                if current_rms is not None:
+                    logger.info(f"Sending immediate RMS update to {request.sid}: {current_rms}")
+                    emit('rms_update', {'rms': current_rms, 'timestamp': datetime.now().isoformat()})
+            except Exception as e:
+                logger.warning(f"Could not send immediate RMS update: {e}")
