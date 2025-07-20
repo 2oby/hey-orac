@@ -70,8 +70,9 @@ class WebSocketBroadcaster:
                 self._rms_count = 0
             self._rms_count += 1
             
-            if self._rms_count % 10 == 0:
-                logger.info(f"Broadcasting RMS #{self._rms_count}: {rms} to room 'realtime'")
+            # Reduced RMS logging - only log every 100 broadcasts
+            if self._rms_count % 100 == 0:
+                logger.debug(f"Broadcasting RMS #{self._rms_count}: {rms} to room 'realtime'")
             
             self.socketio.emit('rms_update', {
                 'rms': rms,
