@@ -28,11 +28,16 @@ from hey_orac.web.broadcaster import WebSocketBroadcaster
 
 # Configure logging for debugging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     stream=sys.stdout,
     force=True
 )
+
+# Silence noisy Socket.IO loggers
+logging.getLogger('engineio.server').setLevel(logging.WARNING)
+logging.getLogger('socketio.server').setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 def parse_arguments():
