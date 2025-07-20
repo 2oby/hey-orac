@@ -372,8 +372,23 @@ function openModelSettings(modelName) {
         updateSliderDisplay('model-sensitivity', model.sensitivity);
         updateSliderDisplay('model-threshold', model.threshold);
         
+        // Attach event listeners for the model sliders (in case they weren't attached yet)
+        sensitivitySlider.removeEventListener('input', updateModelSensitivity);
+        thresholdSlider.removeEventListener('input', updateModelThreshold);
+        sensitivitySlider.addEventListener('input', updateModelSensitivity);
+        thresholdSlider.addEventListener('input', updateModelThreshold);
+        
         document.getElementById('model-settings-modal').style.display = 'block';
     }
+}
+
+// Event handlers for model sliders
+function updateModelSensitivity() {
+    updateSliderDisplay('model-sensitivity', this.value);
+}
+
+function updateModelThreshold() {
+    updateSliderDisplay('model-threshold', this.value);
 }
 
 function closeModelSettings() {
@@ -437,6 +452,8 @@ function updateSliderDisplay(sliderId, value) {
     let displayId;
     if (sliderId === 'model-sensitivity' || sliderId === 'model-threshold') {
         displayId = sliderId + '-display';  // model settings use -display suffix
+    } else if (sliderId.startsWith('volume-')) {
+        displayId = sliderId + '-value';     // volume modal elements use -value suffix
     } else {
         displayId = sliderId + '-value';     // global settings use -value suffix
     }
@@ -446,15 +463,15 @@ function updateSliderDisplay(sliderId, value) {
         // Convert value to number to ensure .toFixed() works
         const numValue = parseFloat(value);
         
-        if (sliderId === 'rms-filter') {
+        if (sliderId === 'rms-filter' || sliderId === 'volume-rms-filter') {
             display.textContent = Math.round(numValue);
-        } else if (sliderId === 'cooldown') {
+        } else if (sliderId === 'cooldown' || sliderId === 'volume-cooldown') {
             display.textContent = numValue.toFixed(1) + 's';
         } else {
             display.textContent = numValue.toFixed(2);  // Show 2 decimals for model settings
         }
     } else {
-        console.warn('Display element not found:', displayId);
+        console.warn('Display element not found:', displayId, 'for slider:', sliderId);
     }
 }
 
@@ -549,13 +566,7 @@ document.addEventListener('DOMContentLoaded', function() {
         saveGlobalSettings();
     });
     
-    document.getElementById('model-sensitivity').addEventListener('input', function() {
-        updateSliderDisplay('model-sensitivity', this.value);
-    });
-    
-    document.getElementById('model-threshold').addEventListener('input', function() {
-        updateSliderDisplay('model-threshold', this.value);
-    });
+    // Model slider event listeners are now attached dynamically when modal opens
     
     // Modal close button
     document.querySelector('.close-btn').addEventListener('click', closeModelSettings);
