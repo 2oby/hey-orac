@@ -373,10 +373,12 @@ function openModelSettings(modelName) {
         updateSliderDisplay('model-threshold', model.threshold);
         
         // Attach event listeners for the model sliders (in case they weren't attached yet)
+        console.log('Attaching event listeners to model sliders');
         sensitivitySlider.removeEventListener('input', updateModelSensitivity);
         thresholdSlider.removeEventListener('input', updateModelThreshold);
         sensitivitySlider.addEventListener('input', updateModelSensitivity);
         thresholdSlider.addEventListener('input', updateModelThreshold);
+        console.log('Event listeners attached');
         
         document.getElementById('model-settings-modal').style.display = 'block';
     }
@@ -384,10 +386,12 @@ function openModelSettings(modelName) {
 
 // Event handlers for model sliders
 function updateModelSensitivity() {
+    console.log('updateModelSensitivity called with value:', this.value);
     updateSliderDisplay('model-sensitivity', this.value);
 }
 
 function updateModelThreshold() {
+    console.log('updateModelThreshold called with value:', this.value);
     updateSliderDisplay('model-threshold', this.value);
 }
 
