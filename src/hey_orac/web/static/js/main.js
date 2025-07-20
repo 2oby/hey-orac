@@ -106,6 +106,7 @@ function handleDetection(detection) {
 
 // Update volume display
 function updateVolume(rms) {
+    console.log('updateVolume called with RMS:', rms);
     currentVolume = rms;
     updateVolumeDisplay();
 }
@@ -331,8 +332,10 @@ function updateSliderDisplay(sliderId, value) {
 
 // Volume display
 function updateVolumeDisplay() {
+    console.log('updateVolumeDisplay called, currentVolume:', currentVolume);
     const meter = document.getElementById('volume-meter');
     const segments = meter.querySelectorAll('.segment');
+    console.log('Found meter element:', meter, 'segments:', segments.length);
     const filterThreshold = parseFloat(document.getElementById('rms-filter-value').textContent);
     
     // Update volume history
