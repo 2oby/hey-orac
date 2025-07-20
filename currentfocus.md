@@ -1,120 +1,97 @@
-# Current Focus: Web GUI Integration COMPLETED ✅
+# Current Focus: Web GUI Integration - Deployment Issues
 
 ## 🎯 Objective
-Successfully integrated the web-based monitoring and configuration GUI into the wake word detection system, providing real-time visualization and control over model settings.
+Successfully integrated the web-based monitoring and configuration GUI, but encountering deployment issues on Raspberry Pi.
 
-## 📋 Implementation Summary
+## ✅ What's Complete
 
-### ✅ Real-Time Monitoring (COMPLETE)
-- **RMS Audio Levels**: WebSocket updates at 10 Hz with 12-segment volume meter
-- **Detection Events**: Instant push notifications with model name, confidence, timestamp
-- **System Status**: Live connection state, audio activity, listening state
-- **Visual Feedback**: Detection animations and red pulse notifications
+### Implementation (100% DONE)
+- **Flask-SocketIO Server**: Web server with WebSocket support on port 7171
+- **REST API**: Full configuration management endpoints
+- **WebSocket Broadcasting**: Real-time RMS and detection events
+- **Frontend Assets**: HTML/CSS/JS ported with WebSocket client
+- **Shared Memory System**: Thread-safe data sharing via multiprocessing.Manager
+- **Docker Configuration**: Port 7171 exposed, config directory mounted
 
-### ✅ Configuration Management (COMPLETE)
-- **Global Settings**: RMS filter (0-5000), cooldown time (0-5s)
-- **Per-Model Settings**: 
-  - Sensitivity (0.00001-1.00000)
-  - Detection threshold (0.00001-1.00000)  
-  - Webhook URL for notifications
-  - Enable/disable toggle
-- **Live Updates**: Configuration changes applied immediately without restart
+### Code Changes
+1. Added Flask dependencies to requirements.txt
+2. Created web server modules:
+   - `src/hey_orac/web/app.py` - Flask application
+   - `src/hey_orac/web/routes.py` - API endpoints
+   - `src/hey_orac/web/broadcaster.py` - WebSocket broadcaster
+3. Ported web GUI assets:
+   - `src/hey_orac/web/static/index.html`
+   - `src/hey_orac/web/static/css/style.css`
+   - `src/hey_orac/web/static/js/main.js`
+4. Updated wake_word_detection.py with web server integration
+5. Modified docker-compose.yml to expose port 7171
 
-### ✅ Technical Implementation (COMPLETE)
-- **Backend**: Flask-SocketIO REST API on port 7171
-- **Frontend**: Single-page application with vanilla JS
-- **Communication**: 
-  - WebSocket for real-time updates (as requested)
-  - REST API for configuration management
-- **Data Flow**: Shared queues between detection thread and Flask using multiprocessing.Manager
+## 🚨 Current Issues
 
-## 🏗️ What Was Built
+### 1. Docker Network Mode Conflict (RESOLVED)
+- **Issue**: Cannot use both `network_mode: host` and port bindings
+- **Fix**: Removed `network_mode: host` from docker-compose.yml
+- **Status**: ✅ Fixed and committed
 
-### Web Server Components
-1. **Flask-SocketIO Application** (`src/hey_orac/web/app.py`)
-   - Serves static files and API
-   - WebSocket support via Socket.IO
-   - CORS enabled for flexibility
+### 2. Missing Flask Dependencies in Docker Image
+- **Issue**: ModuleNotFoundError: No module named 'flask'
+- **Cause**: Docker image needs rebuild after adding Flask to requirements.txt
+- **Status**: 🔄 Docker image rebuild in progress on Pi
+- **Action**: `docker-compose build --no-cache` running
 
-2. **REST API Endpoints** (`src/hey_orac/web/routes.py`)
-   - `/api/config` - Full configuration CRUD
-   - `/api/config/models/{name}` - Per-model settings
-   - `/api/custom-models` - Model listing/activation
-   - `/api/audio/rms` - Real-time audio levels
-   - `/api/detections` - Recent wake word detections
+### 3. Long Build Time
+- **Issue**: Docker build taking extended time on Raspberry Pi
+- **Cause**: Installing many new dependencies (Flask, Flask-SocketIO, eventlet, etc.)
+- **Expected**: ARM builds are slower, especially with compilation
 
-3. **WebSocket Broadcaster** (`src/hey_orac/web/broadcaster.py`)
-   - Runs in separate thread
-   - Broadcasts RMS at 10 Hz
-   - Pushes detection events instantly
-   - Manages status updates
-
-### Frontend Components
-1. **HTML Interface** (`src/hey_orac/web/static/index.html`)
-   - 12-segment volume meter
-   - Model cards with settings
-   - Global control sliders
-   - Status bar indicators
-
-2. **JavaScript Client** (`src/hey_orac/web/static/js/main.js`)
-   - WebSocket connection management
-   - Real-time data handling
-   - Configuration API calls
-   - UI state management
-
-3. **CSS Styling** (`src/hey_orac/web/static/css/style.css`)
-   - Dark neon theme preserved
-   - Green (#00ff41) accent colors
-   - Responsive design
-
-### Integration Points
-1. **Shared Memory System**
-   - `multiprocessing.Manager` for thread-safe data
-   - Queue for events (max 100 items)
-   - Shared dict for current state
-
-2. **Wake Word Detection Updates**
-   - RMS calculation on each audio chunk
-   - Detection events queued for broadcast
-   - Status updates for GUI
-
-3. **Docker Configuration**
-   - Port 7171 exposed for web access
-   - Config directory mounted
-   - Network mode: host
-
-## 📊 Achievement Status
-1. ✅ Web GUI accessible on port 7171
-2. ✅ Real-time RMS visualization working via WebSocket
-3. ✅ Detection events displayed with animations
-4. ✅ All model settings configurable via GUI
-5. ✅ Configuration changes persist across restarts
-6. ✅ No performance impact on wake word detection
-
-## 🚦 Current Status
-**IMPLEMENTATION COMPLETE** - Ready for deployment and testing
-- All planned features implemented
-- WebSocket real-time updates working
-- Configuration management integrated
-- Docker setup updated
-
-## 🚀 Ready for Deployment
-The web GUI is now fully integrated and ready to be deployed to the Raspberry Pi:
+## 📊 Deployment Status
 
 ```bash
-# Deploy to Pi
-./scripts/deploy_and_test.sh "Web GUI integration complete"
-
-# Access web interface
-http://<raspberry-pi-ip>:7171
+# Last known state:
+- Container: Exited with ModuleNotFoundError
+- Port: 7171 exposed in docker-compose.yml
+- Build: In progress with --no-cache flag
+- Dependencies: Installing Flask and related packages
 ```
 
-## Next Focus
-With the web GUI complete, the wake word detection system now has:
-- ✅ Configuration-driven architecture
-- ✅ Model auto-discovery
-- ✅ Web-based monitoring and control
-- ✅ Real-time visualization
-- ✅ Live configuration updates
+## 🔧 Next Steps
 
-The system is feature-complete and ready for production use!
+1. **Wait for Docker build** to complete on Pi
+2. **Restart container** once build finishes
+3. **Verify web GUI** accessible at http://<pi-ip>:7171
+4. **Test wake word detection** with WAV file input
+5. **Verify WebSocket** real-time updates working
+
+## 🎯 Testing Plan
+
+Once deployment succeeds:
+1. Access web GUI at port 7171
+2. Check WebSocket connection status
+3. Monitor RMS levels in real-time
+4. Test model enable/disable
+5. Verify configuration persistence
+6. Test wake word detection with WAV file
+
+## 📝 Commands for Testing
+
+```bash
+# Check build status
+ssh pi "docker images | grep wake-word"
+
+# Once built, start container
+ssh pi "cd ~/WakeWordTest && docker-compose up -d"
+
+# Check logs
+ssh pi "cd ~/WakeWordTest && docker-compose logs -f wake-word-test"
+
+# Test with WAV file (on Pi)
+ssh pi "cd ~/WakeWordTest && docker-compose exec wake-word-test python3 -m hey_orac.wake_word_detection --input-wav /app/wake_word_test_20250718_131542.wav"
+```
+
+## 🚦 Status Summary
+
+**Development**: ✅ Complete
+**Deployment**: 🔄 In Progress (Docker rebuild)
+**Testing**: ⏳ Pending
+
+The web GUI integration is fully implemented but waiting on Docker image rebuild to include Flask dependencies. Once the build completes, the system should be ready for full testing.
