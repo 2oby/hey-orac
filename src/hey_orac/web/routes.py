@@ -231,5 +231,7 @@ def register_socketio_handlers(socketio):
     @socketio.on('subscribe_updates')
     def handle_subscribe():
         """Client subscribes to real-time updates."""
+        logger.info(f"Client {request.sid} subscribing to real-time updates")
         join_room('realtime')
+        logger.info(f"Client {request.sid} joined 'realtime' room")
         emit('subscribed', {'status': 'subscribed to updates'})

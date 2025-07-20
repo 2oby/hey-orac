@@ -65,6 +65,15 @@ class WebSocketBroadcaster:
         """Broadcast current RMS value."""
         try:
             rms = self.shared_data.get('rms', 0.0)
+            # Log every 50th broadcast to avoid spam
+            if hasattr(self, '_rms_count'):
+                self._rms_count += 1
+            else:
+                self._rms_count = 1
+            
+            if self._rms_count % 50 == 0:
+                logger.info(f"Broadcasting RMS #{self._rms_count}: {rms} to room 'realtime'")
+            
             self.socketio.emit('rms_update', {
                 'rms': rms,
                 'timestamp': datetime.utcnow().isoformat() + 'Z'
