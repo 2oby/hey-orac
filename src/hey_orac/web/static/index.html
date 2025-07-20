@@ -734,23 +734,22 @@
         </div>
 
         <div class="controls-section">
-            <div class="sliders-container">
-                <div class="slider-group">
-                    <label class="slider-label">RMS Filter</label>
-                    <input type="range" class="slider" id="rms-filter" min="0" max="100" step="1" value="50">
-                    <span class="slider-value" id="rms-filter-value">50</span>
-                </div>
-                
-                <!-- Remove Debounce slider and label -->
-                
-                <div class="slider-group">
-                    <label class="slider-label">Cooldown (s)</label>
-                    <input type="range" class="slider" id="cooldown" min="0" max="5" step="0.1" value="1.5">
-                    <span class="slider-value" id="cooldown-value">1.5s</span>
-                </div>
+            <!-- Hidden original sliders for JS compatibility -->
+            <div style="display: none;">
+                <input type="range" id="rms-filter" min="0" max="100" step="1" value="50">
+                <span id="rms-filter-value">50</span>
+                <input type="range" id="cooldown" min="0" max="5" step="0.1" value="1.5">
+                <span id="cooldown-value">1.5s</span>
             </div>
 
             <div class="volume-meter-container">
+                <div class="volume-meter-header">
+                    <button class="volume-settings-cog" onclick="openVolumeSettings()">
+                        <svg viewBox="0 0 20 20" fill="currentColor" width="20" height="20">
+                            <path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
                 <div class="volume-meter" id="volume-meter">
                     <div class="volume-segments">
                         <div class="volume-segment"></div>
@@ -779,7 +778,6 @@
             </div>
 
             <div class="model-selection-container">
-                <div class="model-selection-title">Custom Model Selection</div>
                 <div class="models-grid" id="models-grid">
                     <!-- Custom models will be dynamically generated here -->
                 </div>
@@ -868,6 +866,31 @@
             </div>
             <div class="modal-footer" style="padding: 20px; border-top: 1px solid #00ff41; text-align: right;">
                 <button class="save-btn" style="background: #00ff41; color: #0a0a0a; border: none; padding: 10px 20px; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 5px;">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Volume Settings Modal -->
+    <div class="modal-overlay" id="volume-settings-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Volume Settings</h3>
+                <button class="modal-close" onclick="closeVolumeSettings()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="volume-rms-filter">RMS Filter</label>
+                    <input type="range" class="form-input" id="volume-rms-filter" min="0" max="100" step="1" value="50">
+                    <span class="slider-value" id="volume-rms-filter-value">50</span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="volume-cooldown">Cooldown (s)</label>
+                    <input type="range" class="form-input" id="volume-cooldown" min="0" max="5" step="0.1" value="1.5">
+                    <span class="slider-value" id="volume-cooldown-value">1.5s</span>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn" onclick="closeVolumeSettings()">Close</button>
             </div>
         </div>
     </div>

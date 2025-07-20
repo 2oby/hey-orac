@@ -337,6 +337,25 @@ function closeModelSettings() {
     currentEditingModel = null;
 }
 
+function openVolumeSettings() {
+    // Get current values from existing elements
+    const rmsValue = document.getElementById('rms-filter-value').textContent;
+    const cooldownValue = document.getElementById('cooldown-value').textContent;
+    
+    // Set modal values
+    document.getElementById('volume-rms-filter').value = document.getElementById('rms-filter').value;
+    document.getElementById('volume-cooldown').value = document.getElementById('cooldown').value;
+    document.getElementById('volume-rms-filter-value').textContent = rmsValue;
+    document.getElementById('volume-cooldown-value').textContent = cooldownValue;
+    
+    // Show modal
+    document.getElementById('volume-settings-modal').classList.add('active');
+}
+
+function closeVolumeSettings() {
+    document.getElementById('volume-settings-modal').classList.remove('active');
+}
+
 // RMS slider conversion functions
 function rmsToSlider(rms) {
     if (rms <= 0) return 0;
@@ -444,6 +463,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize WebSocket connection
     initWebSocket();
     
+    // Setup event listeners for volume settings modal sliders
+    document.getElementById('volume-rms-filter').addEventListener('input', function() {
+        const rmsValue = sliderToRMS(this.value);
+        updateSliderDisplay('volume-rms-filter', rmsValue);
+        // Update hidden original slider
+        document.getElementById('rms-filter').value = this.value;
+        updateSliderDisplay('rms-filter', rmsValue);
+        saveGlobalSettings();
+    });
+    
+    document.getElementById('volume-cooldown').addEventListener('input', function() {
+        updateSliderDisplay('volume-cooldown', this.value);
+        // Update hidden original slider
+        document.getElementById('cooldown').value = this.value;
+        updateSliderDisplay('cooldown', this.value);
+        saveGlobalSettings();
+    });
+
     // Setup event listeners for sliders
     document.getElementById('rms-filter').addEventListener('input', function() {
         const rmsValue = sliderToRMS(this.value);

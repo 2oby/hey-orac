@@ -42,7 +42,6 @@ body::before {
 .header {
     text-align: center;
     margin-bottom: 30px;
-    border-bottom: 2px solid #00ff41;
     padding-bottom: 20px;
 }
 
@@ -71,10 +70,7 @@ body::before {
 }
 
 .sliders-container {
-    display: flex;
-    gap: 30px;
-    justify-content: center;
-    margin-bottom: 30px;
+    display: none; /* Hidden since moved to modal */
 }
 
 .slider-group {
@@ -136,6 +132,30 @@ body::before {
     align-items: center;
     margin-bottom: 30px;
     width: 100%;
+}
+
+.volume-meter-header {
+    display: flex;
+    justify-content: flex-end;
+    width: 600px;
+    margin-bottom: 10px;
+}
+
+.volume-settings-cog {
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    filter: drop-shadow(0 0 5px currentColor);
+    padding: 0;
+    display: flex;
+    align-items: center;
+    color: #00ff41;
+}
+
+.volume-settings-cog:hover {
+    transform: rotate(90deg);
+    filter: drop-shadow(0 0 10px currentColor);
 }
 
 .volume-meter {
@@ -236,6 +256,26 @@ body::before {
     padding: 20px;
     overflow-y: auto;
     max-height: calc(100vh - 400px);
+}
+
+/* Custom scrollbar styling */
+.models-grid::-webkit-scrollbar {
+    width: 8px;
+}
+
+.models-grid::-webkit-scrollbar-track {
+    background: #0a0a0a;
+    border-radius: 4px;
+}
+
+.models-grid::-webkit-scrollbar-thumb {
+    background: #00ff41;
+    border-radius: 4px;
+    opacity: 0.7;
+}
+
+.models-grid::-webkit-scrollbar-thumb:hover {
+    background: #00cc33;
 }
 
 .model-card {
