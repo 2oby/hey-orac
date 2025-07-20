@@ -1,78 +1,68 @@
-# Current Focus: Fix Docker Build Caching in deploy_and_test.sh
+# Current Focus: Settings Manager Testing & Validation
 
-## 🚨 CRITICAL ISSUE: Container Running Old Code
+## 🧪 IMMEDIATE TASKS: Settings Persistence Testing
 
-### Problem Summary
-- Container frequently runs old code after deployment
-- Changes not reflected even after restart
-- Need proper Docker build caching strategy
+### Test Requirements
+1. **GUI→Config**: Verify settings changed in web interface are saved to config file
+2. **Config Persistence**: Verify saved settings survive application restart  
+3. **Config→GUI**: Verify saved settings are loaded correctly into web interface on startup
+4. **End-to-End**: Complete workflow test (change setting → save → restart → verify loaded)
 
-## 📋 Deploy Script Requirements
-
-### MUST HAVE:
-1. **Cache Dependencies**: Don't rebuild Python packages every time
-2. **Rebuild on Code Changes**: Always rebuild when our source code changes
-3. **Fast Deployment**: Minimize build time while ensuring fresh code
-
-### Docker Build Strategy:
-```dockerfile
-# Good caching pattern:
-COPY requirements.txt .
-RUN pip install -r requirements.txt  # This layer cached if requirements unchanged
-COPY src/ .  # This forces rebuild when code changes
-```
-
-### deploy_and_test.sh Improvements Needed:
-1. **Smart Cache Invalidation**:
-   - Use Docker build cache for dependencies
-   - Force rebuild of application layer when code changes
-   - Consider using `--cache-from` for better caching
-
-2. **Verify Fresh Code**:
-   - Add git commit hash to container
-   - Log the commit hash on startup
-   - Verify expected vs actual commit
-
-3. **Restart Strategy**:
-   - Stop container before pulling new code
-   - Use `docker-compose up --force-recreate` when needed
-   - Consider `docker-compose pull` before `up`
-
-## 🔧 Proposed Solution
-
-Update deploy_and_test.sh to:
-```bash
-# After git pull on Pi
-docker-compose down
-docker-compose build --build-arg CACHEBUST=$(date +%s) wake-word-test
-docker-compose up -d
-```
-
-Or use a smarter approach:
-```bash
-# Only rebuild if source files changed
-if git diff --name-only HEAD~1 | grep -E "(src/|requirements.txt)"; then
-  docker-compose build wake-word-test
-fi
-docker-compose up -d --force-recreate wake-word-test
-```
-
-## 🎯 Success Criteria
-✅ Code changes visible immediately after deployment
-✅ Dependencies cached (no pip install if requirements unchanged)
-✅ Build time under 2 minutes for code-only changes
-✅ Container runs exact commit that was pushed
+### Testing Plan
+- [ ] Examine current settings manager implementation
+- [ ] Identify testable settings (threshold, models, etc.)
+- [ ] Test GUI setting changes trigger config file updates
+- [ ] Test config file changes persist through container restart
+- [ ] Test config file values populate GUI correctly on startup
+- [ ] Fix any identified issues in the settings persistence chain
 
 ---
 
-## Previous Issue: WebSocket Streaming Not Working
+# Previous Focus: Wake Word Detection System Operational
 
-### Status: PARTIALLY FIXED
-- Changed from eventlet to threading mode
-- Removed eventlet from requirements.txt
-- Added better client-side debugging
+## ✅ LATEST UPDATE: Logging Verbosity Fixed (2025-07-20)
 
-### Still TODO:
-- Force Docker rebuild without eventlet
-- Verify WebSocket messages reach client
-- Test RMS streaming works continuously
+### Problem Solved
+- **Issue**: Excessive Socket.IO logging appearing twice per second
+- **Root Cause**: Main logging level set to DEBUG + engineio.server logging not silenced
+- **Solution Applied**:
+  - Changed main logging level from DEBUG to INFO in `wake_word_detection.py:31`
+  - Added explicit silencing of engineio.server and socketio.server loggers to WARNING level
+  - Deployed and verified logs are now clean with only periodic status updates
+
+### Result
+✅ Logs now show only relevant information every ~8 seconds instead of constant RMS broadcasts
+✅ Container performance improved with reduced log overhead
+✅ Debugging information still available but not overwhelming
+
+---
+
+## 🎯 System Status: STABLE
+
+### Current Capabilities Working:
+- ✅ Docker deployment via deploy_and_test.sh
+- ✅ Audio capture and processing
+- ✅ Wake word detection (hey_jarvis model)
+- ✅ Web interface with real-time RMS display
+- ✅ WebSocket streaming (RMS updates, detection events)
+- ✅ Clean, appropriate logging levels
+
+### Recent Fixes Completed:
+1. **WebSocket Streaming**: Fixed by removing eventlet, using threading mode
+2. **Docker Build Caching**: Resolved container running old code issues
+3. **Audio Processing**: Stereo→Mono conversion working correctly
+4. **Model Loading**: NumPy compatibility and model initialization fixed
+5. **Logging Verbosity**: Reduced excessive Socket.IO debug messages
+
+---
+
+## 🔄 Ready for Next Development Phase
+
+The system is now stable and ready for:
+- Custom model testing
+- Speech capture implementation
+- Additional wake word models
+- Performance optimizations
+- Feature enhancements
+
+**No critical issues currently blocking development.**
