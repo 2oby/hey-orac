@@ -852,21 +852,21 @@
                 </div>
                 <form class="modal-form" id="settingsForm">
                     <div class="form-group">
-                        <label class="form-label" for="sensitivityInput">Model Sensitivity</label>
+                        <label class="form-label" for="model-sensitivity">Model Sensitivity</label>
                         <input type="range" class="form-input" id="model-sensitivity" 
                                min="0.00001" max="1.00000" step="0.00050" value="0.05">
                         <span class="slider-value" id="model-sensitivity-value">0.95</span>
                         <small class="form-help">Internal model parameter - higher = more sensitive processing</small>
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="thresholdInput">Detection Threshold</label>
+                        <label class="form-label" for="model-threshold">Detection Threshold</label>
                         <input type="range" class="form-input" id="model-threshold" 
                                min="0.00001" max="1.00000" step="0.00050" value="0.3">
                         <span class="slider-value" id="model-threshold-value">0.3</span>
                         <small class="form-help">Confidence level to trigger detection - lower = easier detection</small>
                     </div>
                     <div class="form-group">
-                        <label class="form-label" for="apiUrlInput">API URL</label>
+                        <label class="form-label" for="model-api-url">API URL</label>
                         <input type="url" class="form-input" id="model-api-url" 
                                placeholder="https://api.example.com/webhook" 
                                value="https://api.example.com/webhook">

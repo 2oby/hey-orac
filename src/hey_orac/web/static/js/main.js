@@ -9,22 +9,22 @@ let reconnectTimer = null;
 
 // Initialize WebSocket connection
 function initWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/socket.io/`;
+    console.log('Initializing WebSocket connection...');
     
-    socket = io(wsUrl, {
-        transports: ['websocket'],
+    socket = io({
+        transports: ['polling', 'websocket'],
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionAttempts: 10
     });
 
     socket.on('connect', () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully!');
         updateConnectionStatus(true);
         
         // Subscribe to real-time updates
         socket.emit('subscribe_updates');
+        console.log('Subscribed to real-time updates');
     });
 
     socket.on('disconnect', () => {
@@ -32,7 +32,17 @@ function initWebSocket() {
         updateConnectionStatus(false);
     });
 
+    socket.on('connect_error', (error) => {
+        console.error('WebSocket connection error:', error);
+        updateConnectionStatus(false);
+    });
+
+    socket.on('subscribed', (data) => {
+        console.log('Successfully subscribed to updates:', data);
+    });
+
     socket.on('rms_update', (data) => {
+        console.log('Received RMS update:', data.rms);
         updateVolume(data.rms);
     });
 
