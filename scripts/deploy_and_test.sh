@@ -106,7 +106,23 @@ ssh "$REMOTE_ALIAS" "\
     echo '${GREEN}✓ Docker cleanup completed${NC}'; \
     
     echo '${BLUE}🐳 Building & starting containers...${NC}'; \
-    docker-compose up --build -d; \
+    echo 'Stopping existing containers...'; \
+    docker-compose down; \
+    \
+    echo 'Checking what changed...'; \
+    CHANGED_FILES=\$(git diff --name-only HEAD~1 2>/dev/null || echo 'unknown'); \
+    echo \"Changed files: \$CHANGED_FILES\"; \
+    \
+    if echo \"\$CHANGED_FILES\" | grep -q 'requirements.txt'; then \
+        echo 'Requirements changed - full rebuild needed...'; \
+        docker-compose build --no-cache --build-arg GIT_COMMIT=$COMMIT_HASH wake-word-test; \
+    else \
+        echo 'Building with code changes (commit: $COMMIT_HASH)...'; \
+        docker-compose build --build-arg CACHEBUST=\$(date +%s) --build-arg GIT_COMMIT=$COMMIT_HASH wake-word-test; \
+    fi; \
+    \
+    echo 'Starting fresh container...'; \
+    docker-compose up -d --force-recreate wake-word-test; \
     
     echo '${BLUE}🔍 Checking container logs...${NC}'; \
     sleep 3; \

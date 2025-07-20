@@ -393,6 +393,14 @@ openwakeword.utils.download_models()
 
 def main():
     """Main function to run the wake word detection system."""
+    # Log git commit if available
+    try:
+        with open('/app/git_commit.txt', 'r') as f:
+            commit = f.read().strip()
+            logger.info(f"🔧 Running code from git commit: {commit}")
+    except:
+        logger.info("🔧 Git commit info not available")
+    
     # Parse command line arguments
     args = parse_arguments()
     

@@ -1,48 +1,78 @@
-# Current Focus: WebSocket and Volume Display Issues - RESOLVED ✅
+# Current Focus: Fix Docker Build Caching in deploy_and_test.sh
 
-## 🎉 ALL ISSUES FIXED!
+## 🚨 CRITICAL ISSUE: Container Running Old Code
 
-### Problems Fixed:
-1. ✅ **Volume bar display** - Now shows segmented LCD-style blocks instead of horizontal stripes
-2. ✅ **RMS streaming** - Continuous updates at 2Hz working properly
-3. ✅ **WebSocket stability** - Added ping/pong keepalive mechanism
+### Problem Summary
+- Container frequently runs old code after deployment
+- Changes not reflected even after restart
+- Need proper Docker build caching strategy
 
-## 📊 Testing Instructions
+## 📋 Deploy Script Requirements
 
-### Access the Web GUI
-1. Open browser to: http://192.168.8.99:7171
-2. Verify:
-   - Volume meter shows individual segments (12 blocks)
-   - Current RMS value updates continuously
-   - WebSocket stays connected (check "Connected" status)
+### MUST HAVE:
+1. **Cache Dependencies**: Don't rebuild Python packages every time
+2. **Rebuild on Code Changes**: Always rebuild when our source code changes
+3. **Fast Deployment**: Minimize build time while ensuring fresh code
 
-### Monitor Real-time Updates
-```bash
-# Watch container logs
-ssh pi "cd ~/WakeWordTest && docker-compose logs -f wake-word-test | grep -E '(RMS|connected|subscribed)'"
+### Docker Build Strategy:
+```dockerfile
+# Good caching pattern:
+COPY requirements.txt .
+RUN pip install -r requirements.txt  # This layer cached if requirements unchanged
+COPY src/ .  # This forces rebuild when code changes
 ```
 
-### Test Volume Response
-1. Make noise near the microphone
-2. Watch the volume meter segments light up
-3. Verify segments are colored: gray → amber → green → red
+### deploy_and_test.sh Improvements Needed:
+1. **Smart Cache Invalidation**:
+   - Use Docker build cache for dependencies
+   - Force rebuild of application layer when code changes
+   - Consider using `--cache-from` for better caching
 
-## 🚀 Deployment Complete
+2. **Verify Fresh Code**:
+   - Add git commit hash to container
+   - Log the commit hash on startup
+   - Verify expected vs actual commit
 
-The fixes have been deployed and tested:
-- HTML structure fixed with proper volume-segments wrapper
-- JavaScript selectors updated to find volume-segment elements
-- WebSocket keepalive with ping/pong every 10 seconds
-- Automatic re-subscription on reconnection
-- Broadcast logging reduced to every 10th update
+3. **Restart Strategy**:
+   - Stop container before pulling new code
+   - Use `docker-compose up --force-recreate` when needed
+   - Consider `docker-compose pull` before `up`
 
-## 📝 Next Steps
+## 🔧 Proposed Solution
 
-The web GUI is now fully functional with:
-- Real-time RMS level display
-- Proper segmented volume meter
-- Stable WebSocket connection
-- Wake word detection notifications
-- Model management interface
+Update deploy_and_test.sh to:
+```bash
+# After git pull on Pi
+docker-compose down
+docker-compose build --build-arg CACHEBUST=$(date +%s) wake-word-test
+docker-compose up -d
+```
 
-Ready for production use! 🎉
+Or use a smarter approach:
+```bash
+# Only rebuild if source files changed
+if git diff --name-only HEAD~1 | grep -E "(src/|requirements.txt)"; then
+  docker-compose build wake-word-test
+fi
+docker-compose up -d --force-recreate wake-word-test
+```
+
+## 🎯 Success Criteria
+✅ Code changes visible immediately after deployment
+✅ Dependencies cached (no pip install if requirements unchanged)
+✅ Build time under 2 minutes for code-only changes
+✅ Container runs exact commit that was pushed
+
+---
+
+## Previous Issue: WebSocket Streaming Not Working
+
+### Status: PARTIALLY FIXED
+- Changed from eventlet to threading mode
+- Removed eventlet from requirements.txt
+- Added better client-side debugging
+
+### Still TODO:
+- Force Docker rebuild without eventlet
+- Verify WebSocket messages reach client
+- Test RMS streaming works continuously

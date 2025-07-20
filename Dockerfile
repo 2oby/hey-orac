@@ -34,6 +34,14 @@ RUN pip install --no-cache-dir --no-deps openwakeword==0.6.0
 # Copy project files for installation
 COPY pyproject.toml .
 COPY README.md .
+
+# Add cache busting for source code changes
+ARG CACHEBUST=1
+ARG GIT_COMMIT=unknown
+RUN echo "Cache bust: ${CACHEBUST}"
+RUN echo "Git commit: ${GIT_COMMIT}" > /app/git_commit.txt
+
+# Copy source code (this layer will rebuild when CACHEBUST changes)
 COPY src/ ./src/
 
 # Install the package without dependencies
