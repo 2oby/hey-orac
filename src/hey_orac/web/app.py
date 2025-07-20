@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 socketio = SocketIO(
     cors_allowed_origins="*", 
-    async_mode='eventlet',
+    async_mode='threading',  # Changed from eventlet to threading
     ping_timeout=120,
     ping_interval=25,
     logger=True,

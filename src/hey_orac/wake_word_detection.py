@@ -660,11 +660,11 @@ def main():
         # Initialize web server in a separate thread
         logger.info("🌐 Starting web server on port 7171...")
         
-        # Initialize routes with shared resources
-        init_routes(settings_manager, shared_data, event_queue)
-        
-        # Create Flask app
+        # Create Flask app FIRST
         app = create_app()
+        
+        # Then initialize routes with shared resources
+        init_routes(settings_manager, shared_data, event_queue)
         
         # Create and start WebSocket broadcaster
         broadcaster = WebSocketBroadcaster(socketio, shared_data, event_queue)

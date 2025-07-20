@@ -18,22 +18,26 @@ function initWebSocket() {
     console.log('Initializing WebSocket connection...');
     
     socket = io({
-        transports: ['polling', 'websocket'],
+        transports: ['websocket', 'polling'], // Prefer websocket over polling
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionAttempts: 10,
         timeout: 120000,
         pingTimeout: 120000,
-        pingInterval: 25000
+        pingInterval: 25000,
+        upgrade: true, // Ensure upgrade from polling to websocket
+        rememberUpgrade: true
     });
 
     socket.on('connect', () => {
         console.log('WebSocket connected successfully!');
+        console.log('Socket ID:', socket.id);
+        console.log('Transport:', socket.io.engine.transport.name);
         updateConnectionStatus(true);
         
         // Subscribe to real-time updates
         socket.emit('subscribe_updates');
-        console.log('Subscribed to real-time updates');
+        console.log('Sent subscribe_updates event');
         
         // Send periodic pings to keep connection alive
         if (window.pingInterval) {
@@ -61,7 +65,8 @@ function initWebSocket() {
     });
 
     socket.on('subscribed', (data) => {
-        console.log('Successfully subscribed to updates:', data);
+        console.log('Received subscribed confirmation:', data);
+        console.log('Should now receive RMS updates...');
     });
     
     socket.on('pong', (data) => {
