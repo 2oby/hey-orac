@@ -713,9 +713,9 @@ def main():
             
             try:
                 # Get current enabled models from configuration
-                current_config = settings_manager.get_config()
-                models_config = current_config.models
-                system_config = current_config.system
+                with settings_manager.get_config() as current_config:
+                    models_config = current_config.models
+                    system_config = current_config.system
                 
                 enabled_models = [model for model in models_config if model.enabled]
                 if not enabled_models:
