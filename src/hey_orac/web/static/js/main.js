@@ -220,6 +220,14 @@ async function saveModelSettings() {
 // UI update functions
 function updateModelCards() {
     const grid = document.getElementById('models-grid');
+    console.log('updateModelCards called, grid element:', grid);
+    console.log('sampleModels to display:', sampleModels);
+    
+    if (!grid) {
+        console.error('models-grid element not found!');
+        return;
+    }
+    
     grid.innerHTML = '';
     
     sampleModels.forEach(model => {
@@ -257,12 +265,12 @@ function openModelSettings(modelName) {
         updateSliderDisplay('model-sensitivity', model.sensitivity);
         updateSliderDisplay('model-threshold', model.threshold);
         
-        document.getElementById('model-modal').style.display = 'flex';
+        document.getElementById('model-settings-modal').style.display = 'block';
     }
 }
 
 function closeModelSettings() {
-    document.getElementById('model-modal').style.display = 'none';
+    document.getElementById('model-settings-modal').style.display = 'none';
     currentEditingModel = null;
 }
 
@@ -382,7 +390,7 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelector('.save-btn').addEventListener('click', saveModelSettings);
     
     // Close modal on outside click
-    document.getElementById('model-modal').addEventListener('click', function(e) {
+    document.getElementById('model-settings-modal').addEventListener('click', function(e) {
         if (e.target === this) {
             closeModelSettings();
         }
