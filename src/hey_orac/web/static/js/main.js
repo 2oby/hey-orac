@@ -344,10 +344,14 @@ function updateVolumeDisplay() {
     
     // Calculate normalized volume (0-12 scale for segments)
     const normalizedVolume = Math.min(12, (currentVolume / 5000) * 12);
+    console.log('normalizedVolume:', normalizedVolume, 'from currentVolume:', currentVolume);
     
     segments.forEach((segment, index) => {
         const shouldBeActive = index < normalizedVolume;
         segment.classList.toggle('active', shouldBeActive);
+        if (index < 3) { // Only log first 3 segments to avoid spam
+            console.log(`Segment ${index}: shouldBeActive=${shouldBeActive}, hasActive=${segment.classList.contains('active')}`);
+        }
         
         // Update filter indicator
         const segmentRMS = (index / 12) * 5000;
