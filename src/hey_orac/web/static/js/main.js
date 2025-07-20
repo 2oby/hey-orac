@@ -433,15 +433,25 @@ function sliderToRMS(sliderValue) {
 }
 
 function updateSliderDisplay(sliderId, value) {
-    const display = document.getElementById(sliderId + '-value');
+    // Handle different display element ID patterns
+    let displayId;
+    if (sliderId === 'model-sensitivity' || sliderId === 'model-threshold') {
+        displayId = sliderId + '-display';  // model settings use -display suffix
+    } else {
+        displayId = sliderId + '-value';     // global settings use -value suffix
+    }
+    
+    const display = document.getElementById(displayId);
     if (display) {
         if (sliderId === 'rms-filter') {
             display.textContent = Math.round(value);
         } else if (sliderId === 'cooldown') {
             display.textContent = value.toFixed(1) + 's';
         } else {
-            display.textContent = value.toFixed(5);
+            display.textContent = value.toFixed(2);  // Show 2 decimals for model settings
         }
+    } else {
+        console.warn('Display element not found:', displayId);
     }
 }
 
