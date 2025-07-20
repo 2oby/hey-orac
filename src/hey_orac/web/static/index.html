@@ -327,65 +327,16 @@
             flex-direction: column;
             gap: 20px;
             min-height: 300px;
+            overflow: hidden;
         }
 
         .models-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            grid-template-columns: repeat(3, 1fr);
             gap: 20px;
             padding: 20px;
-            min-height: 200px;
-            justify-items: center;
-        }
-
-        /* Specific layouts for different model counts */
-        .models-grid[data-count="1"] {
-            grid-template-columns: 1fr;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-
-        .models-grid[data-count="2"] {
-            grid-template-columns: repeat(2, 1fr);
-            max-width: 600px;
-            margin: 0 auto;
-        }
-
-        .models-grid[data-count="3"] {
-            grid-template-columns: repeat(3, 1fr);
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        .models-grid[data-count="4"] {
-            grid-template-columns: repeat(4, 1fr);
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        .models-grid[data-count="5"] {
-            grid-template-columns: repeat(3, 1fr);
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        .models-grid[data-count="6"] {
-            grid-template-columns: repeat(3, 1fr);
-            max-width: 900px;
-            margin: 0 auto;
-        }
-
-        /* For 5 models, align the last 2 to the left */
-        .models-grid[data-count="5"] .model-card:nth-child(4),
-        .models-grid[data-count="5"] .model-card:nth-child(5) {
-            justify-self: start;
-        }
-
-        /* For 6 models, center the last 3 */
-        .models-grid[data-count="6"] .model-card:nth-child(4),
-        .models-grid[data-count="6"] .model-card:nth-child(5),
-        .models-grid[data-count="6"] .model-card:nth-child(6) {
-            justify-self: center;
+            overflow-y: auto;
+            max-height: calc(100vh - 400px);
         }
 
         .model-card {
