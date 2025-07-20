@@ -34,16 +34,20 @@ class WakeDetector:
     - Performance metrics
     """
     
-    def __init__(self, models: Optional[List[str]] = None, inference_framework: str = 'tflite'):
+    def __init__(self, models: Optional[List[str]] = None, inference_framework: str = 'tflite', 
+                 vad_threshold: float = 0.5, cooldown: float = 2.0):
         """
         Initialize the wake word detector.
         
         Args:
             models: List of model names to load, or None for all pre-trained
             inference_framework: 'tflite' or 'onnx'
+            vad_threshold: Voice activity detection threshold (0.0-1.0)
+            cooldown: Seconds between detections
         """
         self.inference_framework = inference_framework
         self.models_to_load = models
+        self.vad_threshold = vad_threshold
         
         # Model and thresholds
         self.model: Optional[Model] = None
@@ -55,7 +59,7 @@ class WakeDetector:
         
         # Detection state
         self.last_detections: Dict[str, float] = {}  # model -> last detection time
-        self.detection_cooldown = 2.0  # Seconds between detections
+        self.detection_cooldown = cooldown
         
         # Initialize models
         self._initialize_models()
@@ -74,11 +78,15 @@ class WakeDetector:
                 # Load specific models
                 self.model = Model(
                     wakeword_models=self.models_to_load,
-                    inference_framework=self.inference_framework
+                    inference_framework=self.inference_framework,
+                    vad_threshold=self.vad_threshold
                 )
             else:
                 # Load all pre-trained models
-                self.model = Model(inference_framework=self.inference_framework)
+                self.model = Model(
+                    inference_framework=self.inference_framework,
+                    vad_threshold=self.vad_threshold
+                )
             
             # Get loaded models
             if hasattr(self.model, 'models') and self.model.models:

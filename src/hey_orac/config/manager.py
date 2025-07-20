@@ -24,7 +24,6 @@ class ModelConfig:
     framework: str = "tflite"
     enabled: bool = True
     threshold: float = 0.3
-    sensitivity: float = 0.6
     webhook_url: str = ""
     priority: int = 1
 
@@ -51,6 +50,7 @@ class SystemConfig:
     hot_reload_interval: float = 5.0
     rms_filter: float = 50.0
     cooldown: float = 2.0
+    vad_threshold: float = 0.5
 
 
 @dataclass
@@ -83,7 +83,6 @@ class SettingsManager:
                         "framework": {"type": "string", "enum": ["tflite", "onnx"]},
                         "enabled": {"type": "boolean"},
                         "threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0},
-                        "sensitivity": {"type": "number", "minimum": 0.0, "maximum": 1.0},
                         "webhook_url": {"type": "string"},
                         "priority": {"type": "integer", "minimum": 1}
                     },
@@ -111,7 +110,8 @@ class SettingsManager:
                     "hot_reload_enabled": {"type": "boolean"},
                     "hot_reload_interval": {"type": "number", "minimum": 1.0},
                     "rms_filter": {"type": "number", "minimum": 0.0, "maximum": 5000.0},
-                    "cooldown": {"type": "number", "minimum": 0.0, "maximum": 60.0}
+                    "cooldown": {"type": "number", "minimum": 0.0, "maximum": 60.0},
+                    "vad_threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0}
                 }
             }
         },
@@ -215,7 +215,6 @@ class SettingsManager:
                     framework=model_dict.get('framework', 'tflite'),
                     enabled=model_dict.get('enabled', True),
                     threshold=model_dict.get('threshold', 0.3),
-                    sensitivity=model_dict.get('sensitivity', 0.6),
                     webhook_url=model_dict.get('webhook_url', ''),
                     priority=model_dict.get('priority', 1)
                 )
@@ -242,7 +241,8 @@ class SettingsManager:
                 hot_reload_enabled=system_dict.get('hot_reload_enabled', True),
                 hot_reload_interval=system_dict.get('hot_reload_interval', 5.0),
                 rms_filter=system_dict.get('rms_filter', 50.0),
-                cooldown=system_dict.get('cooldown', 2.0)
+                cooldown=system_dict.get('cooldown', 2.0),
+                vad_threshold=system_dict.get('vad_threshold', 0.5)
             )
             
             return HeyOracConfig(
@@ -509,7 +509,6 @@ class SettingsManager:
             framework=framework,
             enabled=False,  # Default to disabled for new models
             threshold=0.3,
-            sensitivity=0.6,
             webhook_url="",
             priority=priority
         )
@@ -607,8 +606,6 @@ class SettingsManager:
                     # Update the model with provided values
                     if 'threshold' in updates:
                         model.threshold = float(updates['threshold'])
-                    if 'sensitivity' in updates:
-                        model.sensitivity = float(updates['sensitivity'])
                     if 'webhook_url' in updates:
                         model.webhook_url = str(updates['webhook_url'])
                     if 'enabled' in updates:
@@ -656,6 +653,8 @@ class SettingsManager:
                 config.system.rms_filter = float(updates['rms_filter'])
             if 'cooldown' in updates:
                 config.system.cooldown = float(updates['cooldown'])
+            if 'vad_threshold' in updates:
+                config.system.vad_threshold = float(updates['vad_threshold'])
             
             logger.info(f"Updated system config: {updates}")
             return config

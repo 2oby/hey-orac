@@ -54,6 +54,8 @@ def update_global_config():
             settings_manager.update_system_config(rms_filter=data['rms_filter'])
         if 'cooldown' in data:
             settings_manager.update_system_config(cooldown=data['cooldown'])
+        if 'vad_threshold' in data:
+            settings_manager.update_system_config(vad_threshold=data['vad_threshold'])
         
         settings_manager.save()
         return jsonify({'status': 'success'})
@@ -85,8 +87,6 @@ def update_model_config(model_name):
         updates = {}
         if 'threshold' in data:
             updates['threshold'] = float(data['threshold'])
-        if 'sensitivity' in data:
-            updates['sensitivity'] = float(data['sensitivity'])
         if 'webhook_url' in data:
             updates['webhook_url'] = data['webhook_url']
         if 'enabled' in data:
@@ -116,7 +116,6 @@ def get_models():
                 'name': model.name,
                 'enabled': model.enabled,
                 'threshold': model.threshold,
-                'sensitivity': model.sensitivity,
                 'webhook_url': model.webhook_url,
                 'path': model.path,
                 'framework': model.framework

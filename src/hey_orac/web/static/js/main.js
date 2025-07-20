@@ -179,7 +179,6 @@ async function loadConfig() {
             const convertedModel = {
                 name: model.name,
                 active: model.enabled,
-                sensitivity: model.sensitivity,
                 threshold: model.threshold,
                 apiUrl: model.webhook_url,
                 framework: model.framework,
@@ -216,6 +215,11 @@ async function loadConfig() {
             if (cooldownSlider && config.system.cooldown !== undefined) {
                 cooldownSlider.value = config.system.cooldown;
                 updateSliderDisplay('cooldown', config.system.cooldown);
+            }
+            
+            // Store VAD threshold for global settings modal
+            if (config.system.vad_threshold !== undefined) {
+                window.currentVadThreshold = config.system.vad_threshold;
             }
         }
         
@@ -271,18 +275,16 @@ async function toggleModel(modelName) {
 async function saveModelSettings() {
     if (!currentEditingModel) return;
     
-    const sensitivity = parseFloat(document.getElementById('model-sensitivity').value);
     const threshold = parseFloat(document.getElementById('model-threshold').value);
     const apiUrl = document.getElementById('model-api-url').value;
     
-    console.log('Saving model settings:', {model: currentEditingModel, sensitivity, threshold, apiUrl});
+    console.log('Saving model settings:', {model: currentEditingModel, threshold, apiUrl});
     
     try {
         const response = await fetch(`${API_BASE}/config/models/${currentEditingModel}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                sensitivity: sensitivity,
                 threshold: threshold,
                 webhook_url: apiUrl
             })
@@ -293,7 +295,6 @@ async function saveModelSettings() {
             // Update the local model data
             const model = sampleModels.find(m => m.name === currentEditingModel);
             if (model) {
-                model.sensitivity = sensitivity;
                 model.threshold = threshold;
                 model.apiUrl = apiUrl;
                 console.log('Updated local model:', model);
@@ -358,48 +359,32 @@ function openModelSettings(modelName) {
         document.getElementById('model-name').textContent = model.name;
         
         // Set slider values and verify they were set correctly
-        const sensitivitySlider = document.getElementById('model-sensitivity');
         const thresholdSlider = document.getElementById('model-threshold');
         const apiUrlField = document.getElementById('model-api-url');
         
-        sensitivitySlider.value = model.sensitivity;
         thresholdSlider.value = model.threshold;
         apiUrlField.value = model.apiUrl || '';
         
-        console.log('Set sensitivity slider to:', model.sensitivity, 'actual value:', sensitivitySlider.value);
         console.log('Set threshold slider to:', model.threshold, 'actual value:', thresholdSlider.value);
         
-        updateSliderDisplay('model-sensitivity', model.sensitivity);
         updateSliderDisplay('model-threshold', model.threshold);
         
         // Attach event listeners for the model sliders (in case they weren't attached yet)
         console.log('Attaching event listeners to model sliders');
-        console.log('Sensitivity slider element:', sensitivitySlider);
         console.log('Threshold slider element:', thresholdSlider);
         
         // Test if sliders are the right elements
-        console.log('Sensitivity slider ID:', sensitivitySlider.id);
         console.log('Threshold slider ID:', thresholdSlider.id);
         
-        sensitivitySlider.removeEventListener('input', updateModelSensitivity);
         thresholdSlider.removeEventListener('input', updateModelThreshold);
-        sensitivitySlider.addEventListener('input', updateModelSensitivity);
         thresholdSlider.addEventListener('input', updateModelThreshold);
         console.log('Event listeners attached');
-        
-        // Test the event listeners immediately
-        sensitivitySlider.dispatchEvent(new Event('input'));
-        console.log('Dispatched test input event to sensitivity slider');
         
         document.getElementById('model-settings-modal').style.display = 'block';
     }
 }
 
 // Event handlers for model sliders
-function updateModelSensitivity() {
-    console.log('updateModelSensitivity called with value:', this.value);
-    updateSliderDisplay('model-sensitivity', this.value);
-}
 
 function updateModelThreshold() {
     console.log('updateModelThreshold called with value:', this.value);
@@ -422,11 +407,48 @@ function openGlobalSettings() {
     document.getElementById('volume-rms-filter-value').textContent = rmsValue;
     document.getElementById('volume-cooldown-value').textContent = cooldownValue;
     
+    // Set VAD threshold value
+    const vadThreshold = window.currentVadThreshold || 0.5;
+    document.getElementById('volume-vad-threshold').value = vadThreshold;
+    document.getElementById('volume-vad-threshold-value').textContent = vadThreshold.toFixed(2);
+    
     // Show modal
     document.getElementById('volume-settings-modal').classList.add('active');
 }
 
-function closeGlobalSettings() {
+async function closeGlobalSettings() {
+    // Save the settings before closing
+    const rmsValue = sliderToRMS(parseFloat(document.getElementById('volume-rms-filter').value));
+    const cooldownValue = parseFloat(document.getElementById('volume-cooldown').value);
+    const vadThreshold = parseFloat(document.getElementById('volume-vad-threshold').value);
+    
+    try {
+        const response = await fetch(`${API_BASE}/config/global`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                rms_filter: rmsValue,
+                cooldown: cooldownValue,
+                vad_threshold: vadThreshold
+            })
+        });
+        
+        if (response.ok) {
+            console.log('Global settings saved');
+            // Update the main sliders to match
+            document.getElementById('rms-filter').value = rmsToSlider(rmsValue);
+            document.getElementById('cooldown').value = cooldownValue;
+            updateSliderDisplay('rms-filter', rmsValue);
+            updateSliderDisplay('cooldown', cooldownValue);
+            // Store VAD threshold for future use
+            window.currentVadThreshold = vadThreshold;
+        } else {
+            console.error('Failed to save global settings');
+        }
+    } catch (error) {
+        console.error('Error saving global settings:', error);
+    }
+    
     document.getElementById('volume-settings-modal').classList.remove('active');
 }
 
@@ -465,7 +487,7 @@ function sliderToRMS(sliderValue) {
 function updateSliderDisplay(sliderId, value) {
     // Handle different display element ID patterns
     let displayId;
-    if (sliderId === 'model-sensitivity' || sliderId === 'model-threshold') {
+    if (sliderId === 'model-threshold') {
         displayId = sliderId + '-display';  // model settings use -display suffix
     } else if (sliderId.startsWith('volume-')) {
         displayId = sliderId + '-value';     // volume modal elements use -value suffix
@@ -567,6 +589,12 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('cooldown').value = this.value;
         updateSliderDisplay('cooldown', this.value);
         saveGlobalSettings();
+    });
+    
+    document.getElementById('volume-vad-threshold').addEventListener('input', function() {
+        updateSliderDisplay('volume-vad-threshold', this.value);
+        // Store for global use
+        window.currentVadThreshold = parseFloat(this.value);
     });
 
     // Setup event listeners for sliders

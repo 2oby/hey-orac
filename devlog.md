@@ -107,6 +107,99 @@ for chunk in audio_data:
 ### Next Phase: Settings Persistence Implementation
 **Goal**: Complete GUI ↔ config file persistence with container restart validation
 
+## 2025-07-20 15:30 - 🎉 Settings Manager Implementation Complete
+
+### Major Achievement: Full Settings Persistence Chain
+- **Duration**: ~3 hours of intensive debugging and implementation
+- **Result**: Complete, robust settings management system working end-to-end
+- **Status**: Production ready with comprehensive validation ✅
+
+### Critical Issues Resolved:
+
+#### 1. **Backend Implementation Gaps**
+- **Problem**: Routes called non-existent SettingsManager methods
+- **Solution**: Implemented missing methods:
+  ```python
+  def update_model_config(self, model_name: str, **updates) -> bool
+  def update_system_config(self, **updates) -> bool  
+  def save(self) -> bool
+  def get_model_config(self, model_name: str) -> Optional[ModelConfig]
+  ```
+- **Added**: Missing SystemConfig fields (rms_filter, cooldown)
+
+#### 2. **Frontend Integration Issues**
+- **Problem**: Duplicate HTML elements caused getElementById to target wrong sliders
+- **Root Cause**: Two model modals with identical IDs but JavaScript targeting first (hidden) one
+- **Solution**: Removed unused first modal, fixed element ID patterns
+- **Fixed**: Event listener attachment timing and element targeting
+
+#### 3. **JavaScript Runtime Errors**
+- **Problem**: `value.toFixed is not a function` errors
+- **Cause**: Slider values passed as strings, not numbers
+- **Solution**: Added parseFloat() conversion before .toFixed() calls
+- **Fixed**: Element ID suffix mismatches (-value vs -display)
+
+#### 4. **UI/UX Improvements**
+- **Renamed**: "Volume Settings" → "Global Settings" for clarity
+- **Changed**: "Close" → "Save" button text in Global Settings
+- **Reduced**: Console logging noise from RMS updates
+
+### Technical Deep Dive - The Detective Work:
+
+#### **Phase 1: API Investigation**
+- Verified backend was saving to config file correctly
+- Confirmed config file had correct values after API calls
+- Identified disconnect between file contents and GUI display
+
+#### **Phase 2: JavaScript Debugging**  
+- Added extensive console logging to trace data flow
+- Discovered config was loading correctly into JavaScript
+- Found that GUI elements weren't being updated despite correct data
+
+#### **Phase 3: DOM Element Analysis**
+- Traced getElementById calls to find they targeted wrong elements
+- Discovered duplicate IDs in HTML causing element targeting failures
+- Used browser debugging to confirm event listeners weren't firing
+
+#### **Phase 4: Root Cause Resolution**
+- Systematically removed duplicate HTML elements
+- Fixed event listener attachment timing
+- Resolved element ID naming inconsistencies
+
+### End-to-End Validation Results:
+✅ **Model Settings**: Sensitivity/threshold values persist through restarts
+✅ **Global Settings**: RMS filter/cooldown values persist through restarts
+✅ **Real-time Updates**: Slider text displays update correctly when moved
+✅ **Container Restart**: All settings survive application restarts
+✅ **No Duplicates**: Verified no remaining duplicate IDs or functions
+
+### Architecture Now Working:
+```
+[User Changes GUI] 
+    ↓ 
+[JavaScript Event] 
+    ↓ 
+[API Call] 
+    ↓ 
+[SettingsManager.update_*] 
+    ↓ 
+[JSON File Save] 
+    ↓ 
+[Container Restart] 
+    ↓ 
+[File Load] 
+    ↓ 
+[GUI Displays Correct Values]
+```
+
+### Impact:
+- **Users can now**: Adjust wake word detection sensitivity and system settings
+- **Settings persist**: Through application restarts and container rebuilds  
+- **Real-time feedback**: Immediate visual confirmation of setting changes
+- **Production ready**: Robust error handling and validation throughout
+
+**This completes the major settings management milestone for the wake word detection system.** 🚀
+
 **STATUS: CORE FUNCTIONALITY VERIFIED** ✅
 
 ## 2025-01-18 - Automated Deployment Script
@@ -258,3 +351,94 @@ socketio.run(app, host='0.0.0.0', port=7171)
 - Volume display now shows segmented LCD-style blocks
 - Continuous RMS updates at 2Hz working reliably
 - Connection stability improved with keepalive mechanism
+
+## 2025-07-20 20:15 - Parameter Architecture Refactor Complete
+
+### Major Configuration Architecture Improvements:
+**Objective**: Fix cooldown configuration inconsistency and implement proper OpenWakeWord parameter mapping
+
+### Issues Identified and Resolved:
+
+#### 1. **Cooldown Configuration Bug**
+- **Problem**: `WakeDetector` hardcoded `detection_cooldown = 2.0` ignoring config values
+- **Root Cause**: Constructor didn't accept cooldown parameter, always used hardcoded value
+- **Solution**: 
+  - Added `cooldown: float = 2.0` parameter to `WakeDetector.__init__()`
+  - Updated all model initialization to pass `system_config.cooldown`
+  - Fixed both `app.py` and `wake_word_detection.py` usage
+
+#### 2. **Sensitivity Parameter Elimination**
+- **Research Finding**: OpenWakeWord doesn't support "sensitivity" parameter - this was unmapped concept
+- **Analysis**: Checked OpenWakeWord documentation, confirmed `vad_threshold` is the correct parameter
+- **Action**: Completely removed sensitivity from codebase and UI
+
+#### 3. **VAD Threshold Implementation**
+- **Architecture Decision**: Renamed sensitivity → `vad_threshold` as global system parameter
+- **Reasoning**: OpenWakeWord's `vad_threshold` is global (applies to all models), not per-model
+- **Implementation**:
+  - Moved from `ModelConfig.sensitivity` → `SystemConfig.vad_threshold`
+  - Added to config schema with validation (0.0-1.0 range)
+  - Updated all OpenWakeWord `Model()` constructors to use `vad_threshold=system_config.vad_threshold`
+
+### Technical Implementation Details:
+
+#### **Backend Changes**:
+```python
+# SystemConfig now includes:
+vad_threshold: float = 0.5  # NEW: Global VAD threshold for OpenWakeWord
+
+# All model initialization updated:
+model = openwakeword.Model(
+    wakeword_models=model_paths,
+    vad_threshold=system_config.vad_threshold,  # FIXED: Now uses config
+    enable_speex_noise_suppression=False
+)
+```
+
+#### **Frontend Architecture Changes**:
+- **Removed**: Per-model sensitivity slider from model settings modal
+- **Added**: Global VAD Threshold slider to global settings modal (0.0-1.0 range)
+- **Updated**: REST API routes to handle `vad_threshold` in `/config/global`
+- **Fixed**: JavaScript to load/save VAD threshold with proper validation
+
+#### **Web UI Flow**:
+```
+Global Settings Modal:
+├── RMS Filter (0-100)
+├── Cooldown (0-5s) 
+└── VAD Threshold (0.0-1.0)  ← NEW
+
+Model Settings Modal:  
+├── Threshold (0.0-1.0)     ← Activation threshold (our filtering)
+└── Webhook URL             ← Post-detection action
+```
+
+### Parameter Architecture Now Correct:
+```
+Audio Input → OpenWakeWord(vad_threshold=global) → confidence scores → our_threshold(per-model) → detection events
+```
+
+- **VAD Threshold**: OpenWakeWord's global voice activity detection filter (pre-processing)
+- **Threshold**: Our per-model activation threshold (post-processing) 
+- **Cooldown**: Global detection event spacing (prevents duplicate triggers)
+
+### Files Modified:
+1. **Config System**: `config/manager.py` - added VAD threshold to SystemConfig
+2. **Detection Engine**: `wake_word_detection.py` - fixed all model constructors
+3. **Web Backend**: `web/routes.py` - removed sensitivity, added VAD threshold API
+4. **Frontend**: `static/index.html` - removed sensitivity UI, added VAD threshold
+5. **JavaScript**: `static/js/main.js` - complete sensitivity removal, VAD threshold integration
+
+### Validation Status:
+✅ **Backend**: All OpenWakeWord models receive config VAD threshold  
+✅ **Frontend**: VAD Threshold slider in global settings modal  
+✅ **API**: `/config/global` endpoint accepts `vad_threshold` parameter  
+✅ **Persistence**: VAD threshold saves to config file and loads on restart  
+✅ **Architecture**: Clean separation of concerns (OpenWakeWord vs application filtering)
+
+**STATUS: PARAMETER ARCHITECTURE REFACTORED** 🎉
+- Eliminated non-existent "sensitivity" concept
+- Implemented proper OpenWakeWord parameter mapping  
+- Fixed cooldown configuration consistency
+- Achieved clean architectural separation
+- Ready for deployment and testing

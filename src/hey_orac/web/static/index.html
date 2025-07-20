@@ -479,22 +479,6 @@
             box-shadow: 0 0 10px currentColor;
         }
 
-        .model-sensitivity {
-            margin-top: 15px;
-        }
-
-        .model-sensitivity .slider {
-            width: 100%;
-        }
-
-        .model-sensitivity .slider-label {
-            font-size: 0.9em;
-            margin-bottom: 5px;
-        }
-
-        .model-sensitivity .slider-value {
-            font-size: 0.8em;
-        }
 
         .status-bar {
             position: fixed;
@@ -815,11 +799,6 @@
             </div>
             <div class="modal-body" style="padding: 20px;">
                 <div class="setting-group" style="margin-bottom: 20px;">
-                    <label for="model-sensitivity" style="display: block; margin-bottom: 10px; color: #00ff41;">Sensitivity</label>
-                    <input type="range" id="model-sensitivity" min="0" max="1" step="0.01" value="0.6" style="width: 100%;">
-                    <span class="value-display" id="model-sensitivity-display" style="color: #00ff41;">0.6</span>
-                </div>
-                <div class="setting-group" style="margin-bottom: 20px;">
                     <label for="model-threshold" style="display: block; margin-bottom: 10px; color: #00ff41;">Threshold</label>
                     <input type="range" id="model-threshold" min="0" max="1" step="0.01" value="0.3" style="width: 100%;">
                     <span class="value-display" id="model-threshold-display" style="color: #00ff41;">0.3</span>
@@ -852,6 +831,11 @@
                     <label class="form-label" for="volume-cooldown">Cooldown (s)</label>
                     <input type="range" class="form-input" id="volume-cooldown" min="0" max="5" step="0.1" value="1.5">
                     <span class="slider-value" id="volume-cooldown-value">1.5s</span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="volume-vad-threshold">VAD Threshold</label>
+                    <input type="range" class="form-input" id="volume-vad-threshold" min="0" max="1" step="0.01" value="0.5">
+                    <span class="slider-value" id="volume-vad-threshold-value">0.5</span>
                 </div>
             </div>
             <div class="modal-actions">

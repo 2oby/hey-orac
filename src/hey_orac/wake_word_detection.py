@@ -479,7 +479,7 @@ def main():
                 try:
                     model = openwakeword.Model(
                         wakeword_models=[custom_model_path],
-                        vad_threshold=0.5,
+                        vad_threshold=system_config.vad_threshold,
                         enable_speex_noise_suppression=False
                     )
                     
@@ -543,7 +543,8 @@ def main():
             # Initialize model for recording (needed for real-time detection)
             logger.info("Creating Model for recording with real-time detection...")
             model = openwakeword.Model(
-                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft']
+                wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
+                vad_threshold=system_config.vad_threshold
             )
             
             success, metadata = record_test_audio(audio_manager, usb_mic, model, settings_manager, audio_filename)
@@ -603,7 +604,7 @@ def main():
             
             model = openwakeword.Model(
                 wakeword_models=model_paths,
-                vad_threshold=0.5,
+                vad_threshold=system_config.vad_threshold,
                 enable_speex_noise_suppression=False
             )
             
