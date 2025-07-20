@@ -7,6 +7,12 @@ let currentVolume = 0;
 let volumeHistory = [];
 let reconnectTimer = null;
 
+// Test function for manual RMS update
+function testRMSUpdate(testValue = 100) {
+    console.log('Testing RMS update with value:', testValue);
+    updateVolume(testValue);
+}
+
 // Initialize WebSocket connection
 function initWebSocket() {
     console.log('Initializing WebSocket connection...');
