@@ -559,30 +559,50 @@ def main():
             # Get enabled models from configuration
             enabled_models = [model for model in models_config if model.enabled]
             if not enabled_models:
-                logger.error("❌ No enabled models found in configuration")
-                raise RuntimeError("No enabled models configured")
+                logger.warning("⚠️  No enabled models found in configuration")
+                # Auto-enable the first model if none are enabled
+                if models_config:
+                    first_model = models_config[0]
+                    logger.info(f"Auto-enabling first available model: {first_model.name}")
+                    settings_manager.update_model_config(first_model.name, enabled=True)
+                    settings_manager.save()
+                    # Refresh config
+                    models_config = settings_manager.get_models_config()
+                    enabled_models = [model for model in models_config if model.enabled]
+                else:
+                    raise ValueError("No models available in configuration")
             
-            # Use first enabled model (can be extended for multiple models later)
-            primary_model = enabled_models[0]
-            logger.info(f"Creating Model with primary model: {primary_model.name} ({primary_model.path})")
+            # Load ALL enabled models
+            model_paths = []
+            active_model_configs = {}
+            for model_cfg in enabled_models:
+                if os.path.exists(model_cfg.path):
+                    logger.info(f"✅ Loading model: {model_cfg.name} from {model_cfg.path}")
+                    model_paths.append(model_cfg.path)
+                    active_model_configs[model_cfg.name] = model_cfg
+                else:
+                    logger.error(f"❌ Model file NOT found: {model_cfg.path}")
             
-            # Check if model file exists
-            if os.path.exists(primary_model.path):
-                logger.info(f"✅ Model file found at: {primary_model.path}")
-            else:
-                logger.error(f"❌ Model file NOT found at: {primary_model.path}")
-                raise FileNotFoundError(f"Model not found: {primary_model.path}")
+            if not model_paths:
+                raise ValueError("No valid model files found")
+            
+            logger.info(f"Creating OpenWakeWord with {len(model_paths)} models: {list(active_model_configs.keys())}")
             
             model = openwakeword.Model(
-                wakeword_models=[primary_model.path],
+                wakeword_models=model_paths,
                 vad_threshold=0.5,
                 enable_speex_noise_suppression=False
             )
             
-            # Store model configs for later use (thresholds, webhooks, etc.)
-            active_model_configs = {primary_model.name: primary_model}
+            # Update shared data with loaded models info
+            shared_data['loaded_models'] = list(active_model_configs.keys())
+            shared_data['models_config'] = {name: {
+                'enabled': True,
+                'threshold': cfg.threshold,
+                'sensitivity': cfg.sensitivity,
+                'webhook_url': cfg.webhook_url
+            } for name, cfg in active_model_configs.items()}
             
-            logger.info(f"Using model '{primary_model.name}' with threshold: {primary_model.threshold}, sensitivity: {primary_model.sensitivity}")
             print("DEBUG: Model created successfully", flush=True)
             logger.info("OpenWakeWord model initialized")
             
@@ -741,7 +761,22 @@ def main():
                     best_model = wakeword
             
             # Get threshold from the active model configuration
-            detection_threshold = primary_model.threshold
+            # Map OpenWakeWord model name to our config name
+            config_name = None
+            for name, config in active_model_configs.items():
+                # OpenWakeWord uses the base filename as model name
+                if os.path.basename(config.path).replace('.tflite', '').replace('.onnx', '') == best_model:
+                    config_name = name
+                    break
+            
+            if config_name and config_name in active_model_configs:
+                model_config = active_model_configs[config_name]
+                detection_threshold = model_config.threshold
+            else:
+                # Fallback threshold if model not found in config
+                detection_threshold = 0.3
+                logger.warning(f"Model '{best_model}' not found in active configs, using default threshold")
+            
             if max_confidence >= detection_threshold:
                 logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
                 logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
@@ -749,9 +784,10 @@ def main():
                 # Add detection event to queue for web GUI
                 detection_event = {
                     'type': 'detection',
-                    'model': best_model,
+                    'model': config_name or best_model,
                     'confidence': float(max_confidence),
-                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                    'timestamp': datetime.utcnow().isoformat() + 'Z',
+                    'threshold': detection_threshold
                 }
                 
                 # Update shared data
@@ -764,7 +800,7 @@ def main():
                     pass  # Queue full, skip
                 
                 # Call webhook if configured
-                if primary_model.webhook_url:
+                if config_name and active_model_configs[config_name].webhook_url:
                     try:
                         # Prepare webhook payload
                         webhook_data = {
@@ -772,14 +808,14 @@ def main():
                             "confidence": max_confidence,
                             "threshold": detection_threshold,
                             "timestamp": time.time(),
-                            "model_name": primary_model.name,
+                            "model_name": config_name,
                             "all_scores": prediction
                         }
                         
                         # Make webhook call
-                        logger.info(f"📞 Calling webhook: {primary_model.webhook_url}")
+                        logger.info(f"📞 Calling webhook: {active_model_configs[config_name].webhook_url}")
                         response = requests.post(
-                            primary_model.webhook_url,
+                            active_model_configs[config_name].webhook_url,
                             json=webhook_data,
                             timeout=5  # 5 second timeout
                         )

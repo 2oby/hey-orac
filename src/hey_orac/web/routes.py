@@ -99,8 +99,8 @@ def update_model_config(model_name):
         return jsonify({'error': str(e)}), 500
 
 
-@api_bp.route('/custom-models', methods=['GET'])
-def get_custom_models():
+@api_bp.route('/models', methods=['GET'])
+def get_models():
     """Get list of all available models."""
     try:
         models = settings_manager.get_models_config()
@@ -111,12 +111,20 @@ def get_custom_models():
                 'enabled': model.enabled,
                 'threshold': model.threshold,
                 'sensitivity': model.sensitivity,
-                'webhook_url': model.webhook_url
+                'webhook_url': model.webhook_url,
+                'path': model.path,
+                'framework': model.framework
             })
         return jsonify({'models': result})
     except Exception as e:
         logger.error(f"Error getting models: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/custom-models', methods=['GET'])
+def get_custom_models():
+    """Get list of all available models (legacy endpoint)."""
+    return get_models()
 
 
 @api_bp.route('/custom-models/<model_name>/activate', methods=['POST'])

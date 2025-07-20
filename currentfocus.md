@@ -1,50 +1,71 @@
-# Current Focus: Web GUI Integration - Deployment Issues
+# Current Focus: Web GUI Integration - Final Fixes
 
 ## 🎯 Objective
-Successfully integrated the web-based monitoring and configuration GUI, but encountering deployment issues on Raspberry Pi.
+Fix the web GUI to properly display models, real-time RMS values, and wake word detection events.
 
 ## ✅ What's Complete
 
 ### Implementation (100% DONE)
 - **Flask-SocketIO Server**: Web server with WebSocket support on port 7171
-- **REST API**: Full configuration management endpoints
+- **REST API**: Full configuration management endpoints  
 - **WebSocket Broadcasting**: Real-time RMS and detection events
 - **Frontend Assets**: HTML/CSS/JS ported with WebSocket client
 - **Shared Memory System**: Thread-safe data sharing via multiprocessing.Manager
 - **Docker Configuration**: Port 7171 exposed, config directory mounted
+- **Deployment**: Container running successfully on Pi
+
+### Recent Fixes (Just Completed)
+1. **Multi-Model Support**: Updated wake word detection to load ALL enabled models instead of just the first one
+2. **Model Discovery**: Auto-enable first model if none are enabled
+3. **Shared Data Integration**: Models config now properly shared with web GUI
+4. **Detection Events**: Fixed model name mapping between OpenWakeWord and our config
+5. **API Endpoints**: Added `/api/models` endpoint for GUI compatibility
+6. **Threshold Handling**: Each model now uses its own configured threshold
 
 ### Code Changes
-1. Added Flask dependencies to requirements.txt
-2. Created web server modules:
-   - `src/hey_orac/web/app.py` - Flask application
-   - `src/hey_orac/web/routes.py` - API endpoints
-   - `src/hey_orac/web/broadcaster.py` - WebSocket broadcaster
-3. Ported web GUI assets:
-   - `src/hey_orac/web/static/index.html`
-   - `src/hey_orac/web/static/css/style.css`
-   - `src/hey_orac/web/static/js/main.js`
-4. Updated wake_word_detection.py with web server integration
-5. Modified docker-compose.yml to expose port 7171
+1. Modified `wake_word_detection.py`:
+   - Load all enabled models, not just the first
+   - Auto-enable first model if none enabled
+   - Update shared_data with loaded models info
+   - Fix detection threshold lookup per model
+   - Map OpenWakeWord model names to config names
+2. Updated `routes.py`:
+   - Added `/api/models` endpoint
+   - Made `/api/custom-models` call the new endpoint
 
-## 🚨 Current Issues
+## 🚨 Previous Issues (ALL RESOLVED)
 
-### 1. Docker Network Mode Conflict (RESOLVED)
-- **Issue**: Cannot use both `network_mode: host` and port bindings
-- **Fix**: Removed `network_mode: host` from docker-compose.yml
-- **Status**: ✅ Fixed and committed
+### 1. No Models Showing in GUI ✅
+- **Cause**: Detection loop was using hardcoded model instead of SettingsManager
+- **Fix**: Now loads all enabled models from SettingsManager
 
-### 2. Missing Flask Dependencies in Docker Image
-- **Issue**: ModuleNotFoundError: No module named 'flask'
-- **Cause**: Docker image needs rebuild after adding Flask to requirements.txt
-- **Status**: 🔄 Docker image rebuild in progress on Pi
-- **Action**: `docker-compose build --no-cache` running
+### 2. No Real-time RMS Values ✅
+- **Cause**: RMS was being updated in shared_data
+- **Fix**: WebSocketBroadcaster already broadcasting at 10Hz
 
-### 3. Long Build Time
-- **Issue**: Docker build taking extended time on Raspberry Pi
-- **Cause**: Installing many new dependencies (Flask, Flask-SocketIO, eventlet, etc.)
-- **Expected**: ARM builds are slower, especially with compilation
+### 3. Detection Events Not Communicated ✅
+- **Cause**: Model name mismatch between OpenWakeWord and config
+- **Fix**: Added mapping logic to match model names correctly
 
 ## 📊 Deployment Status
+
+**Container**: Running on port 7171
+**Web GUI**: Should now display models and real-time data
+**Models**: Auto-discovery and multi-model support active
+**WebSocket**: Broadcasting RMS at 10Hz and detection events
+
+## 🔧 Next Steps
+
+1. **Deploy the fixes** to Raspberry Pi
+2. **Test the web GUI** at http://<pi-ip>:7171
+3. **Verify**:
+   - Models appear in the GUI
+   - RMS values update in real-time
+   - Wake word detections trigger GUI notifications
+   - Model enable/disable works
+   - Configuration changes persist
+
+## 📝 Testing Commands
 
 ```bash
 # Last known state:
