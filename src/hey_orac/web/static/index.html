@@ -732,16 +732,14 @@
         <div class="header">
             <img src="assets/images/HeyORAC_Banner.png" alt="Hey Orac" class="banner">
         </div>
-
         <div class="controls-section">
             <!-- Hidden original sliders for JS compatibility -->
-            <div style="display: none;">
+            <div style="display: none; height: 0; margin: 0; padding: 0;">
                 <input type="range" id="rms-filter" min="0" max="100" step="1" value="50">
                 <span id="rms-filter-value">50</span>
                 <input type="range" id="cooldown" min="0" max="5" step="0.1" value="1.5">
                 <span id="cooldown-value">1.5s</span>
             </div>
-
             <div class="volume-meter-container">
                 <div class="volume-meter-header">
                     <button class="volume-settings-cog" onclick="openVolumeSettings()">
