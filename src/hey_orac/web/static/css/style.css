@@ -50,12 +50,6 @@ body::before {
             max-width: 50%;
             height: auto;
             margin-bottom: 20px;
-            filter: drop-shadow(0 0 20px rgba(0, 255, 65, 0.3));
-            transition: all 0.3s ease;
-        }
-
-        .banner:hover {
-            filter: drop-shadow(0 0 30px rgba(0, 255, 65, 0.5));
         }
 
         .title {
@@ -164,7 +158,7 @@ body::before {
 
 .volume-segment {
     flex: 1;
-    background: #1a1a1a;
+    background: #000000;
     border: 1px solid #333;
     border-radius: 2px;
     transition: all 0.1s ease;
@@ -175,21 +169,21 @@ body::before {
     box-shadow: 0 0 10px currentColor;
 }
 
-.volume-segment.amber {
-    background: linear-gradient(145deg, #cc7000, #b35a00);
-    border-color: #cc7000;
-    color: #cc7000;
-    box-shadow: 0 0 10px rgba(204, 112, 0, 0.6);
+.volume-segment.active.amber {
+    background: linear-gradient(145deg, #90EE90, #7FDD7F);
+    border-color: #90EE90;
+    color: #90EE90;
+    box-shadow: 0 0 10px rgba(144, 238, 144, 0.6);
 }
 
-.volume-segment.green {
-    background: linear-gradient(145deg, #00ff41, #00cc33);
-    border-color: #00ff41;
-    color: #00ff41;
-    box-shadow: 0 0 20px rgba(0, 255, 65, 0.8);
+.volume-segment.active.green {
+    background: linear-gradient(145deg, #90EE90, #7FDD7F);
+    border-color: #90EE90;
+    color: #90EE90;
+    box-shadow: 0 0 20px rgba(144, 238, 144, 0.8);
 }
 
-.volume-segment.red {
+.volume-segment.active.red {
     background: linear-gradient(145deg, #ff0066, #cc0052);
     border-color: #ff0066;
     color: #ff0066;
