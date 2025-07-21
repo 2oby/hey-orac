@@ -27,9 +27,6 @@ services:
       # Mount config directory for settings.json
       - ./config:/app/config
     
-    # Run as pi user to match host permissions
-    user: "1000:1000"
-    
     # Environment variables
     environment:
       - PYTHONUNBUFFERED=1

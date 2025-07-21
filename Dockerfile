@@ -87,7 +87,10 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user with specific UID/GID to match host pi user
-RUN groupadd -g 1000 appuser && useradd -u 1000 -g 1000 -m appuser
+# Also add to audio group for device access
+RUN groupadd -g 1000 appuser && \
+    useradd -u 1000 -g 1000 -m appuser && \
+    usermod -a -G audio appuser
 
 # Copy from builder
 WORKDIR /app
