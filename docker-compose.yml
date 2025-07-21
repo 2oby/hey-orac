@@ -21,7 +21,7 @@ services:
       - ./recordings:/app/recordings
       - /tmp:/tmp
       # Cache downloaded OpenWakeWord models
-      - ./model_cache:/root/.local/share/openwakeword
+      - ./model_cache:/home/appuser/.local/share/openwakeword
       # Mount custom TFLite models
       - ./models:/app/models
       # Mount config directory for settings.json

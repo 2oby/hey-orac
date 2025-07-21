@@ -86,15 +86,25 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user
+RUN groupadd -r appuser && useradd -r -g appuser -m appuser
+
 # Copy from builder
 WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 COPY --from=builder /app /app
 
+# Create directories and set ownership
+RUN mkdir -p /app/logs /app/recordings /app/config && \
+    chown -R appuser:appuser /app
+
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 ENV ALSA_CARD=1
+
+# Switch to non-root user
+USER appuser
 
 # Default command - use the installed CLI
 CMD ["hey-orac", "run"]
