@@ -3,7 +3,7 @@
   "models": [
     {
       "name": "hey_computer",
-      "path": "/app/models/hey_computer.tflite",
+      "path": "/app/models/openwakeword/Hey_computer.tflite",
       "framework": "tflite",
       "enabled": true,
       "threshold": 0.5,
