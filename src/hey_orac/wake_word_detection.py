@@ -864,109 +864,199 @@ def main():
                 logger.error(f"Error processing audio data: {e}")
                 continue
 
-            # Enhanced wake word detection logic like old working code
-            max_confidence = 0.0
-            best_model = None
+            # Get system config for multi-trigger setting
+            with settings_manager.get_config() as config:
+                multi_trigger_enabled = config.system.multi_trigger
             
-            # Find the highest confidence score
-            for wakeword, score in prediction.items():
-                if score > max_confidence:
-                    max_confidence = score
-                    best_model = wakeword
-            
-            # Get threshold from the active model configuration
-            # Map OpenWakeWord model name to our config name
-            config_name = None
-            
-            # First check the model name mapping
-            if best_model in model_name_mapping:
-                config_name = model_name_mapping[best_model]
-            # Then try direct match (in case config name matches prediction key)
-            elif best_model in active_model_configs:
-                config_name = best_model
-            else:
-                # Log unmapped model for debugging
-                if best_model is not None:
-                    logger.warning(f"Could not map prediction key '{best_model}' to config name")
-                    logger.debug(f"Available mappings: {model_name_mapping}")
-                    logger.debug(f"Active configs: {list(active_model_configs.keys())}")
-            
-            if config_name and config_name in active_model_configs:
-                model_config = active_model_configs[config_name]
-                detection_threshold = model_config.threshold
-            else:
-                # Fallback threshold if model not found in config
-                detection_threshold = 0.3
-                if best_model is not None:
-                    logger.warning(f"Model '{best_model}' not found in active configs, using default threshold")
-            
-            if max_confidence >= detection_threshold:
-                logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
-                logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+            if multi_trigger_enabled:
+                # MULTI-TRIGGER MODE: Check each model independently
+                triggered_models = []
                 
-                # Add detection event to queue for web GUI
-                detection_event = {
-                    'type': 'detection',
-                    'model': config_name or best_model,
-                    'confidence': float(max_confidence),
-                    'timestamp': datetime.utcnow().isoformat() + 'Z',
-                    'threshold': detection_threshold
-                }
+                for wakeword, score in prediction.items():
+                    # Map OpenWakeWord model name to our config name
+                    config_name = None
+                    if wakeword in model_name_mapping:
+                        config_name = model_name_mapping[wakeword]
+                    elif wakeword in active_model_configs:
+                        config_name = wakeword
+                    
+                    if config_name and config_name in active_model_configs:
+                        model_config = active_model_configs[config_name]
+                        detection_threshold = model_config.threshold
+                        
+                        if score >= detection_threshold:
+                            triggered_models.append({
+                                'wakeword': wakeword,
+                                'config_name': config_name,
+                                'confidence': score,
+                                'threshold': detection_threshold,
+                                'model_config': model_config
+                            })
                 
-                # Update shared data
-                shared_data['last_detection'] = detection_event
-                
-                # Add to event queue if not full
-                try:
-                    event_queue.put_nowait(detection_event)
-                except:
-                    pass  # Queue full, skip
-                
-                # Call webhook if configured
-                if config_name and active_model_configs[config_name].webhook_url:
+                # Process each triggered model
+                for trigger_info in triggered_models:
+                    logger.info(f"🎯 WAKE WORD DETECTED (MULTI-TRIGGER)! Confidence: {trigger_info['confidence']:.6f} (threshold: {trigger_info['threshold']:.6f}) - Source: {trigger_info['wakeword']}")
+                    logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+                    
+                    # Create detection event for each triggered model
+                    detection_event = {
+                        'type': 'detection',
+                        'model': trigger_info['config_name'],
+                        'confidence': float(trigger_info['confidence']),
+                        'timestamp': datetime.utcnow().isoformat() + 'Z',
+                        'threshold': trigger_info['threshold'],
+                        'multi_trigger': True
+                    }
+                    
+                    # Update shared data with latest detection
+                    shared_data['last_detection'] = detection_event
+                    
+                    # Add to event queue
                     try:
-                        # Prepare webhook payload
-                        webhook_data = {
-                            "wake_word": best_model,
-                            "confidence": max_confidence,
-                            "threshold": detection_threshold,
-                            "timestamp": time.time(),
-                            "model_name": config_name,
-                            "all_scores": prediction
-                        }
-                        
-                        # Make webhook call
-                        logger.info(f"📞 Calling webhook: {active_model_configs[config_name].webhook_url}")
-                        response = requests.post(
-                            active_model_configs[config_name].webhook_url,
-                            json=webhook_data,
-                            timeout=5  # 5 second timeout
-                        )
-                        
-                        if response.status_code == 200:
-                            logger.info(f"✅ Webhook call successful")
-                        else:
-                            logger.warning(f"⚠️ Webhook returned status code: {response.status_code}")
+                        event_queue.put_nowait(detection_event)
+                    except:
+                        pass  # Queue full, skip
+                    
+                    # Call webhook if configured
+                    if trigger_info['model_config'].webhook_url:
+                        try:
+                            # Prepare webhook payload
+                            webhook_data = {
+                                "wake_word": trigger_info['wakeword'],
+                                "confidence": trigger_info['confidence'],
+                                "threshold": trigger_info['threshold'],
+                                "timestamp": time.time(),
+                                "model_name": trigger_info['config_name'],
+                                "all_scores": prediction,
+                                "multi_trigger": True
+                            }
                             
-                    except requests.exceptions.Timeout:
-                        logger.error("❌ Webhook call timed out")
-                    except requests.exceptions.RequestException as e:
-                        logger.error(f"❌ Webhook call failed: {e}")
-                    except Exception as e:
-                        logger.error(f"❌ Unexpected error during webhook call: {e}")
+                            # Make webhook call
+                            logger.info(f"📞 Calling webhook (multi-trigger): {trigger_info['model_config'].webhook_url}")
+                            response = requests.post(
+                                trigger_info['model_config'].webhook_url,
+                                json=webhook_data,
+                                timeout=5  # 5 second timeout
+                            )
+                            
+                            if response.status_code == 200:
+                                logger.info(f"✅ Webhook call successful (multi-trigger)")
+                            else:
+                                logger.warning(f"⚠️ Webhook returned status code: {response.status_code}")
+                                
+                        except requests.exceptions.Timeout:
+                            logger.error("❌ Webhook call timed out (multi-trigger)")
+                        except requests.exceptions.RequestException as e:
+                            logger.error(f"❌ Webhook call failed (multi-trigger): {e}")
+                        except Exception as e:
+                            logger.error(f"❌ Unexpected error during webhook call (multi-trigger): {e}")
+            
             else:
-                # Enhanced debugging - log more frequent confidence updates
-                if chunk_count % 50 == 0:  # Every 50 chunks instead of 100
-                    logger.debug(f"🎯 Best confidence: {max_confidence:.6f} from '{best_model}' (threshold: {detection_threshold:.6f})")
-                    logger.debug(f"   All scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+                # SINGLE-TRIGGER MODE: Original "winner takes all" behavior
+                max_confidence = 0.0
+                best_model = None
                 
-                # Also check for moderate confidence levels for debugging
-                if max_confidence > 0.1:
-                    logger.info(f"🔍 Moderate confidence detected: {best_model} = {max_confidence:.6f}")
-                elif max_confidence > 0.05:
-                    logger.debug(f"🔍 Weak signal: {best_model} = {max_confidence:.6f}")
-                elif max_confidence > 0.01:
-                    logger.debug(f"🔍 Very weak signal: {best_model} = {max_confidence:.6f}")
+                # Find the highest confidence score
+                for wakeword, score in prediction.items():
+                    if score > max_confidence:
+                        max_confidence = score
+                        best_model = wakeword
+                
+                # Get threshold from the active model configuration
+                # Map OpenWakeWord model name to our config name
+                config_name = None
+                
+                # First check the model name mapping
+                if best_model in model_name_mapping:
+                    config_name = model_name_mapping[best_model]
+                # Then try direct match (in case config name matches prediction key)
+                elif best_model in active_model_configs:
+                    config_name = best_model
+                else:
+                    # Log unmapped model for debugging
+                    if best_model is not None:
+                        logger.warning(f"Could not map prediction key '{best_model}' to config name")
+                        logger.debug(f"Available mappings: {model_name_mapping}")
+                        logger.debug(f"Active configs: {list(active_model_configs.keys())}")
+                
+                if config_name and config_name in active_model_configs:
+                    model_config = active_model_configs[config_name]
+                    detection_threshold = model_config.threshold
+                else:
+                    # Fallback threshold if model not found in config
+                    detection_threshold = 0.3
+                    if best_model is not None:
+                        logger.warning(f"Model '{best_model}' not found in active configs, using default threshold")
+                
+                if max_confidence >= detection_threshold:
+                    logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
+                    logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+                    
+                    # Add detection event to queue for web GUI
+                    detection_event = {
+                        'type': 'detection',
+                        'model': config_name or best_model,
+                        'confidence': float(max_confidence),
+                        'timestamp': datetime.utcnow().isoformat() + 'Z',
+                        'threshold': detection_threshold,
+                        'multi_trigger': False
+                    }
+                    
+                    # Update shared data
+                    shared_data['last_detection'] = detection_event
+                    
+                    # Add to event queue if not full
+                    try:
+                        event_queue.put_nowait(detection_event)
+                    except:
+                        pass  # Queue full, skip
+                    
+                    # Call webhook if configured
+                    if config_name and active_model_configs[config_name].webhook_url:
+                        try:
+                            # Prepare webhook payload
+                            webhook_data = {
+                                "wake_word": best_model,
+                                "confidence": max_confidence,
+                                "threshold": detection_threshold,
+                                "timestamp": time.time(),
+                                "model_name": config_name,
+                                "all_scores": prediction,
+                                "multi_trigger": False
+                            }
+                            
+                            # Make webhook call
+                            logger.info(f"📞 Calling webhook: {active_model_configs[config_name].webhook_url}")
+                            response = requests.post(
+                                active_model_configs[config_name].webhook_url,
+                                json=webhook_data,
+                                timeout=5  # 5 second timeout
+                            )
+                            
+                            if response.status_code == 200:
+                                logger.info(f"✅ Webhook call successful")
+                            else:
+                                logger.warning(f"⚠️ Webhook returned status code: {response.status_code}")
+                                
+                        except requests.exceptions.Timeout:
+                            logger.error("❌ Webhook call timed out")
+                        except requests.exceptions.RequestException as e:
+                            logger.error(f"❌ Webhook call failed: {e}")
+                        except Exception as e:
+                            logger.error(f"❌ Unexpected error during webhook call: {e}")
+                else:
+                    # Enhanced debugging - log more frequent confidence updates
+                    if chunk_count % 50 == 0:  # Every 50 chunks instead of 100
+                        logger.debug(f"🎯 Best confidence: {max_confidence:.6f} from '{best_model}' (threshold: {detection_threshold:.6f})")
+                        logger.debug(f"   All scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+                    
+                    # Also check for moderate confidence levels for debugging
+                    if max_confidence > 0.1:
+                        logger.info(f"🔍 Moderate confidence detected: {best_model} = {max_confidence:.6f}")
+                    elif max_confidence > 0.05:
+                        logger.debug(f"🔍 Weak signal: {best_model} = {max_confidence:.6f}")
+                    elif max_confidence > 0.01:
+                        logger.debug(f"🔍 Very weak signal: {best_model} = {max_confidence:.6f}")
 
     except KeyboardInterrupt:
         # Handle graceful shutdown on Ctrl+C

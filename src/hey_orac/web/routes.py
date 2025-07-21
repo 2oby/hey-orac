@@ -56,6 +56,8 @@ def update_global_config():
             settings_manager.update_system_config(cooldown=data['cooldown'])
         if 'vad_threshold' in data:
             settings_manager.update_system_config(vad_threshold=data['vad_threshold'])
+        if 'multi_trigger' in data:
+            settings_manager.update_system_config(multi_trigger=data['multi_trigger'])
         
         settings_manager.save()
         return jsonify({'status': 'success'})

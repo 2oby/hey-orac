@@ -51,6 +51,10 @@ class SystemConfig:
     rms_filter: float = 50.0
     cooldown: float = 2.0
     vad_threshold: float = 0.5
+    # MULTI_TRIGGER: Enable multiple wake word models to trigger simultaneously
+    # WARNING: This is for testing purposes only. In normal operation, this should be FALSE
+    # to prevent multiple notifications when multiple models trigger at similar confidence levels
+    multi_trigger: bool = False
 
 
 @dataclass
@@ -111,7 +115,8 @@ class SettingsManager:
                     "hot_reload_interval": {"type": "number", "minimum": 1.0},
                     "rms_filter": {"type": "number", "minimum": 0.0, "maximum": 5000.0},
                     "cooldown": {"type": "number", "minimum": 0.0, "maximum": 60.0},
-                    "vad_threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+                    "vad_threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                    "multi_trigger": {"type": "boolean"}
                 }
             }
         },
@@ -242,7 +247,8 @@ class SettingsManager:
                 hot_reload_interval=system_dict.get('hot_reload_interval', 5.0),
                 rms_filter=system_dict.get('rms_filter', 50.0),
                 cooldown=system_dict.get('cooldown', 2.0),
-                vad_threshold=system_dict.get('vad_threshold', 0.5)
+                vad_threshold=system_dict.get('vad_threshold', 0.5),
+                multi_trigger=system_dict.get('multi_trigger', False)
             )
             
             return HeyOracConfig(
@@ -655,6 +661,8 @@ class SettingsManager:
                 config.system.cooldown = float(updates['cooldown'])
             if 'vad_threshold' in updates:
                 config.system.vad_threshold = float(updates['vad_threshold'])
+            if 'multi_trigger' in updates:
+                config.system.multi_trigger = bool(updates['multi_trigger'])
             
             logger.info(f"Updated system config: {updates}")
             return config
