@@ -86,8 +86,8 @@ RUN apt-get update && apt-get install -y \
     libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN groupadd -r appuser && useradd -r -g appuser -m appuser
+# Create non-root user with specific UID/GID to match host pi user
+RUN groupadd -g 1000 appuser && useradd -u 1000 -g 1000 -m appuser
 
 # Copy from builder
 WORKDIR /app
