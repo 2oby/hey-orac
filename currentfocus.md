@@ -1,4 +1,27 @@
-# Current Focus: 🐛 Fix Model Switching Bug - Detection Loop Not Reloading Models
+# Current Focus: 🧪 Test Multi-Trigger Implementation & Template-Based Configuration
+
+## 🎯 Testing Requirements for Recent Changes
+
+### **1. SettingsManager Template Support** (NEW - NEEDS TESTING)
+- **Test Case**: Delete settings.json and verify it's created from template
+- **Expected**: New settings.json should match settings.json.template exactly
+- **Verify**: All default values (rms_filter: 50.0, cooldown: 2.0, vad_threshold: 0.5)
+- **Edge Case**: Test with missing/corrupt template file (should fall back to hardcoded defaults)
+
+### **2. Multi-Trigger Wake Word Detection** (NEEDS TESTING)
+- **Test Case**: Enable multi_trigger in settings.json and load multiple models
+- **Expected**: Multiple models can trigger simultaneously if they exceed thresholds
+- **Verify**: Each model sends separate webhook/detection event
+- **Compare**: Single-trigger mode should only trigger highest confidence model
+
+### **3. Docker Non-Root User Permissions** (DEPLOYED - VERIFY)
+- **Test Case**: Check file permissions of created settings.json
+- **Expected**: Files created with appuser ownership, readable by host
+- **Verify**: OpenWakeWord can download models to its resources directory
+
+---
+
+## 🐛 EXISTING BUG: Model Switching - Detection Loop Not Reloading Models
 
 ## 🔴 CRITICAL BUG: Model Activation Changes Not Applied to Detection Engine
 

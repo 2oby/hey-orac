@@ -499,3 +499,11 @@ enabled: true/false    # Model activation state
 - System running stably with proper OpenWakeWord integration
 - Web-based configuration management fully operational
 - Ready for wake word detection testing and feature development
+
+## 2025-01-21 - SettingsManager Template Support & Configuration Fixes
+- Modified SettingsManager to automatically use settings.json.template when creating new configuration
+- Added `_create_from_template()` method that copies template file when settings.json doesn't exist
+- Fixed type mismatch: rms_filter changed from boolean to float (50.0) in both template and settings
+- Aligned default values between template and hardcoded defaults (cooldown: 2.0, vad_threshold: 0.5)
+- Template now serves its intended purpose - providing proper initial configuration on first deployment
+- Maintains fallback to hardcoded defaults if template is missing or invalid

@@ -396,7 +396,7 @@ function closeModelSettings() {
     currentEditingModel = null;
 }
 
-function openGlobalSettings() {
+async function openGlobalSettings() {
     // Get current values from existing elements
     const rmsValue = document.getElementById('rms-filter-value').textContent;
     const cooldownValue = document.getElementById('cooldown-value').textContent;
@@ -412,6 +412,19 @@ function openGlobalSettings() {
     document.getElementById('volume-vad-threshold').value = vadThreshold;
     document.getElementById('volume-vad-threshold-value').textContent = vadThreshold.toFixed(2);
     
+    // Fetch and set multi-trigger value
+    try {
+        const response = await fetch(`${API_BASE}/config`);
+        if (response.ok) {
+            const config = await response.json();
+            const multiTrigger = config.system?.multi_trigger || false;
+            document.getElementById('multi-trigger-checkbox').checked = multiTrigger;
+        }
+    } catch (error) {
+        console.error('Error fetching config:', error);
+        document.getElementById('multi-trigger-checkbox').checked = false;
+    }
+    
     // Show modal
     document.getElementById('volume-settings-modal').classList.add('active');
 }
@@ -421,6 +434,7 @@ async function closeGlobalSettings() {
     const rmsValue = sliderToRMS(parseFloat(document.getElementById('volume-rms-filter').value));
     const cooldownValue = parseFloat(document.getElementById('volume-cooldown').value);
     const vadThreshold = parseFloat(document.getElementById('volume-vad-threshold').value);
+    const multiTrigger = document.getElementById('multi-trigger-checkbox').checked;
     
     try {
         const response = await fetch(`${API_BASE}/config/global`, {
@@ -429,7 +443,8 @@ async function closeGlobalSettings() {
             body: JSON.stringify({
                 rms_filter: rmsValue,
                 cooldown: cooldownValue,
-                vad_threshold: vadThreshold
+                vad_threshold: vadThreshold,
+                multi_trigger: multiTrigger
             })
         });
         

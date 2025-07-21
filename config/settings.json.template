@@ -1,45 +1,52 @@
 {
-  "models": {
-    "hey_jarvis": {
+  "version": "1.0",
+  "models": [
+    {
+      "name": "hey_computer",
+      "path": "/app/models/hey_computer.tflite",
+      "framework": "tflite",
       "enabled": true,
       "threshold": 0.5,
-      "type": "onnx",
-      "path": "openwakeword/hey_jarvis.onnx"
+      "priority": 1,
+      "webhook_url": null
     },
-    "alexa": {
+    {
+      "name": "hey_jarvis",
+      "path": "hey_jarvis",
+      "framework": "tflite",
       "enabled": false,
       "threshold": 0.5,
-      "type": "onnx",
-      "path": "openwakeword/alexa.onnx"
+      "priority": 2,
+      "webhook_url": null
+    },
+    {
+      "name": "alexa",
+      "path": "alexa",
+      "framework": "tflite",
+      "enabled": false,
+      "threshold": 0.5,
+      "priority": 3,
+      "webhook_url": null
     }
-  },
+  ],
   "audio": {
-    "device_index": -1,
     "sample_rate": 16000,
+    "channels": 2,
     "chunk_size": 1280,
-    "ring_buffer_seconds": 10,
-    "silence_threshold": 0.01,
-    "silence_duration": 0.3,
-    "max_recording_seconds": 15,
-    "pre_roll_seconds": 1.0
+    "device_index": null,
+    "auto_select_usb": true
   },
-  "transport": {
-    "endpoint": "http://localhost:8080/stream",
-    "timeout": 30,
-    "retry_count": 3,
-    "backoff_factor": 2.0,
-    "tls_enabled": false,
-    "bearer_token": null
-  },
-  "web": {
-    "host": "0.0.0.0",
-    "port": 8000,
-    "debug": false,
-    "cors_origins": ["*"]
-  },
-  "logging": {
-    "level": "INFO",
-    "format": "json",
-    "file": null
+  "system": {
+    "log_level": "INFO",
+    "models_dir": "/app/models",
+    "recordings_dir": "/app/recordings",
+    "metrics_enabled": true,
+    "metrics_port": 8000,
+    "hot_reload_enabled": true,
+    "hot_reload_interval": 5.0,
+    "multi_trigger": false,
+    "rms_filter": 50.0,
+    "cooldown": 2.0,
+    "vad_threshold": 0.5
   }
 }

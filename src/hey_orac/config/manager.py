@@ -157,6 +157,41 @@ class SettingsManager:
             system=SystemConfig()
         )
     
+    def _create_from_template(self) -> bool:
+        """
+        Create settings.json from template file.
+        
+        Returns:
+            True if successful, False if template not found or error
+        """
+        template_path = self.config_path.parent / "settings.json.template"
+        
+        try:
+            if not template_path.exists():
+                logger.debug(f"Template file not found at {template_path}")
+                return False
+            
+            logger.info(f"Creating configuration from template: {template_path}")
+            
+            # Load and validate template
+            with open(template_path, 'r') as f:
+                config_dict = json.load(f)
+            
+            if not self._validate_config(config_dict):
+                logger.error("Template validation failed, falling back to defaults")
+                return False
+            
+            # Convert to config object and save
+            self._config = self._dict_to_config(config_dict)
+            self._save_config()
+            
+            logger.info("Configuration created from template successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error creating config from template: {e}")
+            return False
+    
     def _validate_config(self, config_dict: Dict[str, Any]) -> bool:
         """
         Validate configuration against schema.
@@ -281,7 +316,10 @@ class SettingsManager:
         with self._lock:
             try:
                 if not self.config_path.exists():
-                    logger.info("Config file not found, creating default configuration")
+                    logger.info("Config file not found, attempting to create from template")
+                    if self._create_from_template():
+                        return True
+                    logger.info("Template not found, creating default configuration")
                     self._config = self._get_default_config()
                     self._save_config()
                     return True
