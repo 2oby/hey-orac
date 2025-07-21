@@ -96,7 +96,9 @@ COPY --from=builder /app /app
 
 # Create directories and set ownership
 RUN mkdir -p /app/logs /app/recordings /app/config && \
-    chown -R appuser:appuser /app
+    mkdir -p /usr/local/lib/python3.9/site-packages/openwakeword/resources && \
+    chown -R appuser:appuser /app && \
+    chown -R appuser:appuser /usr/local/lib/python3.9/site-packages/openwakeword
 
 # Set environment variables
 ENV PYTHONPATH=/app
