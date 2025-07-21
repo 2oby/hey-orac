@@ -19,6 +19,12 @@
 - **Expected**: Files created with appuser ownership, readable by host
 - **Verify**: OpenWakeWord can download models to its resources directory
 
+### **4. Multi-Trigger Checkbox State Issue** (NEW - NEEDS FIXING)
+- **Problem**: Multi-trigger checkbox shows as unchecked in GUI but multiple model selection is enabled
+- **Test Case**: Check checkbox state matches actual multi_trigger setting in config
+- **Expected**: Checkbox should reflect true state of multi_trigger setting
+- **Current Bug**: GUI shows unchecked but functionality works
+
 ---
 
 ## 🐛 EXISTING BUG: Model Switching - Detection Loop Not Reloading Models
