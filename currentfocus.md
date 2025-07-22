@@ -1,106 +1,199 @@
-# Current Focus: 🧪 Test Multi-Trigger Implementation & Template-Based Configuration
+# Current Focus: Multi-Phase Implementation Plan for Outstanding Requirements
 
-## 🎯 Testing Requirements for Recent Changes
-
-### **1. SettingsManager Template Support** (NEW - NEEDS TESTING)
-- **Test Case**: Delete settings.json and verify it's created from template
-- **Expected**: New settings.json should match settings.json.template exactly
-- **Verify**: All default values (rms_filter: 50.0, cooldown: 2.0, vad_threshold: 0.5)
-- **Edge Case**: Test with missing/corrupt template file (should fall back to hardcoded defaults)
-
-### **2. Multi-Trigger Wake Word Detection** (NEEDS TESTING)
-- **Test Case**: Enable multi_trigger in settings.json and load multiple models
-- **Expected**: Multiple models can trigger simultaneously if they exceed thresholds
-- **Verify**: Each model sends separate webhook/detection event
-- **Compare**: Single-trigger mode should only trigger highest confidence model
-
-### **3. Docker Non-Root User Permissions** (DEPLOYED - VERIFY)
-- **Test Case**: Check file permissions of created settings.json
-- **Expected**: Files created with appuser ownership, readable by host
-- **Verify**: OpenWakeWord can download models to its resources directory
-
-### **4. Multi-Trigger Checkbox State Issue** (NEW - NEEDS FIXING)
-- **Problem**: Multi-trigger checkbox shows as unchecked in GUI but multiple model selection is enabled
-- **Test Case**: Check checkbox state matches actual multi_trigger setting in config
-- **Expected**: Checkbox should reflect true state of multi_trigger setting
-- **Current Bug**: GUI shows unchecked but functionality works
+## 📋 Overview
+This document outlines a phased approach to implement the outstanding requirements for the Hey ORAC wake-word service. Each phase builds incrementally with small, testable changes that can be committed, deployed, and verified before proceeding.
 
 ---
 
-## 🐛 EXISTING BUG: Model Switching - Detection Loop Not Reloading Models
+## Phase 1: GUI Bug Fixes & Configuration Validation (High Priority)
 
-## 🔴 CRITICAL BUG: Model Activation Changes Not Applied to Detection Engine
+### 1.1 Fix Multi-Trigger Checkbox State Bug (#4)
+**Files**: `src/hey_orac/web/routes.py`, `src/hey_orac/web/templates/settings.html`
+- Fix checkbox binding to reflect actual `multi_trigger` state from config
+- Ensure checkbox updates properly save to settings.json
+- Test: Toggle checkbox and verify settings.json updates correctly
+- Commit: "Fix multi-trigger checkbox state synchronization"
 
-### **Bug Description:**
-When users change the active model in the GUI, wake word detections still go to "Hay--compUta_v_lrg" regardless of which model is activated/deactivated. The GUI correctly updates and the configuration is saved, but the detection engine continues using the models loaded at startup.
-
-### **Root Cause Analysis:**
-1. **Models loaded once at startup**: OpenWakeWord model object created with initially enabled models
-2. **No config change detection**: Detection loop never checks `shared_data['config_changed']` flag
-3. **Stale model state**: `active_model_configs` dictionary never updated after startup
-4. **Detection events use stale models**: Wake words trigger based on startup configuration
-
-### **Evidence Found:**
-- ✅ GUI correctly calls `/custom-models/{name}/activate` API
-- ✅ API correctly updates config and sets `config_changed = True`
-- ❌ Detection loop runs with original models loaded at startup
-- ❌ Detection events use stale `active_model_configs` dictionary
-- ❌ No mechanism to reload OpenWakeWord models during runtime
+### 1.2 Validate Cooldown Slider Range
+**Files**: `src/hey_orac/web/templates/settings.html`, `src/hey_orac/web/routes.py`
+- Add HTML5 validation: min="0" max="5" step="0.1" default="2"
+- Add server-side validation in routes.py
+- Update tooltips/labels to show "0-5 seconds"
+- Test: Try invalid values, verify defaults work
+- Commit: "Add cooldown slider validation (0-5s range)"
 
 ---
 
-## 🛠️ Implementation Tasks
+## Phase 2: Audio Capture & Pre-roll Buffer
 
-### **1. Add Config Change Detection** (HIGH PRIORITY)
-- Modify detection loop in `wake_word_detection.py` to check `shared_data['config_changed']`
-- Check periodically (e.g., every loop iteration or every N seconds)
-- Trigger model reload when flag is True
+### 2.1 Implement Ring Buffer for Pre-roll
+**Files**: `src/hey_orac/audio/ring_buffer.py` (enhance existing)
+- Extend RingBuffer to maintain 1 second of audio history
+- Add method `get_pre_roll()` to extract last 1s of audio
+- Test with unit tests using synthetic audio
+- Commit: "Add pre-roll capability to RingBuffer"
 
-### **2. Implement Model Reloading Function** (HIGH PRIORITY)
-- Create function to reload OpenWakeWord models based on current config
-- Update `active_model_configs` dictionary with current enabled models
-- Properly dispose of old model object before creating new one
-- Reset `config_changed` flag after successful reload
-
-### **3. Fix Model Name Mapping** (MEDIUM PRIORITY)
-- Ensure consistent model name mapping between OpenWakeWord and config
-- Handle edge cases where model filename doesn't match config name
-- Add logging to track model name resolution
-
-### **4. Test End-to-End** (HIGH PRIORITY)
-- Verify model activation/deactivation works correctly
-- Ensure wake words trigger correct model names
-- Test multiple model switches and edge cases
-- Validate memory management during model reloading
+### 2.2 Integrate Pre-roll with Detection
+**Files**: `src/hey_orac/wake_word_detection.py`
+- Modify detection loop to continuously feed RingBuffer
+- On wake detection, retrieve pre-roll audio
+- Log pre-roll retrieval for verification
+- Test: Verify 1s of audio precedes wake event
+- Commit: "Integrate pre-roll buffer with wake detection"
 
 ---
 
-## 📝 Code Changes Required
+## Phase 3: Endpointing Implementation
 
-### **File: `src/hey_orac/wake_word_detection.py`**
+### 3.1 Create Endpointing Module
+**Files**: `src/hey_orac/audio/endpointing.py` (enhance existing)
+- Implement silence detection (RMS < threshold for 300ms)
+- Add 400ms grace period logic
+- Add 15s failsafe timeout
+- Unit tests with various audio patterns
+- Commit: "Implement audio endpointing logic"
 
-1. **Add config change detection in main loop** (around line 706)
-2. **Create `reload_models()` function** to:
-   - Get current enabled models from settings
-   - Rebuild model paths list
-   - Create new OpenWakeWord model object
-   - Update active_model_configs dictionary
-3. **Fix model name mapping** in detection logic (lines 781-803)
-
-### **Expected Behavior After Fix:**
-- User toggles model in GUI
-- API updates configuration file
-- Detection loop detects config change
-- Models are reloaded with new configuration
-- Wake words trigger notifications with correct model names
-- System continues running without restart
+### 3.2 Integrate Endpointing with Detection
+**Files**: `src/hey_orac/wake_word_detection.py`
+- After wake detection, start recording with endpointing
+- Combine pre-roll + active speech + trailing silence
+- Log endpointing decisions (silence detected, timeout, etc.)
+- Test: Speak with pauses, verify correct endpoint
+- Commit: "Integrate endpointing with wake detection"
 
 ---
 
-## 🎯 Success Criteria
+## Phase 4: HTTP Streaming Transport
 
-1. **GUI model toggle** immediately affects which models are active
-2. **Wake word detections** use the correct model name in events
-3. **No false detections** from deactivated models
-4. **Smooth transitions** without audio interruption during reload
-5. **Memory stable** after multiple model switches
+### 4.1 Create Stream Transport Module
+**Files**: `src/hey_orac/transport/http_stream.py` (new)
+- Implement HTTP POST to configurable endpoint_url
+- Format: 16kHz, 16-bit mono WAV
+- Add connection pooling with requests.Session
+- Basic error handling and logging
+- Unit tests with mock server
+- Commit: "Add HTTP stream transport module"
+
+### 4.2 Add Reliability Features
+**Files**: `src/hey_orac/transport/http_stream.py`
+- Implement exponential backoff (1s, 2s, 4s... max 30s)
+- Add circuit breaker (fail after N attempts)
+- Add retry queue for failed streams
+- Unit tests for failure scenarios
+- Commit: "Add reliability features to stream transport"
+
+### 4.3 Integrate Streaming with Detection
+**Files**: `src/hey_orac/wake_word_detection.py`, `src/hey_orac/config/manager.py`
+- Add endpoint_url to model config
+- On detection + endpointing, stream audio
+- Make streaming async (don't block detection)
+- Test: Monitor server logs, verify audio received
+- Commit: "Integrate HTTP streaming with wake detection"
+
+---
+
+## Phase 5: Threading & Permissions Hardening
+
+### 5.1 Finalize Manager Queue/Events
+**Files**: `src/hey_orac/models/manager.py`, `src/hey_orac/wake_word_detection.py`
+- Review and fix any race conditions
+- Handle microphone disconnect gracefully
+- Ensure config reload is thread-safe
+- Test: Unplug/replug mic during operation
+- Commit: "Harden threading and event handling"
+
+### 5.2 Docker Non-Root Permissions
+**Files**: `Dockerfile`, `docker-compose.yml`
+- Verify appuser has correct permissions
+- Ensure OpenWakeWord cache directory is writable
+- Test model download as non-root user
+- Add volume mount for model cache if needed
+- Commit: "Fix Docker non-root user permissions"
+
+---
+
+## Phase 6: Observability
+
+### 6.1 Prometheus Metrics
+**Files**: `src/hey_orac/metrics/collector.py` (enhance existing)
+- Add counters: wake_detections_total, stream_success_total, stream_failures_total
+- Add histograms: audio_rms, inference_time_seconds
+- Expose on metrics_port (8000)
+- Test: curl metrics endpoint, verify data
+- Commit: "Add Prometheus metrics for observability"
+
+### 6.2 Structured Logging
+**Files**: `src/hey_orac/wake_word_detection.py`, logging config
+- Add JSON formatter for structured logs
+- Include labels: app="hey-orac", component, level
+- Configure for Loki ingestion
+- Test: Verify JSON output format
+- Commit: "Add structured logging for Loki"
+
+---
+
+## Phase 7: Testing & Automation
+
+### 7.1 Golden WAV Test Fixtures
+**Files**: `tests/fixtures/audio/` (new), `tests/unit/test_endpointing.py`
+- Create test WAVs: wake words, silence, noise
+- Unit tests for endpointing with fixtures
+- Unit tests for streaming with fixtures
+- Commit: "Add golden WAV test fixtures"
+
+### 7.2 Stress Test Suite
+**Files**: `tests/stress/test_detection_load.py` (new)
+- Generate background noise corpus
+- Simulate 50 wakes/hour
+- Monitor memory, CPU, detection accuracy
+- Commit: "Add stress test suite"
+
+### 7.3 Template Corruption Tests
+**Files**: `tests/unit/test_settings_manager.py`
+- Test missing template file
+- Test corrupted JSON in template
+- Test invalid schema in template
+- Verify fallback to defaults
+- Commit: "Add settings template corruption tests"
+
+### 7.4 Docker Deploy Helper
+**Files**: `scripts/deploy_helper.sh` (new)
+- Check ALSA device permissions
+- Suggest udev rules if needed
+- Verify audio group membership
+- Test microphone access
+- Commit: "Add Docker deploy helper script"
+
+---
+
+## Phase 8: Documentation
+
+### 8.1 Update README
+**Files**: `README.md`
+- Document streaming setup (endpoint_url config)
+- Document new settings keys
+- Add troubleshooting section
+- Commit: "Update README with streaming docs"
+
+### 8.2 User Guide
+**Files**: `docs/user_guide.md` (new)
+- Complete setup walkthrough
+- Configuration reference
+- Troubleshooting guide
+- Performance tuning tips
+- Commit: "Add comprehensive user guide"
+
+---
+
+## Implementation Notes
+
+1. **Each phase should be tested independently** before moving to the next
+2. **Use the deploy_and_test.sh script** after each commit
+3. **Monitor logs carefully** during testing for any issues
+4. **Update devlog.md** after completing each phase
+5. **Keep changes small and focused** - one feature per commit
+
+## Current Status
+- Ready to begin Phase 1: GUI Bug Fixes
+- All phases designed to be incremental and testable
+- Total estimated commits: ~25-30 small, focused changes

@@ -507,3 +507,22 @@ enabled: true/false    # Model activation state
 - Aligned default values between template and hardcoded defaults (cooldown: 2.0, vad_threshold: 0.5)
 - Template now serves its intended purpose - providing proper initial configuration on first deployment
 - Maintains fallback to hardcoded defaults if template is missing or invalid
+
+## 2025-07-22 12:00 - Multi-Trigger Status Update & UI Issue Identified
+- **Multi-Trigger Detection**: Core functionality confirmed implemented and working
+  - Multiple models can trigger simultaneously when enabled
+  - Each model sends separate detection events
+  - Backend properly handles multi_trigger configuration flag
+- **Critical UI Issue Identified**: Multi-trigger checkbox state bug
+  - Problem: GUI checkbox shows unchecked but multi-trigger functionality works
+  - Impact: Users cannot control multi-trigger mode through web interface
+  - Status: High priority fix needed for checkbox state synchronization
+- **Next Steps**: Fix checkbox state loading/saving to match config file values
+
+## 2025-07-22 12:05 - Model Switching Bug Resolution Confirmed
+- **Model Switching Detection Loop**: Confirmed resolved and working
+  - Models now reload dynamically when configuration changes through GUI
+  - Detection loop properly detects config changes and reloads models
+  - Active model configurations update correctly during runtime
+  - No system restart required for model activation/deactivation changes
+- **Status**: Critical bug fully resolved - dynamic model switching operational
