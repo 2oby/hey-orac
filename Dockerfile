@@ -1,5 +1,5 @@
 # Multi-stage build for Raspberry Pi
-FROM python:3.12-slim as builder
+FROM python:3.9-slim-bullseye as builder
 
 # Install system dependencies for audio and OpenWakeWord
 # Group related packages together for better layer caching
@@ -79,7 +79,7 @@ ENV ALSA_CARD=1
 ENV AUDIO_DEVICE=/dev/snd
 
 # Add runtime stage
-FROM python:3.12-slim as runtime
+FROM python:3.9-slim-bullseye as runtime
 
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -97,14 +97,14 @@ RUN groupadd -g 1000 appuser && \
 
 # Copy from builder
 WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
 COPY --from=builder /app /app
 
 # Create directories and set ownership
 RUN mkdir -p /app/logs /app/recordings /app/config && \
-    mkdir -p /usr/local/lib/python3.12/site-packages/openwakeword/resources && \
+    mkdir -p /usr/local/lib/python3.9/site-packages/openwakeword/resources && \
     chown -R appuser:appuser /app && \
-    chown -R appuser:appuser /usr/local/lib/python3.12/site-packages/openwakeword
+    chown -R appuser:appuser /usr/local/lib/python3.9/site-packages/openwakeword
 
 # Set environment variables
 ENV PYTHONPATH=/app
