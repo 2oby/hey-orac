@@ -1,7 +1,8 @@
 # Multi-stage build for Raspberry Pi
-FROM python:3.9-slim-bullseye as builder
+FROM python:3.12-slim as builder
 
 # Install system dependencies for audio and OpenWakeWord
+# Group related packages together for better layer caching
 RUN apt-get update && apt-get install -y \
     # Audio system dependencies
     alsa-utils \
@@ -24,15 +25,16 @@ RUN apt-get update && apt-get install -y \
 # Set up working directory
 WORKDIR /app
 
-# Copy requirements first
-COPY requirements.txt .
+# Copy dependency files first (these change less frequently)
+COPY requirements.txt pyproject.toml ./
+
+# Install Python dependencies (this layer is cached unless requirements change)
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install OpenWakeWord without dependencies to avoid tflite-runtime issues
 RUN pip install --no-cache-dir --no-deps openwakeword==0.6.0
 
-# Copy project files for installation
-COPY pyproject.toml .
+# Copy project metadata (changes less frequently than source code)
 COPY README.md .
 
 # Add cache busting for source code changes
@@ -47,8 +49,9 @@ COPY src/ ./src/
 # Install the package without dependencies
 RUN pip install --no-cache-dir --no-deps -e .
 
-# Copy additional resources
+# Copy additional resources (models, configs, etc.)
 COPY models/ ./models/
+COPY config/ ./config/
 
 # Create necessary directories
 RUN mkdir -p /app/logs /app/recordings
@@ -76,7 +79,7 @@ ENV ALSA_CARD=1
 ENV AUDIO_DEVICE=/dev/snd
 
 # Add runtime stage
-FROM python:3.9-slim-bullseye as runtime
+FROM python:3.12-slim as runtime
 
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y \
@@ -94,14 +97,14 @@ RUN groupadd -g 1000 appuser && \
 
 # Copy from builder
 WORKDIR /app
-COPY --from=builder /usr/local/lib/python3.9/site-packages /usr/local/lib/python3.9/site-packages
+COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /app /app
 
 # Create directories and set ownership
 RUN mkdir -p /app/logs /app/recordings /app/config && \
-    mkdir -p /usr/local/lib/python3.9/site-packages/openwakeword/resources && \
+    mkdir -p /usr/local/lib/python3.12/site-packages/openwakeword/resources && \
     chown -R appuser:appuser /app && \
-    chown -R appuser:appuser /usr/local/lib/python3.9/site-packages/openwakeword
+    chown -R appuser:appuser /usr/local/lib/python3.12/site-packages/openwakeword
 
 # Set environment variables
 ENV PYTHONPATH=/app
@@ -112,4 +115,4 @@ ENV ALSA_CARD=1
 USER appuser
 
 # Default command - use the installed CLI
-CMD ["hey-orac", "run"]
+CMD ["python3", "-m", "hey_orac.wake_word_detection"]

@@ -8,7 +8,7 @@ set -euo pipefail
 # Default parameters
 COMMIT_MSG=${1:-"Initial OpenWakeWord test implementation"}
 REMOTE_ALIAS="pi"
-PROJECT_NAME="WakeWordTest"
+PROJECT_NAME="hey-orac"  # Updated to match current project name
 
 # Terminal colors
 GREEN='\033[0;32m'
@@ -17,8 +17,8 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}🚀 OpenWakeWord Test Deployment Script${NC}"
-echo -e "${BLUE}======================================${NC}"
+echo -e "${BLUE}🚀 Hey ORAC Deployment Script${NC}"
+echo -e "${BLUE}============================${NC}"
 echo -e "${YELLOW}Deploying to: $REMOTE_ALIAS${NC}"
 echo -e "${YELLOW}Project: $PROJECT_NAME${NC}"
 echo -e "${YELLOW}Commit message: $COMMIT_MSG${NC}"
@@ -46,8 +46,8 @@ else
     echo -e "${YELLOW}Committing with message: $COMMIT_MSG${NC}"
     git commit -m "$COMMIT_MSG"
     
-    echo -e "${YELLOW}Pushing to origin/wake-word-test${NC}"
-    git push origin wake-word-test
+    echo -e "${YELLOW}Pushing to origin/main${NC}"
+    git push origin main
 fi
 
 # Get current commit hash and branch
@@ -80,7 +80,7 @@ ssh "$REMOTE_ALIAS" "\
     docker --version; \
     docker-compose --version; \
     
-    echo '${BLUE}🧹 Cleaning up old Docker resources...${NC}'; \
+    echo '${BLUE}🧹 Smart Docker cleanup...${NC}'; \
     echo 'Disk space before cleanup:'; \
     df -h | grep -E '/$|/home'; \
     \
@@ -88,8 +88,8 @@ ssh "$REMOTE_ALIAS" "\
     docker-compose down --remove-orphans 2>/dev/null || true; \
     docker container prune -f 2>/dev/null || true; \
     \
-    echo 'Removing unused images (keeping last 2)...'; \
-    docker image prune -a -f --filter \"until=24h\" 2>/dev/null || true; \
+    echo 'Removing only dangling images (keeping recent builds)...'; \
+    docker image prune -f 2>/dev/null || true; \
     \
     echo 'Removing unused volumes...'; \
     docker volume prune -f 2>/dev/null || true; \
@@ -97,36 +97,70 @@ ssh "$REMOTE_ALIAS" "\
     echo 'Removing unused networks...'; \
     docker network prune -f 2>/dev/null || true; \
     \
-    echo 'Cleaning build cache...'; \
-    docker builder prune -f --filter \"until=24h\" 2>/dev/null || true; \
-    \
     echo 'Disk space after cleanup:'; \
     df -h | grep -E '/$|/home'; \
     \
     echo '${GREEN}✓ Docker cleanup completed${NC}'; \
     
+    echo '${BLUE}🔍 Smart change detection...${NC}'; \
+    \
+    # Check what files changed since last deployment
+    if [ -f .last_deploy_commit ]; then
+        LAST_COMMIT=\$(cat .last_deploy_commit);
+        echo \"Last deployment commit: \$LAST_COMMIT\";
+        CHANGED_FILES=\$(git diff --name-only \$LAST_COMMIT $COMMIT_HASH 2>/dev/null || echo '');
+    else
+        echo 'No previous deployment found - full rebuild needed';
+        CHANGED_FILES='full_rebuild';
+    fi; \
+    \
+    echo \"Changed files: \$CHANGED_FILES\"; \
+    \
+    # Determine build strategy based on changes
+    BUILD_STRATEGY='incremental'; \
+    \
+    if echo \"\$CHANGED_FILES\" | grep -q 'requirements.txt\|pyproject.toml\|Dockerfile'; then
+        echo '${YELLOW}⚠️  Dependencies or Dockerfile changed - full rebuild needed${NC}';
+        BUILD_STRATEGY='full';
+    elif echo \"\$CHANGED_FILES\" | grep -q 'src/.*\.py'; then
+        echo '${BLUE}📝 Python source code changed - incremental rebuild${NC}';
+        BUILD_STRATEGY='incremental';
+    elif echo \"\$CHANGED_FILES\" | grep -q 'models/'; then
+        echo '${BLUE}🤖 Model files changed - incremental rebuild${NC}';
+        BUILD_STRATEGY='incremental';
+    elif [ \"\$CHANGED_FILES\" = 'full_rebuild' ]; then
+        echo '${YELLOW}⚠️  First deployment or no previous commit - full rebuild${NC}';
+        BUILD_STRATEGY='full';
+    else
+        echo '${GREEN}✓ No significant changes - using cached layers${NC}';
+        BUILD_STRATEGY='cache_only';
+    fi; \
+    \
     echo '${BLUE}🐳 Building & starting containers...${NC}'; \
     echo 'Stopping existing containers...'; \
     docker-compose down; \
     \
-    echo 'Checking what changed...'; \
-    CHANGED_FILES=\$(git diff --name-only HEAD~1 2>/dev/null || echo 'unknown'); \
-    echo \"Changed files: \$CHANGED_FILES\"; \
-    \
-    if echo \"\$CHANGED_FILES\" | grep -q 'requirements.txt'; then \
-        echo 'Requirements changed - full rebuild needed...'; \
-        docker-compose build --no-cache --build-arg GIT_COMMIT=$COMMIT_HASH wake-word-test; \
-    else \
-        echo 'Building with code changes (commit: $COMMIT_HASH)...'; \
-        docker-compose build --build-arg CACHEBUST=\$(date +%s) --build-arg GIT_COMMIT=$COMMIT_HASH wake-word-test; \
+    # Execute build strategy
+    if [ \"\$BUILD_STRATEGY\" = 'full' ]; then
+        echo '${YELLOW}🔄 Full rebuild (no cache)...${NC}';
+        docker-compose build --no-cache --build-arg GIT_COMMIT=$COMMIT_HASH hey-orac;
+    elif [ \"\$BUILD_STRATEGY\" = 'incremental' ]; then
+        echo '${BLUE}⚡ Incremental rebuild (with cache)...${NC}';
+        docker-compose build --build-arg CACHEBUST=\$(date +%s) --build-arg GIT_COMMIT=$COMMIT_HASH hey-orac;
+    else
+        echo '${GREEN}🚀 Using cached layers...${NC}';
+        docker-compose build --build-arg GIT_COMMIT=$COMMIT_HASH hey-orac;
     fi; \
     \
     echo 'Starting fresh container...'; \
-    docker-compose up -d --force-recreate wake-word-test; \
-    
+    docker-compose up -d --force-recreate hey-orac; \
+    \
+    # Save current commit for next deployment
+    echo $COMMIT_HASH > .last_deploy_commit; \
+    \
     echo '${BLUE}🔍 Checking container logs...${NC}'; \
     sleep 3; \
-    docker-compose logs wake-word-test | tail -n 10; \
+    docker-compose logs hey-orac | tail -n 10; \
     
     echo '${BLUE}📊 Checking resource usage...${NC}'; \
     echo 'Container status:'; \
@@ -141,29 +175,29 @@ ssh "$REMOTE_ALIAS" "\
     echo '${BLUE}🔍 Checking container health...${NC}'; \
     docker-compose ps; \
     
-    echo '${BLUE}🧪 Testing OpenWakeWord system...${NC}'; \
+    echo '${BLUE}🧪 Testing Hey ORAC system...${NC}'; \
     echo 'Checking wake word detection service...'; \
     \
     echo 'Testing container health...'; \
-    docker-compose ps wake-word-test | grep -q 'Up' && echo '✅ Wake word service is running' || echo '❌ Wake word service not running'; \
+    docker-compose ps hey-orac | grep -q 'Up' && echo '✅ Hey ORAC service is running' || echo '❌ Hey ORAC service not running'; \
     \
     echo 'Checking audio device access...'; \
-    docker-compose exec -T wake-word-test python3 -c \"from src.audio_utils import AudioManager; am = AudioManager(); devices = am.list_input_devices(); print(f'Found {len(devices)} input devices')\" 2>/dev/null && echo '✅ Audio devices accessible' || echo '❌ Audio device access failed'; \
+    docker-compose exec -T hey-orac python3 -c \"import pyaudio; p = pyaudio.PyAudio(); print(f'Found {p.get_device_count()} audio devices')\" 2>/dev/null && echo '✅ Audio devices accessible' || echo '❌ Audio device access failed'; \
     \
-    echo 'Testing OpenWakeWord model loading...'; \
-    docker-compose exec -T wake-word-test python3 -c \"import openwakeword; from openwakeword.model import Model; m = Model(); print('Model loaded successfully')\" 2>/dev/null && echo '✅ OpenWakeWord models loaded' || echo '❌ Model loading failed'; \
+    echo 'Testing wake word model loading...'; \
+    docker-compose exec -T hey-orac python3 -c \"import openwakeword; print('OpenWakeWord loaded successfully')\" 2>/dev/null && echo '✅ Wake word models loaded' || echo '❌ Model loading failed'; \
     
-    echo '${GREEN}✓ OpenWakeWord system tests completed${NC}'; \
+    echo '${GREEN}✓ Hey ORAC system tests completed${NC}'; \
     
     echo '${GREEN}✓ Deployment completed successfully${NC}'; \
 "
 
 echo -e "${GREEN}🎉 Deployment completed successfully!${NC}"
 echo -e "${BLUE}📊 To monitor the service:${NC}"
-echo -e "${YELLOW}  ssh pi 'cd ~/WakeWordTest && docker-compose logs -f wake-word-test'${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/$PROJECT_NAME && docker-compose logs -f hey-orac'${NC}"
 echo -e "${BLUE}📊 To check container status:${NC}"
-echo -e "${YELLOW}  ssh pi 'cd ~/WakeWordTest && docker-compose ps'${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/$PROJECT_NAME && docker-compose ps'${NC}"
 echo -e "${BLUE}🔧 To restart the service:${NC}"
-echo -e "${YELLOW}  ssh pi 'cd ~/WakeWordTest && docker-compose restart wake-word-test'${NC}"
+echo -e "${YELLOW}  ssh pi 'cd ~/$PROJECT_NAME && docker-compose restart hey-orac'${NC}"
 echo -e "${BLUE}🛑 To stop the service:${NC}"
-echo -e "${YELLOW}  ssh pi 'cd ~/WakeWordTest && docker-compose down'${NC}" 
+echo -e "${YELLOW}  ssh pi 'cd ~/$PROJECT_NAME && docker-compose down'${NC}" 

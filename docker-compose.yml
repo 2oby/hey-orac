@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  wake-word-test:
+  hey-orac:
     build: .
-    container_name: wake-word-test
+    container_name: hey-orac
     command: python3 -m hey_orac.wake_word_detection
     restart: unless-stopped
     
