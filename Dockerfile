@@ -34,9 +34,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Install OpenWakeWord without dependencies to avoid tflite-runtime issues
 RUN pip install --no-cache-dir --no-deps openwakeword==0.6.0
 
-# Copy project metadata (changes less frequently than source code)
-COPY README.md .
-
 # Add cache busting for source code changes
 ARG CACHEBUST=1
 ARG GIT_COMMIT=unknown
