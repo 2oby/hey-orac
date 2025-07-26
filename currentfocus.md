@@ -1,4 +1,50 @@
-# Current Focus: Multi-Phase Implementation Plan for Outstanding Requirements
+# Current Focus: STT Integration after Wake Word Detection
+
+## 🎯 Primary Goal
+Integrate Speech-to-Text (STT) API functionality to capture and transcribe user speech after wake word detection. When a wake word is detected, the system should record the subsequent speech from the user and send it to the STT API for transcription.
+
+## Implementation Steps
+
+1. **Design Audio Buffer System** - Create a circular audio buffer that continuously stores recent audio chunks, allowing us to capture speech immediately after wake word detection without missing the beginning of utterances.
+
+2. **Implement Speech Recording Logic** - After wake word detection, continue recording audio for a configurable duration (e.g., 5-10 seconds) or until silence is detected using Voice Activity Detection (VAD).
+
+3. **Convert Audio to STT Format** - Ensure recorded audio matches STT API requirements: WAV format, 16kHz sample rate, 16-bit depth, mono channel. The current system already uses 16kHz but may need channel conversion.
+
+4. **Create STT API Client** - Implement a client module that handles:
+   - Preparing audio data as WAV file in memory
+   - Making POST requests to the STT endpoint at `/stt/v1/stream`
+   - Handling responses and errors
+   - Managing timeouts and retries
+
+5. **Integrate into Detection Flow** - Modify the wake word detection loop to:
+   - Trigger recording after detection
+   - Send recorded audio to STT
+   - Log or act on transcription results
+   - Handle concurrent detections in multi-trigger mode
+
+6. **Add Configuration Support** - Extend the settings manager to include:
+   - STT service URL/host
+   - Recording duration
+   - Silence detection parameters
+   - Language preferences
+   - Enable/disable STT per wake word model
+
+7. **Handle Edge Cases** - Implement proper error handling for:
+   - Network failures
+   - STT service unavailability
+   - Audio duration limits (15 seconds max)
+   - Concurrent wake word detections
+
+8. **Test and Validate** - Ensure the complete flow works:
+   - Wake word triggers recording
+   - Audio is properly formatted
+   - STT returns accurate transcriptions
+   - System remains responsive during STT calls
+
+---
+
+# Previous Focus: Multi-Phase Implementation Plan for Outstanding Requirements
 
 ## 📋 Overview
 This document outlines a phased approach to implement the outstanding requirements for the Hey ORAC wake-word service. Each phase builds incrementally with small, testable changes that can be committed, deployed, and verified before proceeding.

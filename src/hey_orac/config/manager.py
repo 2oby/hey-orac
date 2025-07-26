@@ -26,6 +26,7 @@ class ModelConfig:
     threshold: float = 0.3
     webhook_url: str = ""
     priority: int = 1
+    stt_enabled: bool = True
 
 
 @dataclass
@@ -36,6 +37,21 @@ class AudioConfig:
     chunk_size: int = 1280
     device_index: Optional[int] = None
     auto_select_usb: bool = True
+
+
+@dataclass
+class STTConfig:
+    """Speech-to-Text configuration."""
+    enabled: bool = True
+    base_url: str = "http://localhost:8000"
+    timeout: int = 30
+    language: Optional[str] = None
+    pre_roll_duration: float = 1.0
+    silence_threshold: float = 0.01
+    silence_duration: float = 0.3
+    grace_period: float = 0.4
+    max_recording_duration: float = 15.0
+    enable_per_model: bool = True
 
 
 @dataclass
@@ -63,6 +79,7 @@ class HeyOracConfig:
     models: List[ModelConfig]
     audio: AudioConfig
     system: SystemConfig
+    stt: STTConfig
     version: str = "1.0"
 
 
@@ -88,7 +105,8 @@ class SettingsManager:
                         "enabled": {"type": "boolean"},
                         "threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0},
                         "webhook_url": {"type": "string"},
-                        "priority": {"type": "integer", "minimum": 1}
+                        "priority": {"type": "integer", "minimum": 1},
+                        "stt_enabled": {"type": "boolean"}
                     },
                     "required": ["name", "path"]
                 }
@@ -118,9 +136,24 @@ class SettingsManager:
                     "vad_threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0},
                     "multi_trigger": {"type": "boolean"}
                 }
+            },
+            "stt": {
+                "type": "object",
+                "properties": {
+                    "enabled": {"type": "boolean"},
+                    "base_url": {"type": "string"},
+                    "timeout": {"type": "integer", "minimum": 1, "maximum": 300},
+                    "language": {"type": ["string", "null"]},
+                    "pre_roll_duration": {"type": "number", "minimum": 0.0, "maximum": 5.0},
+                    "silence_threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                    "silence_duration": {"type": "number", "minimum": 0.1, "maximum": 5.0},
+                    "grace_period": {"type": "number", "minimum": 0.0, "maximum": 5.0},
+                    "max_recording_duration": {"type": "number", "minimum": 1.0, "maximum": 60.0},
+                    "enable_per_model": {"type": "boolean"}
+                }
             }
         },
-        "required": ["models", "audio", "system"]
+        "required": ["models", "audio", "system", "stt"]
     }
     
     def __init__(self, config_path: str = "/app/config/settings.json"):
@@ -154,7 +187,8 @@ class SettingsManager:
         return HeyOracConfig(
             models=[],  # Start with empty models - auto-discovery will populate
             audio=AudioConfig(),
-            system=SystemConfig()
+            system=SystemConfig(),
+            stt=STTConfig()
         )
     
     def _create_from_template(self) -> bool:
@@ -256,7 +290,8 @@ class SettingsManager:
                     enabled=model_dict.get('enabled', True),
                     threshold=model_dict.get('threshold', 0.3),
                     webhook_url=model_dict.get('webhook_url', ''),
-                    priority=model_dict.get('priority', 1)
+                    priority=model_dict.get('priority', 1),
+                    stt_enabled=model_dict.get('stt_enabled', True)
                 )
                 models.append(model)
             
@@ -286,10 +321,26 @@ class SettingsManager:
                 multi_trigger=system_dict.get('multi_trigger', False)
             )
             
+            # Convert STT config
+            stt_dict = config_dict.get('stt', {})
+            stt = STTConfig(
+                enabled=stt_dict.get('enabled', True),
+                base_url=stt_dict.get('base_url', 'http://localhost:8000'),
+                timeout=stt_dict.get('timeout', 30),
+                language=stt_dict.get('language'),
+                pre_roll_duration=stt_dict.get('pre_roll_duration', 1.0),
+                silence_threshold=stt_dict.get('silence_threshold', 0.01),
+                silence_duration=stt_dict.get('silence_duration', 0.3),
+                grace_period=stt_dict.get('grace_period', 0.4),
+                max_recording_duration=stt_dict.get('max_recording_duration', 15.0),
+                enable_per_model=stt_dict.get('enable_per_model', True)
+            )
+            
             return HeyOracConfig(
                 models=models,
                 audio=audio,
                 system=system,
+                stt=stt,
                 version=config_dict.get('version', '1.0')
             )
             
@@ -303,7 +354,8 @@ class SettingsManager:
             'version': config.version,
             'models': [asdict(model) for model in config.models],
             'audio': asdict(config.audio),
-            'system': asdict(config.system)
+            'system': asdict(config.system),
+            'stt': asdict(config.stt)
         }
     
     def _load_config(self) -> bool:
@@ -501,6 +553,13 @@ class SettingsManager:
             if self._config is None:
                 return SystemConfig()
             return self._config.system
+    
+    def get_stt_config(self) -> STTConfig:
+        """Get STT configuration."""
+        with self._lock:
+            if self._config is None:
+                return STTConfig()
+            return self._config.stt
     
     def _discover_model_files(self) -> List[str]:
         """

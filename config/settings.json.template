@@ -8,7 +8,8 @@
       "enabled": true,
       "threshold": 0.5,
       "priority": 1,
-      "webhook_url": null
+      "webhook_url": null,
+      "stt_enabled": true
     },
     {
       "name": "hey_jarvis",
@@ -17,7 +18,8 @@
       "enabled": false,
       "threshold": 0.5,
       "priority": 2,
-      "webhook_url": null
+      "webhook_url": null,
+      "stt_enabled": true
     },
     {
       "name": "alexa",
@@ -26,7 +28,8 @@
       "enabled": false,
       "threshold": 0.5,
       "priority": 3,
-      "webhook_url": null
+      "webhook_url": null,
+      "stt_enabled": true
     }
   ],
   "audio": {
@@ -48,5 +51,17 @@
     "rms_filter": 50.0,
     "cooldown": 2.0,
     "vad_threshold": 0.5
+  },
+  "stt": {
+    "enabled": true,
+    "base_url": "http://orin3:8000",
+    "timeout": 30,
+    "language": null,
+    "pre_roll_duration": 1.0,
+    "silence_threshold": 0.01,
+    "silence_duration": 0.3,
+    "grace_period": 0.4,
+    "max_recording_duration": 15.0,
+    "enable_per_model": true
   }
 }

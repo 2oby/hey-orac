@@ -21,6 +21,10 @@ import requests
 import threading
 from multiprocessing import Manager, Queue
 from hey_orac.audio.utils import AudioManager  # Import the AudioManager class
+from hey_orac.audio.ring_buffer import RingBuffer  # Import RingBuffer for pre-roll
+from hey_orac.audio.speech_recorder import SpeechRecorder  # Import SpeechRecorder
+from hey_orac.audio.endpointing import EndpointConfig  # Import EndpointConfig
+from hey_orac.transport.stt_client import STTClient  # Import STT client
 from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
 from hey_orac.web.app import create_app, socketio
 from hey_orac.web.routes import init_routes
@@ -706,6 +710,57 @@ def main():
         shared_data['is_active'] = True
         shared_data['status_changed'] = True
         
+        # Initialize STT components if enabled
+        ring_buffer = None
+        speech_recorder = None
+        stt_client = None
+        
+        with settings_manager.get_config() as config:
+            stt_config = config.stt
+        
+        if stt_config.enabled:
+            logger.info("🎙️ Initializing STT components...")
+            
+            # Initialize ring buffer for pre-roll audio
+            ring_buffer = RingBuffer(
+                capacity_seconds=10.0,  # Keep 10 seconds of audio history
+                sample_rate=audio_config.sample_rate
+            )
+            
+            # Initialize STT client
+            stt_client = STTClient(
+                base_url=stt_config.base_url,
+                timeout=stt_config.timeout
+            )
+            
+            # Check STT service health
+            if stt_client.health_check():
+                logger.info("✅ STT service is healthy")
+                
+                # Initialize speech recorder with endpointing config
+                endpoint_config = EndpointConfig(
+                    silence_threshold=stt_config.silence_threshold,
+                    silence_duration=stt_config.silence_duration,
+                    grace_period=stt_config.grace_period,
+                    max_duration=stt_config.max_recording_duration,
+                    pre_roll=stt_config.pre_roll_duration
+                )
+                
+                speech_recorder = SpeechRecorder(
+                    ring_buffer=ring_buffer,
+                    stt_client=stt_client,
+                    endpoint_config=endpoint_config
+                )
+                
+                logger.info("✅ STT components initialized successfully")
+            else:
+                logger.warning("⚠️ STT service is not healthy, disabling STT functionality")
+                stt_config.enabled = False
+                ring_buffer = None
+                stt_client = None
+        else:
+            logger.info("ℹ️ STT is disabled in configuration")
+        
         # Function to reload models when configuration changes
         def reload_models():
             nonlocal model, active_model_configs, model_name_mapping
@@ -839,6 +894,12 @@ def main():
                 # Update listening state
                 shared_data['is_listening'] = True
                 
+                # Feed audio to ring buffer if STT is enabled
+                if ring_buffer is not None:
+                    # Convert to int16 for ring buffer storage
+                    audio_int16 = audio_data.astype(np.int16)
+                    ring_buffer.write(audio_int16)
+                
                 # Log every 100 chunks to show we're processing audio
                 chunk_count += 1
                 if chunk_count % 100 == 0:
@@ -950,6 +1011,22 @@ def main():
                             logger.error(f"❌ Webhook call failed (multi-trigger): {e}")
                         except Exception as e:
                             logger.error(f"❌ Unexpected error during webhook call (multi-trigger): {e}")
+                    
+                    # Trigger STT recording if enabled
+                    if (speech_recorder is not None and 
+                        trigger_info['model_config'].stt_enabled and
+                        not speech_recorder.is_busy()):
+                        # Get STT language from config
+                        with settings_manager.get_config() as config:
+                            stt_language = config.stt.language
+                        
+                        # Start recording in background thread
+                        speech_recorder.start_recording(
+                            audio_stream=stream,
+                            wake_word=trigger_info['config_name'],
+                            confidence=trigger_info['confidence'],
+                            language=stt_language
+                        )
             
             else:
                 # SINGLE-TRIGGER MODE: Original "winner takes all" behavior
@@ -1044,6 +1121,23 @@ def main():
                             logger.error(f"❌ Webhook call failed: {e}")
                         except Exception as e:
                             logger.error(f"❌ Unexpected error during webhook call: {e}")
+                    
+                    # Trigger STT recording if enabled
+                    if (speech_recorder is not None and 
+                        config_name and 
+                        active_model_configs[config_name].stt_enabled and
+                        not speech_recorder.is_busy()):
+                        # Get STT language from config
+                        with settings_manager.get_config() as config:
+                            stt_language = config.stt.language
+                        
+                        # Start recording in background thread
+                        speech_recorder.start_recording(
+                            audio_stream=stream,
+                            wake_word=config_name,
+                            confidence=max_confidence,
+                            language=stt_language
+                        )
                 else:
                     # Enhanced debugging - log more frequent confidence updates
                     if chunk_count % 50 == 0:  # Every 50 chunks instead of 100
@@ -1061,6 +1155,15 @@ def main():
     except KeyboardInterrupt:
         # Handle graceful shutdown on Ctrl+C
         logger.info("Stopping audio stream and terminating AudioManager...")
+        
+        # Stop speech recorder if active
+        if speech_recorder:
+            speech_recorder.stop()
+        
+        # Close STT client
+        if stt_client:
+            stt_client.close()
+        
         if stream:
             stream.stop_stream()
             stream.close()
@@ -1072,6 +1175,15 @@ def main():
         import traceback
         logger.error(f"Error during execution: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Stop speech recorder if active
+        if speech_recorder:
+            speech_recorder.stop()
+        
+        # Close STT client
+        if stt_client:
+            stt_client.close()
+        
         if stream:
             stream.stop_stream()
             stream.close()

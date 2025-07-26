@@ -525,4 +525,33 @@ enabled: true/false    # Model activation state
   - Detection loop properly detects config changes and reloads models
   - Active model configurations update correctly during runtime
   - No system restart required for model activation/deactivation changes
+
+## 2025-07-25 - STT Integration Implementation
+- **Created STT Client Module**: Added `transport/stt_client.py` with full API support
+  - Converts audio to WAV format (16kHz, 16-bit, mono) in memory
+  - Handles POST requests to `/stt/v1/stream` endpoint
+  - Includes health check and model preload functionality
+  - Robust error handling for timeouts and connection failures
+- **Created Speech Recorder Module**: Added `audio/speech_recorder.py` for post-wake-word recording
+  - Combines pre-roll audio from ring buffer with actively recorded speech
+  - Uses existing endpointing module for silence detection
+  - Runs recording and STT transcription in background thread
+  - Prevents concurrent recordings when busy
+- **Enhanced Configuration Manager**: Added STT configuration support
+  - New `STTConfig` dataclass with all STT parameters
+  - Updated schema validation to include STT section
+  - Added `stt_enabled` flag per model for selective STT activation
+  - Updated settings.json.template with STT configuration
+- **Integrated STT into Wake Word Detection Flow**:
+  - Ring buffer continuously stores audio for pre-roll capture
+  - On wake word detection, triggers speech recording if STT enabled
+  - Supports both single-trigger and multi-trigger modes
+  - Proper cleanup of STT resources on shutdown
+- **Key Features Implemented**:
+  - 1-second pre-roll audio capture before wake word
+  - Configurable silence detection with grace period
+  - 15-second maximum recording duration failsafe
+  - Per-model STT enable/disable configuration
+  - Background recording to avoid blocking detection loop
+- **Next Step**: Deploy and test end-to-end flow on Raspberry Pi
 - **Status**: Critical bug fully resolved - dynamic model switching operational
