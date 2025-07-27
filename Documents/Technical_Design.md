@@ -220,7 +220,7 @@ hey-orac/
      --device /dev/snd \
      -v $(pwd)/config:/config \
      -v $(pwd)/models:/models \
-     -p 8000:8000 \
+     -p 7171:7171 \
      ghcr.io/acme/hey-orac:1.0.0
    ```
 3. **Update** – pull new tag, `docker compose up -d`.

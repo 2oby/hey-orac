@@ -720,12 +720,15 @@ def main():
         
         if stt_config.enabled:
             logger.info("🎙️ Initializing STT components...")
+            logger.debug(f"STT Configuration: base_url={stt_config.base_url}, timeout={stt_config.timeout}s")
+            logger.debug(f"STT Endpoint settings: pre_roll={stt_config.pre_roll_duration}s, silence_threshold={stt_config.silence_threshold}, silence_duration={stt_config.silence_duration}s")
             
             # Initialize ring buffer for pre-roll audio
             ring_buffer = RingBuffer(
                 capacity_seconds=10.0,  # Keep 10 seconds of audio history
                 sample_rate=audio_config.sample_rate
             )
+            logger.debug(f"RingBuffer initialized with capacity={10.0}s, sample_rate={audio_config.sample_rate}Hz")
             
             # Initialize STT client
             stt_client = STTClient(
@@ -734,8 +737,10 @@ def main():
             )
             
             # Check STT service health
+            logger.debug(f"Checking STT service health at {stt_config.base_url}/stt/v1/health")
             if stt_client.health_check():
                 logger.info("✅ STT service is healthy")
+                logger.debug("STT health check passed, service is ready for transcription")
                 
                 # Initialize speech recorder with endpointing config
                 endpoint_config = EndpointConfig(
@@ -1068,6 +1073,7 @@ def main():
                 if max_confidence >= detection_threshold:
                     logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
                     logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
+                    logger.debug(f"Detection details: model={best_model}, config_name={config_name}, stt_enabled={active_model_configs.get(config_name, {}).get('stt_enabled', False) if config_name else False}")
                     
                     # Add detection event to queue for web GUI
                     detection_event = {
@@ -1127,10 +1133,14 @@ def main():
                         config_name and 
                         active_model_configs[config_name].stt_enabled and
                         not speech_recorder.is_busy()):
+                        logger.info(f"🎤 Triggering STT recording for wake word '{config_name}'")
+                        logger.debug(f"STT recording conditions met: speech_recorder={speech_recorder is not None}, config_name={config_name}, stt_enabled={active_model_configs[config_name].stt_enabled}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
+                        
                         # Get STT language from config
                         with settings_manager.get_config() as config:
                             stt_language = config.stt.language
                         
+                        logger.debug(f"Starting recording with language={stt_language}")
                         # Start recording in background thread
                         speech_recorder.start_recording(
                             audio_stream=stream,
@@ -1138,6 +1148,8 @@ def main():
                             confidence=max_confidence,
                             language=stt_language
                         )
+                    else:
+                        logger.debug(f"STT recording NOT triggered. Conditions: speech_recorder={speech_recorder is not None}, config_name={config_name}, stt_enabled={active_model_configs.get(config_name, {}).get('stt_enabled', False) if config_name else False}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
                 else:
                     # Enhanced debugging - log more frequent confidence updates
                     if chunk_count % 50 == 0:  # Every 50 chunks instead of 100

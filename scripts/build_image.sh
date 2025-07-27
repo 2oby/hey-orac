@@ -26,4 +26,4 @@ docker buildx build \
     .
 
 echo "Build complete!"
-echo "Run with: docker run --device /dev/snd -v \$(pwd)/config:/config -p 8000:8000 $TAG"
+echo "Run with: docker run --device /dev/snd -v \$(pwd)/config:/config -p 7171:7171 $TAG"

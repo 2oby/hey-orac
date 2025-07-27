@@ -44,7 +44,7 @@
     "models_dir": "/app/models",
     "recordings_dir": "/app/recordings",
     "metrics_enabled": true,
-    "metrics_port": 8000,
+    "metrics_port": 7171,
     "hot_reload_enabled": true,
     "hot_reload_interval": 5.0,
     "multi_trigger": false,
@@ -54,7 +54,7 @@
   },
   "stt": {
     "enabled": true,
-    "base_url": "http://orin3:8000",
+    "base_url": "http://192.168.8.191:7272",
     "timeout": 30,
     "language": null,
     "pre_roll_duration": 1.0,

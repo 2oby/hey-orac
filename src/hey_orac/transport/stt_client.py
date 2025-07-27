@@ -28,6 +28,7 @@ class STTClient:
         self.timeout = timeout
         self.session = requests.Session()
         logger.info(f"STT client initialized with base URL: {self.base_url}")
+        logger.debug(f"STT client configuration: timeout={timeout}s")
     
     def create_wav_file(self, audio_data: np.ndarray, sample_rate: int = 16000) -> bytes:
         """
@@ -41,9 +42,11 @@ class STTClient:
             WAV file data as bytes
         """
         # Ensure audio is int16
+        logger.debug(f"Converting audio: dtype={audio_data.dtype}, shape={audio_data.shape}")
         if audio_data.dtype == np.float32:
             # Convert float32 to int16 (assuming range -1.0 to 1.0)
             audio_int16 = np.clip(audio_data * 32767, -32768, 32767).astype(np.int16)
+            logger.debug("Converted float32 audio to int16")
         else:
             audio_int16 = audio_data.astype(np.int16)
         
@@ -79,7 +82,8 @@ class STTClient:
             
             # Calculate audio duration
             duration = len(audio_data) / 16000
-            logger.info(f"Sending {duration:.2f}s of audio to STT service")
+            wav_size = len(wav_data)
+            logger.info(f"📤 Sending {duration:.2f}s of audio to STT service ({wav_size/1024:.1f} KB)")
             
             # Prepare request
             files = {'file': ('audio.wav', wav_data, 'audio/wav')}
@@ -88,18 +92,28 @@ class STTClient:
                 data['language'] = language
             data['task'] = task
             
+            logger.debug(f"Request parameters: language={language}, task={task}")
+            
             # Make request
             url = f"{self.base_url}/stt/v1/stream"
+            logger.debug(f"Making POST request to: {url}")
+            
+            start_time = datetime.now()
             response = self.session.post(
                 url,
                 files=files,
                 data=data,
                 timeout=self.timeout
             )
+            request_time = (datetime.now() - start_time).total_seconds()
+            logger.debug(f"Request completed in {request_time:.3f}s, status={response.status_code}")
             
             if response.status_code == 200:
                 result = response.json()
-                logger.info(f"STT transcription successful: '{result.get('text', '')}'")
+                transcription = result.get('text', '')
+                logger.info(f"✅ STT transcription successful: '{transcription}'")
+                logger.debug(f"Full STT response: {result}")
+                logger.info(f"📝 TRANSCRIPTION LOG: '{transcription}'")
                 return True, result
             else:
                 error_msg = f"STT request failed with status {response.status_code}"
@@ -136,18 +150,22 @@ class STTClient:
             True if service is healthy, False otherwise
         """
         try:
+            health_url = f"{self.base_url}/stt/v1/health"
+            logger.debug(f"Checking STT health at: {health_url}")
+            
             response = self.session.get(
-                f"{self.base_url}/stt/v1/health",
+                health_url,
                 timeout=5
             )
             
             if response.status_code == 200:
                 health = response.json()
+                logger.debug(f"Health check response: {health}")
                 if health.get('status') == 'healthy' and health.get('model_loaded'):
-                    logger.info(f"STT service healthy: model={health.get('model_name')}")
+                    logger.info(f"✅ STT service healthy: model={health.get('model_name')}, backend={health.get('backend')}, device={health.get('device')}")
                     return True
                 else:
-                    logger.warning(f"STT service unhealthy: {health}")
+                    logger.warning(f"⚠️ STT service unhealthy: {health}")
                     return False
             else:
                 logger.warning(f"STT health check failed with status {response.status_code}")

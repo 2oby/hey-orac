@@ -20,7 +20,7 @@ docker run -d --name hey-orac \
   --device /dev/snd \
   -v $(pwd)/config:/config \
   -v $(pwd)/models:/models \
-  -p 8000:8000 \
+  -p 7171:7171 \
   ghcr.io/2oby/hey-orac:latest
 ```
 

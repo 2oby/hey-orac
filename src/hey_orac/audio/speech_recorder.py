@@ -66,6 +66,9 @@ class SpeechRecorder:
             
             self.is_recording = True
             
+        logger.info(f"🎤 Starting speech recording thread for wake word '{wake_word}'")
+        logger.debug(f"Recording parameters: confidence={confidence:.3f}, language={language}")
+        
         # Start recording in a separate thread
         self.recording_thread = threading.Thread(
             target=self._record_and_transcribe,
@@ -73,6 +76,7 @@ class SpeechRecorder:
             daemon=True
         )
         self.recording_thread.start()
+        logger.debug("Recording thread started successfully")
     
     def _record_and_transcribe(self,
                               audio_stream,
@@ -92,8 +96,11 @@ class SpeechRecorder:
             logger.info(f"🎙️ Starting speech recording after '{wake_word}' (confidence: {confidence:.3f})")
             
             # Get pre-roll audio from ring buffer
+            logger.debug(f"Requesting {self.endpoint_config.pre_roll}s of pre-roll audio from ring buffer")
             pre_roll_audio = self.ring_buffer.read_last(self.endpoint_config.pre_roll)
-            logger.info(f"Retrieved {len(pre_roll_audio)/16000:.2f}s of pre-roll audio")
+            pre_roll_duration = len(pre_roll_audio)/16000 if len(pre_roll_audio) > 0 else 0
+            logger.info(f"Retrieved {pre_roll_duration:.2f}s of pre-roll audio ({len(pre_roll_audio)} samples)")
+            logger.debug(f"Ring buffer state: has data={len(pre_roll_audio) > 0}")
             
             # Initialize endpointer
             endpointer = SpeechEndpointer(self.endpoint_config)
@@ -131,9 +138,14 @@ class SpeechRecorder:
                     # Process through endpointer
                     is_speech, should_end = endpointer.process_audio(audio_data)
                     
+                    if is_speech and not hasattr(self, '_speech_started'):
+                        self._speech_started = True
+                        logger.debug("Speech activity detected")
+                    
                     if should_end:
                         duration = endpointer.get_speech_duration()
-                        logger.info(f"Speech endpoint detected after {duration:.2f}s")
+                        logger.info(f"🔚 Speech endpoint detected after {duration:.2f}s")
+                        logger.debug(f"Endpoint reason: silence detected for {self.endpoint_config.silence_duration}s + grace period {self.endpoint_config.grace_period}s")
                         break
                     
                     # Check timeout
@@ -152,10 +164,14 @@ class SpeechRecorder:
                 logger.info(f"Recorded {duration:.2f}s of audio, sending to STT...")
                 
                 # Send to STT
+                logger.info(f"📤 Sending {duration:.2f}s audio to STT service...")
+                logger.debug(f"Audio format: 16kHz, mono, {len(full_audio)} samples")
+                
                 success, result = self.stt_client.transcribe(
                     full_audio,
                     language=language
                 )
+                logger.debug(f"STT response received: success={success}")
                 
                 if success:
                     transcription = result.get('text', '')
@@ -164,9 +180,10 @@ class SpeechRecorder:
                     
                     logger.info(f"✅ STT transcription successful:")
                     logger.info(f"   Wake word: {wake_word}")
-                    logger.info(f"   Transcription: '{transcription}'")
+                    logger.info(f"   📝 TRANSCRIPTION: '{transcription}'")
                     logger.info(f"   Confidence: {confidence_score:.2f}")
                     logger.info(f"   Processing time: {processing_time:.3f}s")
+                    logger.debug(f"Full STT response: {result}")
                     
                     # TODO: Here we could emit an event or call a callback
                     # with the transcription result for further processing
@@ -183,7 +200,10 @@ class SpeechRecorder:
         finally:
             with self.recording_lock:
                 self.is_recording = False
-            logger.info("Speech recording completed")
+            if hasattr(self, '_speech_started'):
+                delattr(self, '_speech_started')
+            logger.info("🏁 Speech recording completed")
+            logger.debug("Recording thread finished, ready for next detection")
     
     def is_busy(self) -> bool:
         """Check if currently recording."""
