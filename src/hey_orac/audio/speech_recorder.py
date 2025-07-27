@@ -106,7 +106,11 @@ class SpeechRecorder:
             endpointer = SpeechEndpointer(self.endpoint_config)
             
             # Collect audio chunks
-            audio_chunks = [pre_roll_audio] if len(pre_roll_audio) > 0 else []
+            audio_chunks = []
+            if len(pre_roll_audio) > 0:
+                # Normalize pre-roll audio from int16 to float32 range
+                pre_roll_normalized = pre_roll_audio.astype(np.float32) / 32768.0
+                audio_chunks.append(pre_roll_normalized)
             
             # Record until endpoint detected
             start_time = time.time()
@@ -127,10 +131,10 @@ class SpeechRecorder:
                     if len(audio_array) > chunk_size:
                         # Stereo data - convert to mono
                         stereo_data = audio_array.reshape(-1, 2)
-                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32) / 32768.0
                     else:
                         # Already mono
-                        audio_data = audio_array.astype(np.float32)
+                        audio_data = audio_array.astype(np.float32) / 32768.0
                     
                     # Store in buffer
                     audio_chunks.append(audio_data)

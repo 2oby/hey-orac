@@ -44,9 +44,11 @@ class STTClient:
         # Ensure audio is int16
         logger.debug(f"Converting audio: dtype={audio_data.dtype}, shape={audio_data.shape}")
         if audio_data.dtype == np.float32:
-            # Convert float32 to int16 (assuming range -1.0 to 1.0)
+            # Convert float32 to int16 (assuming normalized range -1.0 to 1.0)
             audio_int16 = np.clip(audio_data * 32767, -32768, 32767).astype(np.int16)
             logger.debug("Converted float32 audio to int16")
+        elif audio_data.dtype == np.int16:
+            audio_int16 = audio_data
         else:
             audio_int16 = audio_data.astype(np.int16)
         
