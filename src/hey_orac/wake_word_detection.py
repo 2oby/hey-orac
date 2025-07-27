@@ -1073,7 +1073,7 @@ def main():
                 if max_confidence >= detection_threshold:
                     logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
                     logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
-                    logger.debug(f"Detection details: model={best_model}, config_name={config_name}, stt_enabled={active_model_configs.get(config_name, {}).get('stt_enabled', False) if config_name else False}")
+                    logger.debug(f"Detection details: model={best_model}, config_name={config_name}, stt_enabled={active_model_configs[config_name].stt_enabled if config_name and config_name in active_model_configs else False}")
                     
                     # Add detection event to queue for web GUI
                     detection_event = {
@@ -1149,7 +1149,7 @@ def main():
                             language=stt_language
                         )
                     else:
-                        logger.debug(f"STT recording NOT triggered. Conditions: speech_recorder={speech_recorder is not None}, config_name={config_name}, stt_enabled={active_model_configs.get(config_name, {}).get('stt_enabled', False) if config_name else False}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
+                        logger.debug(f"STT recording NOT triggered. Conditions: speech_recorder={speech_recorder is not None}, config_name={config_name}, stt_enabled={active_model_configs[config_name].stt_enabled if config_name and config_name in active_model_configs else False}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
                 else:
                     # Enhanced debugging - log more frequent confidence updates
                     if chunk_count % 50 == 0:  # Every 50 chunks instead of 100
