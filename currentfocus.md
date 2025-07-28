@@ -1,46 +1,57 @@
-# Current Focus: STT Integration after Wake Word Detection
+# Current Focus: Audio Quality Improvements for STT
 
 ## 🎯 Primary Goal
-Integrate Speech-to-Text (STT) API functionality to capture and transcribe user speech after wake word detection. When a wake word is detected, the system should record the subsequent speech from the user and send it to the STT API for transcription.
+Improve audio quality before sending to STT to reduce clipping and enhance transcription accuracy. While the integration pipeline works end-to-end, audio quality issues are preventing proper transcriptions.
 
-## Implementation Steps
+## 🔍 Current Status
+- ✅ Wake word detection → STT pipeline fully working
+- ✅ Audio crackling/distortion fixed
+- ⚠️ Audio still has slight clipping issues
+- ❌ ORAC STT returns empty transcriptions (whisper.cpp integration bug)
 
-1. **Design Audio Buffer System** - Create a circular audio buffer that continuously stores recent audio chunks, allowing us to capture speech immediately after wake word detection without missing the beginning of utterances.
+## 📝 Test Results
+- Direct whisper-cli test: Successfully transcribed "Computer, maybe we have a little lamb"
+- ORAC STT API: Returns empty text for same audio file
+- Audio quality: Improved but still needs compression/normalization
 
-2. **Implement Speech Recording Logic** - After wake word detection, continue recording audio for a configurable duration (e.g., 5-10 seconds) or until silence is detected using Voice Activity Detection (VAD).
+## Next Steps
 
-3. **Convert Audio to STT Format** - Ensure recorded audio matches STT API requirements: WAV format, 16kHz sample rate, 16-bit depth, mono channel. The current system already uses 16kHz but may need channel conversion.
+### 1. **Add Audio Preprocessing** (Priority: HIGH)
+Implement audio processing to reduce clipping and improve quality:
+- **Dynamic Range Compression** - Reduce volume peaks that cause clipping
+- **Automatic Gain Control (AGC)** - Normalize audio levels
+- **Low-pass filtering** - Remove high-frequency noise
+- **Peak limiting** - Prevent values exceeding valid range
 
-4. **Create STT API Client** - Implement a client module that handles:
-   - Preparing audio data as WAV file in memory
-   - Making POST requests to the STT endpoint at `/stt/v1/stream`
-   - Handling responses and errors
-   - Managing timeouts and retries
+### 2. **Debug ORAC STT Integration** (Priority: HIGH)
+Since whisper-cli works but ORAC STT doesn't:
+- Check whisper.cpp Python bindings in ORAC STT
+- Add detailed logging to trace where transcription is lost
+- Verify audio format compatibility
+- Test with different whisper models
 
-5. **Integrate into Detection Flow** - Modify the wake word detection loop to:
-   - Trigger recording after detection
-   - Send recorded audio to STT
-   - Log or act on transcription results
-   - Handle concurrent detections in multi-trigger mode
+### 3. **Audio Quality Testing**
+- Save preprocessed audio for comparison
+- Test with various speaking volumes
+- Verify no clipping at hardware level
+- Monitor RMS levels throughout pipeline
 
-6. **Add Configuration Support** - Extend the settings manager to include:
-   - STT service URL/host
-   - Recording duration
-   - Silence detection parameters
-   - Language preferences
-   - Enable/disable STT per wake word model
+## Technical Details
 
-7. **Handle Edge Cases** - Implement proper error handling for:
-   - Network failures
-   - STT service unavailability
-   - Audio duration limits (15 seconds max)
-   - Concurrent wake word detections
+### Audio Pipeline Issues Found:
+1. **Float32 normalization** - Fixed ✅
+2. **Pre-roll audio mixing** - Fixed ✅
+3. **Clipping from loud input** - Needs compression ⚠️
+4. **ORAC STT whisper.cpp binding** - Returns empty text ❌
 
-8. **Test and Validate** - Ensure the complete flow works:
-   - Wake word triggers recording
-   - Audio is properly formatted
-   - STT returns accurate transcriptions
-   - System remains responsive during STT calls
+### Proposed Audio Processing Chain:
+```
+Microphone → Ring Buffer → Wake Detection
+                ↓
+         Speech Recording → Pre-processing → STT
+                              (compression,
+                               AGC, limiting)
+```
 
 ---
 
