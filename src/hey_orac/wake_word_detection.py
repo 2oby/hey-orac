@@ -525,6 +525,12 @@ def main():
 
     # Try to explicitly load specific models
     logger.info("Attempting to load pre-trained models...")
+    
+    # Initialize variables that might be accessed in exception handlers
+    speech_recorder = None
+    stt_client = None
+    stream = None
+    audio_manager = None
 
     try:
         # Handle test pipeline mode FIRST - don't need audio manager for testing
@@ -594,8 +600,6 @@ def main():
             return
 
         # Initialize audio source - either WAV file or microphone
-        stream = None
-        audio_manager = None
         usb_mic = None
         
         if args.input_wav:
@@ -660,7 +664,11 @@ def main():
             preprocessing_active = preprocessing_manager.initialize(
                 usb_mic=usb_mic, 
                 stream=stream,
-                audio_config=dict(audio_config)
+                audio_config={
+                    'channels': audio_config.channels,
+                    'sample_rate': audio_config.sample_rate,
+                    'chunk_size': audio_config.chunk_size
+                }
             )
             
             if preprocessing_active:
@@ -809,8 +817,6 @@ def main():
         
         # Initialize STT components if enabled
         ring_buffer = None
-        speech_recorder = None
-        stt_client = None
         
         with settings_manager.get_config() as config:
             stt_config = config.stt
