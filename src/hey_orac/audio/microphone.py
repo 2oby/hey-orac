@@ -11,6 +11,7 @@ from typing import Optional, Callable, Tuple
 from dataclasses import dataclass
 
 from .ring_buffer import RingBuffer
+from .preprocessor import AudioPreprocessor, AudioPreprocessorConfig
 
 
 logger = logging.getLogger(__name__)
@@ -42,7 +43,8 @@ class AudioCapture:
         sample_rate: int = 16000,
         chunk_size: int = 1280,
         ring_buffer_seconds: float = 10.0,
-        device_index: Optional[int] = None
+        device_index: Optional[int] = None,
+        preprocessor_config: Optional[AudioPreprocessorConfig] = None
     ):
         """
         Initialize audio capture.
@@ -60,8 +62,12 @@ class AudioCapture:
         # Initialize PyAudio
         self.pyaudio = pyaudio.PyAudio()
         
-        # Ring buffer for audio storage
-        self.ring_buffer = RingBuffer(ring_buffer_seconds, sample_rate)
+        # Ring buffer for audio storage (using float32)
+        self.ring_buffer = RingBuffer(ring_buffer_seconds, sample_rate, dtype=np.float32)
+        
+        # Audio preprocessor
+        self.preprocessor_config = preprocessor_config or AudioPreprocessorConfig(sample_rate=sample_rate)
+        self.preprocessor = AudioPreprocessor(self.preprocessor_config)
         
         # Audio stream
         self.stream: Optional[pyaudio.Stream] = None
@@ -191,12 +197,18 @@ class AudioCapture:
                     stereo_data = audio_array.reshape(-1, 2)
                     audio_array = np.mean(stereo_data, axis=1).astype(np.int16)
                 
-                # Write to ring buffer
-                self.ring_buffer.write(audio_array)
+                # Convert to float32 early for preprocessing
+                audio_float = audio_array.astype(np.float32) / 32768.0
                 
-                # Update RMS
+                # Apply preprocessing (AGC, compression, limiting)
+                processed_audio = self.preprocessor.process(audio_float)
+                
+                # Write to ring buffer (already float32)
+                self.ring_buffer.write(processed_audio)
+                
+                # Update RMS from processed audio
                 with self.rms_lock:
-                    self.current_rms = float(np.sqrt(np.mean(audio_array.astype(np.float32) ** 2)))
+                    self.current_rms = float(np.sqrt(np.mean(processed_audio ** 2)))
                 
             except queue.Empty:
                 continue
@@ -218,11 +230,11 @@ class AudioCapture:
             Audio chunk as float32 array, or None if not available
         """
         try:
-            # Get the last chunk_size samples
+            # Get the last chunk_size samples (already float32)
             audio_data = self.ring_buffer.read_last(self.chunk_size / self.sample_rate)
             if len(audio_data) == self.chunk_size:
-                # Convert to float32 for OpenWakeWord
-                return audio_data.astype(np.float32)
+                # Already float32 from preprocessing
+                return audio_data
             return None
         except Exception as e:
             logger.error(f"Error getting audio chunk: {e}")
@@ -236,9 +248,33 @@ class AudioCapture:
             seconds: Duration of pre-roll to retrieve
             
         Returns:
-            Audio data as int16 array
+            Audio data as float32 array
         """
         return self.ring_buffer.read_last(seconds)
+    
+    def get_pre_roll_int16(self, seconds: float) -> np.ndarray:
+        """
+        Get pre-roll audio from ring buffer as int16.
+        
+        Args:
+            seconds: Duration of pre-roll to retrieve
+            
+        Returns:
+            Audio data as int16 array
+        """
+        return self.ring_buffer.read_last_as_int16(seconds)
+    
+    def get_audio_metrics(self) -> dict:
+        """
+        Get audio quality metrics from preprocessor.
+        
+        Returns:
+            Dictionary of audio metrics
+        """
+        metrics = self.preprocessor.get_metrics()
+        metrics['current_rms'] = self.get_rms()
+        metrics['buffer_fill_level'] = self.ring_buffer.get_fill_level()
+        return metrics
     
     def __del__(self):
         """Cleanup on deletion."""

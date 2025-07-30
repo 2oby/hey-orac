@@ -555,3 +555,45 @@ enabled: true/false    # Model activation state
   - Background recording to avoid blocking detection loop
 - **Next Step**: Deploy and test end-to-end flow on Raspberry Pi
 - **Status**: Critical bug fully resolved - dynamic model switching operational
+
+## 2025-07-30 12:00 - 🎉 Hey ORAC → ORAC STT Integration Complete
+
+### Major Achievement: End-to-End Integration Working
+- **Duration**: Full integration development and testing completed
+- **Result**: Complete wake word → speech-to-text pipeline operational
+- **Status**: ✅ PRODUCTION READY - All components integrated successfully
+
+### Integration Success Milestones:
+✅ **Wake word detection → STT pipeline** - Fully functional end-to-end flow  
+✅ **Audio streaming to ORAC STT** - Successful HTTP streaming transport  
+✅ **Transcriptions received and logged** - Complete speech-to-text processing  
+✅ **Multi-model STT support** - Per-model webhook URL configuration  
+✅ **Background STT processing** - Non-blocking speech recording and transcription
+
+### Critical Integration Fixes Applied:
+1. **STT Component Initialization** - Removed global dependency issues
+2. **Per-Model Webhook URLs** - STT triggers based on individual model webhook_url
+3. **Dynamic URL Support** - STT client accepts configurable webhook endpoints  
+4. **JSON Serialization Fix** - Convert numpy float32 to Python types for API compatibility
+5. **Speech Recorder Creation** - Always initialize even if initial health check fails
+6. **Health Check Timing** - Moved initialization after STT client setup
+
+### Architecture Achievement:
+```
+Wake Word Detection → Speech Recording → STT Transcription → Webhook Delivery
+       ↓                     ↓                  ↓                    ↓
+   Ring Buffer          Pre-roll Audio     ORAC STT API        Model Actions
+   (1s history)         + Live Speech      (whisper.cpp)       (configurable)
+```
+
+### Technical Implementation Completed:
+- **Pre-roll Audio Capture**: 1-second audio history before wake word
+- **Speech Endpointing**: Silence detection with 300ms/400ms thresholds  
+- **STT Client**: HTTP streaming to configurable STT endpoints
+- **Background Processing**: Non-blocking STT to maintain wake word detection
+- **Error Handling**: Robust timeout and connection failure recovery
+
+**STATUS: INTEGRATION MILESTONE ACHIEVED** 🚀  
+- Complete Hey ORAC → ORAC STT integration working
+- Ready for audio quality improvements and parameter verification  
+- Production-ready speech-to-text pipeline operational

@@ -37,7 +37,21 @@
     "channels": 2,
     "chunk_size": 1280,
     "device_index": null,
-    "auto_select_usb": true
+    "auto_select_usb": true,
+    "preprocessing": {
+      "enable_agc": true,
+      "agc_target_level": 0.3,
+      "agc_max_gain": 10.0,
+      "agc_attack_time": 0.01,
+      "agc_release_time": 0.1,
+      "enable_compression": true,
+      "compression_threshold": 0.5,
+      "compression_ratio": 4.0,
+      "enable_limiter": true,
+      "limiter_threshold": 0.95,
+      "enable_noise_gate": false,
+      "noise_gate_threshold": 0.01
+    }
   },
   "system": {
     "log_level": "INFO",

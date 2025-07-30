@@ -21,9 +21,11 @@ import requests
 import threading
 from multiprocessing import Manager, Queue
 from hey_orac.audio.utils import AudioManager  # Import the AudioManager class
+from hey_orac.audio.microphone import AudioCapture  # Import AudioCapture for preprocessing
 from hey_orac.audio.ring_buffer import RingBuffer  # Import RingBuffer for pre-roll
 from hey_orac.audio.speech_recorder import SpeechRecorder  # Import SpeechRecorder
 from hey_orac.audio.endpointing import EndpointConfig  # Import EndpointConfig
+from hey_orac.audio.preprocessor import AudioPreprocessorConfig  # Import preprocessor config
 from hey_orac.transport.stt_client import STTClient  # Import STT client
 from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
 from hey_orac.web.app import create_app, socketio

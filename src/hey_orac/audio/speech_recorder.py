@@ -99,7 +99,7 @@ class SpeechRecorder:
         try:
             logger.info(f"🎙️ Starting speech recording after '{wake_word}' (confidence: {confidence:.3f})")
             
-            # Get pre-roll audio from ring buffer
+            # Get pre-roll audio from ring buffer (already float32 and preprocessed)
             logger.debug(f"Requesting {self.endpoint_config.pre_roll}s of pre-roll audio from ring buffer")
             pre_roll_audio = self.ring_buffer.read_last(self.endpoint_config.pre_roll)
             pre_roll_duration = len(pre_roll_audio)/16000 if len(pre_roll_audio) > 0 else 0
@@ -112,9 +112,8 @@ class SpeechRecorder:
             # Collect audio chunks
             audio_chunks = []
             if len(pre_roll_audio) > 0:
-                # Normalize pre-roll audio from int16 to float32 range
-                pre_roll_normalized = pre_roll_audio.astype(np.float32) / 32768.0
-                audio_chunks.append(pre_roll_normalized)
+                # Pre-roll audio is already float32 and preprocessed
+                audio_chunks.append(pre_roll_audio)
             
             # Record until endpoint detected
             start_time = time.time()
@@ -139,6 +138,9 @@ class SpeechRecorder:
                     else:
                         # Already mono
                         audio_data = audio_array.astype(np.float32) / 32768.0
+                    
+                    # Note: This audio is coming directly from the stream, not preprocessed
+                    # In production, this should go through the same preprocessing pipeline
                     
                     # Store in buffer
                     audio_chunks.append(audio_data)

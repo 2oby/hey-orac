@@ -30,6 +30,23 @@ class ModelConfig:
 
 
 @dataclass
+class AudioPreprocessingConfig:
+    """Audio preprocessing configuration."""
+    enable_agc: bool = True
+    agc_target_level: float = 0.3
+    agc_max_gain: float = 10.0
+    agc_attack_time: float = 0.01
+    agc_release_time: float = 0.1
+    enable_compression: bool = True
+    compression_threshold: float = 0.5
+    compression_ratio: float = 4.0
+    enable_limiter: bool = True
+    limiter_threshold: float = 0.95
+    enable_noise_gate: bool = False
+    noise_gate_threshold: float = 0.01
+
+
+@dataclass
 class AudioConfig:
     """Audio capture configuration."""
     sample_rate: int = 16000
@@ -37,6 +54,11 @@ class AudioConfig:
     chunk_size: int = 1280
     device_index: Optional[int] = None
     auto_select_usb: bool = True
+    preprocessing: Optional[AudioPreprocessingConfig] = None
+    
+    def __post_init__(self):
+        if self.preprocessing is None:
+            self.preprocessing = AudioPreprocessingConfig()
 
 
 @dataclass
@@ -118,7 +140,24 @@ class SettingsManager:
                     "channels": {"type": "integer", "minimum": 1, "maximum": 2},
                     "chunk_size": {"type": "integer", "minimum": 128, "maximum": 8192},
                     "device_index": {"type": ["integer", "null"]},
-                    "auto_select_usb": {"type": "boolean"}
+                    "auto_select_usb": {"type": "boolean"},
+                    "preprocessing": {
+                        "type": "object",
+                        "properties": {
+                            "enable_agc": {"type": "boolean"},
+                            "agc_target_level": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                            "agc_max_gain": {"type": "number", "minimum": 0.0, "maximum": 40.0},
+                            "agc_attack_time": {"type": "number", "minimum": 0.001, "maximum": 1.0},
+                            "agc_release_time": {"type": "number", "minimum": 0.01, "maximum": 5.0},
+                            "enable_compression": {"type": "boolean"},
+                            "compression_threshold": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+                            "compression_ratio": {"type": "number", "minimum": 1.0, "maximum": 20.0},
+                            "enable_limiter": {"type": "boolean"},
+                            "limiter_threshold": {"type": "number", "minimum": 0.5, "maximum": 1.0},
+                            "enable_noise_gate": {"type": "boolean"},
+                            "noise_gate_threshold": {"type": "number", "minimum": 0.0, "maximum": 0.5}
+                        }
+                    }
                 }
             },
             "system": {
@@ -297,12 +336,34 @@ class SettingsManager:
             
             # Convert audio config
             audio_dict = config_dict.get('audio', {})
+            
+            # Handle preprocessing config
+            preprocessing_dict = audio_dict.get('preprocessing', {})
+            if preprocessing_dict:
+                preprocessing = AudioPreprocessingConfig(
+                    enable_agc=preprocessing_dict.get('enable_agc', True),
+                    agc_target_level=preprocessing_dict.get('agc_target_level', 0.3),
+                    agc_max_gain=preprocessing_dict.get('agc_max_gain', 10.0),
+                    agc_attack_time=preprocessing_dict.get('agc_attack_time', 0.01),
+                    agc_release_time=preprocessing_dict.get('agc_release_time', 0.1),
+                    enable_compression=preprocessing_dict.get('enable_compression', True),
+                    compression_threshold=preprocessing_dict.get('compression_threshold', 0.5),
+                    compression_ratio=preprocessing_dict.get('compression_ratio', 4.0),
+                    enable_limiter=preprocessing_dict.get('enable_limiter', True),
+                    limiter_threshold=preprocessing_dict.get('limiter_threshold', 0.95),
+                    enable_noise_gate=preprocessing_dict.get('enable_noise_gate', False),
+                    noise_gate_threshold=preprocessing_dict.get('noise_gate_threshold', 0.01)
+                )
+            else:
+                preprocessing = None
+            
             audio = AudioConfig(
                 sample_rate=audio_dict.get('sample_rate', 16000),
                 channels=audio_dict.get('channels', 2),
                 chunk_size=audio_dict.get('chunk_size', 1280),
                 device_index=audio_dict.get('device_index'),
-                auto_select_usb=audio_dict.get('auto_select_usb', True)
+                auto_select_usb=audio_dict.get('auto_select_usb', True),
+                preprocessing=preprocessing
             )
             
             # Convert system config

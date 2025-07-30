@@ -1,0 +1,111 @@
+--- wake_word_detection.py.original
++++ wake_word_detection.py
+@@ -29,6 +29,7 @@
+ from hey_orac.transport.stt_client import STTClient  # Import STT client
+ from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
+ from hey_orac.web.app import create_app, socketio
++from hey_orac.wake_word_detection_preprocessing import initialize_audio_capture_with_preprocessing, get_preprocessed_audio_chunk, update_audio_metrics
+ from hey_orac.web.routes import init_routes
+ from hey_orac.web.broadcaster import WebSocketBroadcaster
+ 
+@@ -515,6 +516,7 @@
+         stream = None
+         audio_manager = None
+         usb_mic = None
++        audio_capture = None  # For preprocessed audio
+         
+         if args.input_wav:
+             # Use WAV file as input
+@@ -560,7 +562,8 @@
+             return
+ 
+         # Start audio stream if using microphone (skip if using WAV file)
+-        if not args.input_wav:
++        use_preprocessing = not args.input_wav and hasattr(audio_config, 'preprocessing') and audio_config.preprocessing
++        if not args.input_wav and not use_preprocessing:
+             # Start audio stream with parameters from configuration
+             stream = audio_manager.start_stream(
+                 device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
+@@ -726,11 +729,24 @@
+         logger.debug(f"STT Configuration: base_url={stt_config.base_url}, timeout={stt_config.timeout}s")
+         logger.debug(f"STT Endpoint settings: pre_roll={stt_config.pre_roll_duration}s, silence_threshold={stt_config.silence_threshold}, silence_duration={stt_config.silence_duration}s")
+         
+-        # Initialize ring buffer for pre-roll audio
+-        ring_buffer = RingBuffer(
+-            capacity_seconds=10.0,  # Keep 10 seconds of audio history
+-            sample_rate=audio_config.sample_rate
+-        )
++        # Initialize audio capture with preprocessing if enabled
++        if use_preprocessing:
++            device_idx = usb_mic.index if audio_config.device_index is None else audio_config.device_index
++            audio_capture, ring_buffer = initialize_audio_capture_with_preprocessing(
++                audio_config, device_idx
++            )
++            if not audio_capture:
++                logger.error("Failed to initialize audio capture with preprocessing")
++                raise RuntimeError("Failed to initialize audio capture")
++            # For speech recording, we'll use the audio capture's stream
++            stream = audio_capture.stream
++        else:
++            # Initialize ring buffer for pre-roll audio (old method)
++            ring_buffer = RingBuffer(
++                capacity_seconds=10.0,  # Keep 10 seconds of audio history
++                sample_rate=audio_config.sample_rate
++            )
++        
+         logger.debug(f"RingBuffer initialized with capacity={10.0}s, sample_rate={audio_config.sample_rate}Hz")
+         
+         # Initialize STT client
+@@ -882,45 +898,13 @@
+                     last_config_check = current_time
+                 
+                 # Read one chunk of audio data (1280 samples)
+-                data = stream.read(1280, exception_on_overflow=False)
+-                if data is None or len(data) == 0:
+-                    logger.warning("No audio data read from stream")
++                audio_data = get_preprocessed_audio_chunk(audio_capture, args, stream)
++                if audio_data is None:
++                    logger.warning("No audio data available")
+                     continue
+-
+-                # Convert bytes to numpy array - now handling stereo input
+-                audio_array = np.frombuffer(data, dtype=np.int16)
+-                
+-                # Handle channel conversion based on input source
+-                if args.input_wav and hasattr(stream, 'channels'):
+-                    # For WAV files, check the stream's channel count
+-                    if stream.channels == 2 and len(audio_array) > 1280:
+-                        # Stereo WAV file - convert to mono
+-                        stereo_data = audio_array.reshape(-1, 2)
+-                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+-                    else:
+-                        # Mono WAV file
+-                        audio_data = audio_array.astype(np.float32)
+-                else:
+-                    # Microphone input - use original logic
+-                    if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
+-                        # Reshape to separate left and right channels, then average
+-                        stereo_data = audio_array.reshape(-1, 2)
+-                        # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
+-                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+-                    else:
+-                        # Already mono - CRITICAL FIX: no normalization!
+-                        audio_data = audio_array.astype(np.float32)
+-
+-                # Calculate RMS for web GUI display
+-                rms = np.sqrt(np.mean(audio_data**2))
+-                shared_data['rms'] = float(rms)
+                 
+-                # Update listening state
+-                shared_data['is_listening'] = True
+-                
+-                # Feed audio to ring buffer if STT is enabled
+-                if ring_buffer is not None:
+-                    # Convert to int16 for ring buffer storage
+-                    audio_int16 = audio_data.astype(np.int16)
+-                    ring_buffer.write(audio_int16)
++                # Update audio metrics
++                rms = update_audio_metrics(shared_data, audio_capture, audio_data, args)
++                shared_data['is_listening'] = True
+                 
+                 # Log every 100 chunks to show we're processing audio
