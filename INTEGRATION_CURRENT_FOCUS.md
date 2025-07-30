@@ -1,8 +1,8 @@
 # Hey_Orac Integration Current Focus
 
-**Date**: July 27, 2025  
-**Status**: Wake word detection working, STT integration needs configuration fixes  
-**Priority**: HIGH - Core integration functionality partially working
+**Date**: July 30, 2025  
+**Status**: STT integration code fixed, but audio still not streaming to ORAC STT  
+**Priority**: HIGH - Core integration functionality implemented but not working end-to-end
 
 ## Current Issue Summary
 
@@ -14,10 +14,16 @@
 - **Service health**: Both containers operational
 - **Enhanced logging**: Comprehensive debug logging implemented
 
-### ❌ What's Not Working
-- **STT triggering**: Wake words detected but audio not sent to STT service
-- **Configuration issue**: `stt_enabled` is per-model but should be global
-- **Model configuration**: Some models missing `stt_enabled` field entirely
+### ✅ Recent Fixes Implemented (July 30)
+1. **Always initialize STT components** - Removed global `stt.enabled` dependency
+2. **Use per-model webhook URLs** - STT triggers based on webhook_url presence
+3. **Dynamic URL support** - STT client accepts webhook URLs per request
+4. **Per-model health checks** - Check each model's STT endpoint on startup
+
+### ❌ What's Still Not Working
+- **Audio not streaming**: Wake words detected but audio still not sent to ORAC STT
+- **Missing webhook URLs**: Models don't have webhook_url configured
+- **No transcriptions arriving**: ORAC STT not receiving any audio streams
 
 ### 🔍 Evidence from Testing
 
@@ -35,16 +41,15 @@
 - No audio sent to ORAC STT service
 - No transcriptions logged
 
-## Root Cause Analysis
+## Root Cause Analysis (UPDATED)
 
-### 1. Configuration Design Issue
-The current implementation expects `stt_enabled` to be a per-model setting, but the actual requirement is:
-- STT should be **globally enabled** in the configuration
-- Each model should have its own **webhook URL** configured via GUI
-- When ANY wake word is detected, audio should be sent to that model's configured URL
+### Previous Issues (NOW FIXED ✅)
+1. ~~STT components only initialized if globally enabled~~ → **FIXED**: Always initialized
+2. ~~Code checked `stt_enabled` per model~~ → **FIXED**: Now checks `webhook_url` presence
+3. ~~STT client couldn't use dynamic URLs~~ → **FIXED**: Accepts webhook_url parameter
 
-### 2. Missing Configuration Fields
-The `computer_v2` model configuration lacks the `stt_enabled` field:
+### Current Issue
+The `computer_v2` model configuration has an **empty webhook_url**:
 ```json
 {
   "name": "computer_v2",
@@ -52,29 +57,27 @@ The `computer_v2` model configuration lacks the `stt_enabled` field:
   "framework": "tflite",
   "enabled": true,
   "threshold": 0.3,
-  "webhook_url": "",
+  "webhook_url": "",  // ← EMPTY! This prevents STT triggering
   "priority": 6
-  // Missing: "stt_enabled": true
 }
 ```
 
-### 3. Configuration Mismatch
-The code expects STT to be configured per-model, but the business logic should be:
-1. Global STT enable/disable setting
-2. Per-model webhook URLs (configured via GUI)
-3. Audio sent to the webhook URL when that specific model triggers
+**The fix is simple**: Set the webhook_url to the ORAC STT endpoint!
 
 ## Proposed Solution
 
-### Short-term Fix (Immediate)
-1. Add `stt_enabled: true` to all active wake word models
-2. Configure the webhook URL to point to ORAC STT service
+### Immediate Fix Required
+Set the webhook_url for computer_v2 model:
+```json
+"webhook_url": "http://192.168.8.191:7272"
+```
 
-### Long-term Fix (Proper Implementation)
-1. Refactor STT configuration to be global
-2. Use model's `webhook_url` field for STT endpoint
-3. Remove per-model `stt_enabled` field
-4. Update GUI to allow webhook URL configuration per model
+### What We've Already Fixed ✅
+1. ~~Refactor STT configuration to be global~~ → **DONE**: Always initialized
+2. ~~Use model's `webhook_url` field for STT endpoint~~ → **DONE**: Code updated
+3. ~~Remove per-model `stt_enabled` field~~ → **DONE**: Now uses webhook_url
+4. ~~Add dynamic URL support~~ → **DONE**: STT client accepts webhook URLs
+5. ~~Add per-model health checks~~ → **DONE**: Checks on startup/reload
 
 ## Configuration Structure Issues
 
@@ -116,10 +119,10 @@ The code expects STT to be configured per-model, but the business logic should b
 
 ## Next Steps
 
-1. **Immediate**: Add `stt_enabled: true` to computer_v2 model configuration
+1. **Immediate**: Update computer_v2 model configuration to set webhook_url to "http://192.168.8.191:7272"
 2. **Test**: Verify audio is sent to STT after wake word detection
-3. **Refactor**: Update code to use webhook_url instead of global STT URL
-4. **Document**: Update configuration documentation to clarify the design
+3. **Monitor**: Check ORAC STT logs for incoming transcription requests
+4. **Verify**: Confirm transcriptions appear in Hey ORAC logs
 
 ## Success Criteria
 
@@ -132,10 +135,21 @@ After fixes, we should see in logs:
 
 ## Technical Details
 
-### Enhanced Logging Added
-- `wake_word_detection.py`: STT initialization, detection details, recording triggers
-- `speech_recorder.py`: Recording lifecycle, audio capture, endpoint detection
-- `stt_client.py`: HTTP requests, responses, transcription results
+### Code Changes Implemented (July 30)
+1. **wake_word_detection.py**:
+   - Line 721: Removed `if stt_config.enabled` check - always initialize STT
+   - Line 1129: Check `webhook_url` instead of `stt_enabled`
+   - Line 1148: Pass webhook_url to speech_recorder
+   - Lines 622-630, 827-835: Added per-model health checks
+
+2. **stt_client.py**:
+   - Line 70: Added `webhook_url` parameter to `transcribe()`
+   - Lines 102-108: Use webhook_url if provided
+   - Line 157: Added `webhook_url` parameter to `health_check()`
+
+3. **speech_recorder.py**:
+   - Line 53: Added `webhook_url` parameter to `start_recording()`
+   - Line 183: Pass webhook_url to STT client
 
 ### STT Service Details
 - Endpoint: `http://192.168.8.191:7272/stt/v1/stream`
@@ -146,5 +160,5 @@ After fixes, we should see in logs:
 
 ---
 
-**Status**: Ready to implement immediate fix and test end-to-end flow  
-**Owner**: Configuration update needed, then retest
+**Status**: Code implementation complete. Configuration update needed to set webhook URLs  
+**Action Required**: Update model configurations with webhook URLs via GUI or config file

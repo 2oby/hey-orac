@@ -619,16 +619,6 @@ def main():
                 enable_speex_noise_suppression=False
             )
             
-            # Perform health checks for models with webhook URLs
-            logger.info("🏥 Performing per-model STT health checks...")
-            for name, cfg in active_model_configs.items():
-                if cfg.webhook_url and stt_client:
-                    logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
-                    if stt_client.health_check(webhook_url=cfg.webhook_url):
-                        logger.info(f"✅ STT healthy for model '{name}'")
-                    else:
-                        logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
-            
             # Update shared data with loaded models info
             shared_data['loaded_models'] = list(active_model_configs.keys())
             shared_data['models_config'] = {name: {
@@ -773,6 +763,17 @@ def main():
             # Don't null out components - keep them for per-model URL attempts
             speech_recorder = None
         
+        # Perform health checks for models with webhook URLs
+        if stt_client:
+            logger.info("🏥 Performing per-model STT health checks...")
+            for name, cfg in active_model_configs.items():
+                if cfg.webhook_url:
+                    logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
+                    if stt_client.health_check(webhook_url=cfg.webhook_url):
+                        logger.info(f"✅ STT healthy for model '{name}'")
+                    else:
+                        logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
+        
         # Function to reload models when configuration changes
         def reload_models():
             nonlocal model, active_model_configs, model_name_mapping
@@ -824,16 +825,6 @@ def main():
                 test_predictions = new_model.predict(test_audio)
                 logger.info(f"✅ New model test successful - predictions: {list(test_predictions.keys())}")
                 
-                # Perform health checks for models with webhook URLs
-                logger.info("🏥 Performing per-model STT health checks for reloaded models...")
-                for name, cfg in new_active_configs.items():
-                    if cfg.webhook_url and stt_client:
-                        logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
-                        if stt_client.health_check(webhook_url=cfg.webhook_url):
-                            logger.info(f"✅ STT healthy for model '{name}'")
-                        else:
-                            logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
-                
                 # Replace old model and configs
                 old_model = model
                 model = new_model
@@ -847,6 +838,17 @@ def main():
                     'threshold': cfg.threshold,
                     'webhook_url': cfg.webhook_url
                 } for name, cfg in active_model_configs.items()}
+                
+                # Perform health checks for reloaded models with webhook URLs
+                if stt_client:
+                    logger.info("🏥 Performing per-model STT health checks for reloaded models...")
+                    for name, cfg in active_model_configs.items():
+                        if cfg.webhook_url:
+                            logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
+                            if stt_client.health_check(webhook_url=cfg.webhook_url):
+                                logger.info(f"✅ STT healthy for model '{name}'")
+                            else:
+                                logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
                 
                 # Clean up old model (helps with memory)
                 del old_model
