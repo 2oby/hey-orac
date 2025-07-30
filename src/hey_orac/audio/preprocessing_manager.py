@@ -74,7 +74,7 @@ class PreprocessingManager:
             # Create AudioCapture instance
             from hey_orac.audio.microphone import AudioCapture
             self.audio_capture = AudioCapture(
-                device_index=usb_mic['index'],
+                device_index=usb_mic.index,
                 channels=audio_config.get('channels', 2),
                 rate=audio_config.get('sample_rate', 16000),
                 chunk_size=audio_config.get('chunk_size', 1280),
