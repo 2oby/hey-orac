@@ -64,7 +64,8 @@
     "multi_trigger": false,
     "rms_filter": 50.0,
     "cooldown": 2.0,
-    "vad_threshold": 0.5
+    "vad_threshold": 0.5,
+    "enable_audio_preprocessing": false
   },
   "stt": {
     "enabled": true,

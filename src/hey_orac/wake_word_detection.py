@@ -26,6 +26,7 @@ from hey_orac.audio.ring_buffer import RingBuffer  # Import RingBuffer for pre-r
 from hey_orac.audio.speech_recorder import SpeechRecorder  # Import SpeechRecorder
 from hey_orac.audio.endpointing import EndpointConfig  # Import EndpointConfig
 from hey_orac.audio.preprocessor import AudioPreprocessorConfig  # Import preprocessor config
+from hey_orac.audio.preprocessing_manager import PreprocessingManager  # Import PreprocessingManager
 from hey_orac.transport.stt_client import STTClient  # Import STT client
 from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
 from hey_orac.web.app import create_app, socketio
@@ -132,6 +133,85 @@ class WavFileStream:
     def close(self):
         """Compatibility method - does nothing for WAV file."""
         pass
+
+
+def read_audio_chunk(args, stream, audio_capture, chunk_size=1280):
+    """
+    Read audio chunk from appropriate source.
+    
+    Args:
+        args: Command line arguments
+        stream: PyAudio stream or WavFileStream
+        audio_capture: AudioCapture instance (may be None)
+        chunk_size: Number of samples to read
+        
+    Returns:
+        tuple: (raw_data, source_type) or (None, None) on error
+    """
+    try:
+        if args.input_wav:
+            # WAV file reading
+            data = stream.read(chunk_size, exception_on_overflow=False)
+            return data, 'wav_file'
+        elif audio_capture and audio_capture.is_active():
+            # Preprocessed audio from AudioCapture
+            chunk = audio_capture.read_chunk()
+            if chunk is not None and len(chunk) == chunk_size:
+                # Convert float32 back to int16 bytes for compatibility
+                audio_int16 = (chunk * 32768.0).astype(np.int16)
+                return audio_int16.tobytes(), 'preprocessed'
+            else:
+                return None, None
+        else:
+            # Raw stream reading (current approach)
+            data = stream.read(chunk_size, exception_on_overflow=False)
+            return data, 'microphone'
+    except Exception as e:
+        logger.error(f"Error reading audio chunk: {e}")
+        return None, None
+
+
+def process_audio_data(raw_data, source_type='microphone', wav_channels=None):
+    """
+    Process raw audio data to format expected by OpenWakeWord.
+    
+    Args:
+        raw_data: Raw audio bytes
+        source_type: 'microphone', 'wav_file', or 'preprocessed'
+        wav_channels: Number of channels for WAV files
+        
+    Returns:
+        numpy array of float32 audio data or None on error
+    """
+    if raw_data is None or len(raw_data) == 0:
+        return None
+        
+    try:
+        # Convert bytes to numpy array
+        audio_array = np.frombuffer(raw_data, dtype=np.int16)
+        
+        # Handle channel conversion based on source
+        if source_type == 'wav_file' and wav_channels == 2 and len(audio_array) > 1280:
+            # Stereo WAV file - convert to mono
+            stereo_data = audio_array.reshape(-1, 2)
+            audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+        elif source_type == 'preprocessed':
+            # Already processed, just convert
+            audio_data = audio_array.astype(np.float32)
+        else:
+            # Microphone input - check if stereo
+            if len(audio_array) > 1280:  # Stereo data
+                stereo_data = audio_array.reshape(-1, 2)
+                audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+            else:
+                # Already mono
+                audio_data = audio_array.astype(np.float32)
+                
+        return audio_data
+    except Exception as e:
+        logger.error(f"Error processing audio data: {e}")
+        return None
+
 
 def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename='test_recording.wav'):
     """Record 10 seconds of test audio with countdown and metadata generation."""
