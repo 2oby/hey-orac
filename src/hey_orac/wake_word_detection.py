@@ -741,27 +741,25 @@ def main():
         if stt_client.health_check():
             logger.info("✅ STT service is healthy")
             logger.debug("STT health check passed, service is ready for transcription")
-            
-            # Initialize speech recorder with endpointing config
-            endpoint_config = EndpointConfig(
-                silence_threshold=stt_config.silence_threshold,
-                silence_duration=stt_config.silence_duration,
-                grace_period=stt_config.grace_period,
-                max_duration=stt_config.max_recording_duration,
-                pre_roll=stt_config.pre_roll_duration
-            )
-            
-            speech_recorder = SpeechRecorder(
-                ring_buffer=ring_buffer,
-                stt_client=stt_client,
-                endpoint_config=endpoint_config
-            )
-            
-            logger.info("✅ STT components initialized successfully")
         else:
-            logger.warning("⚠️ STT service is not healthy, STT functionality will be limited")
-            # Don't null out components - keep them for per-model URL attempts
-            speech_recorder = None
+            logger.warning("⚠️ STT service is not healthy at startup, but will proceed with per-model webhook URLs")
+        
+        # Always initialize speech recorder (for per-model webhook URLs)
+        endpoint_config = EndpointConfig(
+            silence_threshold=stt_config.silence_threshold,
+            silence_duration=stt_config.silence_duration,
+            grace_period=stt_config.grace_period,
+            max_duration=stt_config.max_recording_duration,
+            pre_roll=stt_config.pre_roll_duration
+        )
+        
+        speech_recorder = SpeechRecorder(
+            ring_buffer=ring_buffer,
+            stt_client=stt_client,
+            endpoint_config=endpoint_config
+        )
+        
+        logger.info("✅ STT components initialized successfully")
         
         # Perform health checks for models with webhook URLs
         if stt_client:
@@ -1116,14 +1114,14 @@ def main():
                     # Call webhook if configured
                     if config_name and active_model_configs[config_name].webhook_url:
                         try:
-                            # Prepare webhook payload
+                            # Prepare webhook payload (convert numpy types to Python types)
                             webhook_data = {
                                 "wake_word": best_model,
-                                "confidence": max_confidence,
-                                "threshold": detection_threshold,
+                                "confidence": float(max_confidence),
+                                "threshold": float(detection_threshold),
                                 "timestamp": time.time(),
                                 "model_name": config_name,
-                                "all_scores": prediction,
+                                "all_scores": {k: float(v) for k, v in prediction.items()},
                                 "multi_trigger": False
                             }
                             
