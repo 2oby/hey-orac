@@ -640,6 +640,9 @@ def main():
                 logger.error("❌ Recording failed. Exiting.")
             return
 
+        # Initialize preprocessing manager
+        preprocessing_manager = PreprocessingManager(settings_manager, logger)
+        
         # Start audio stream if using microphone (skip if using WAV file)
         if not args.input_wav:
             # Start audio stream with parameters from configuration
@@ -652,6 +655,18 @@ def main():
             if not stream:
                 logger.error("Failed to start audio stream. Exiting.")
                 raise RuntimeError("Failed to start audio stream")
+                
+            # Initialize preprocessing if enabled
+            preprocessing_active = preprocessing_manager.initialize(
+                usb_mic=usb_mic, 
+                stream=stream,
+                audio_config=dict(audio_config)
+            )
+            
+            if preprocessing_active:
+                logger.info("✅ Audio preprocessing is active")
+            else:
+                logger.info("ℹ️  Audio preprocessing is disabled or unavailable")
 
         # Initialize the OpenWakeWord model with enabled models from configuration
         print("DEBUG: About to create Model()", flush=True)
@@ -965,35 +980,25 @@ def main():
                             logger.error("❌ Failed to apply configuration change")
                     last_config_check = current_time
                 
-                # Read one chunk of audio data (1280 samples)
-                data = stream.read(1280, exception_on_overflow=False)
-                if data is None or len(data) == 0:
+                # Read audio chunk using our extracted function
+                data, source_type = read_audio_chunk(
+                    args, 
+                    stream, 
+                    preprocessing_manager.audio_capture if preprocessing_manager.is_preprocessing_active() else None,
+                    chunk_size=1280
+                )
+                
+                if data is None:
                     logger.warning("No audio data read from stream")
                     continue
 
-                # Convert bytes to numpy array - now handling stereo input
-                audio_array = np.frombuffer(data, dtype=np.int16)
+                # Process audio data using our extracted function
+                wav_channels = stream.channels if args.input_wav and hasattr(stream, 'channels') else None
+                audio_data = process_audio_data(data, source_type, wav_channels)
                 
-                # Handle channel conversion based on input source
-                if args.input_wav and hasattr(stream, 'channels'):
-                    # For WAV files, check the stream's channel count
-                    if stream.channels == 2 and len(audio_array) > 1280:
-                        # Stereo WAV file - convert to mono
-                        stereo_data = audio_array.reshape(-1, 2)
-                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                    else:
-                        # Mono WAV file
-                        audio_data = audio_array.astype(np.float32)
-                else:
-                    # Microphone input - use original logic
-                    if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
-                        # Reshape to separate left and right channels, then average
-                        stereo_data = audio_array.reshape(-1, 2)
-                        # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
-                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                    else:
-                        # Already mono - CRITICAL FIX: no normalization!
-                        audio_data = audio_array.astype(np.float32)
+                if audio_data is None:
+                    logger.warning("Failed to process audio data")
+                    continue
 
                 # Calculate RMS for web GUI display
                 rms = np.sqrt(np.mean(audio_data**2))
@@ -1014,8 +1019,10 @@ def main():
                     audio_volume = np.abs(audio_data).mean()
                     logger.info(f"📊 Processed {chunk_count} audio chunks")
                     logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}, RMS: {rms:.4f}")
-                    logger.info(f"   Raw data size: {len(data)} bytes, samples: {len(audio_array)}")
-                    if len(audio_array) > 1280:
+                    logger.info(f"   Source: {source_type}, Raw data size: {len(data)} bytes")
+                    if preprocessing_manager.is_preprocessing_active():
+                        logger.info(f"   ✅ Audio preprocessing active (AGC, compression, limiting)")
+                    elif source_type == 'microphone' and len(data) > 2560:
                         logger.info(f"   ✅ Stereo→Mono conversion active")
 
                 # Pass the audio data to the model for wake word prediction
