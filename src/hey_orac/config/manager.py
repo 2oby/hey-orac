@@ -93,6 +93,8 @@ class SystemConfig:
     # WARNING: This is for testing purposes only. In normal operation, this should be FALSE
     # to prevent multiple notifications when multiple models trigger at similar confidence levels
     multi_trigger: bool = False
+    # Enable audio preprocessing (AGC, compression, limiting)
+    enable_audio_preprocessing: bool = False
 
 
 @dataclass
@@ -379,7 +381,8 @@ class SettingsManager:
                 rms_filter=system_dict.get('rms_filter', 50.0),
                 cooldown=system_dict.get('cooldown', 2.0),
                 vad_threshold=system_dict.get('vad_threshold', 0.5),
-                multi_trigger=system_dict.get('multi_trigger', False)
+                multi_trigger=system_dict.get('multi_trigger', False),
+                enable_audio_preprocessing=system_dict.get('enable_audio_preprocessing', False)
             )
             
             # Convert STT config
