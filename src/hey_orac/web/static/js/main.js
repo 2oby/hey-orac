@@ -145,8 +145,7 @@ function handleDetection(detection) {
         lastDetectionElement.textContent = `${detection.model} at ${time} (${(detection.confidence * 100).toFixed(1)}%)`;
     }
     
-    // Play notification sound
-    playNotificationSound();
+    // No audio notification (device has no speaker)
 }
 
 // Update volume display
@@ -572,12 +571,6 @@ function updateVolumeDisplay() {
     
     // Update audio status
     document.querySelector('.audio-status').textContent = `Active (RMS: ${currentVolume.toFixed(0)})`;
-}
-
-// Notification sound
-function playNotificationSound() {
-    const audio = new Audio('/assets/audio/beep.mp3');
-    audio.play().catch(e => console.log('Audio play failed:', e));
 }
 
 // Initialize everything when DOM is loaded

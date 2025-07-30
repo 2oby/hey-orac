@@ -867,6 +867,10 @@ def main():
         last_config_check = time.time()
         CONFIG_CHECK_INTERVAL = 1.0  # Check for config changes every second
         
+        # Debouncing: track last detection time per model
+        last_detection_times = {}
+        DETECTION_COOLDOWN = 2.0  # Minimum seconds between detections for same model
+        
         while True:
             try:
                 # Check for configuration changes
@@ -980,6 +984,18 @@ def main():
                 
                 # Process each triggered model
                 for trigger_info in triggered_models:
+                    # Check debounce cooldown
+                    model_name = trigger_info['config_name']
+                    current_time = time.time()
+                    if model_name in last_detection_times:
+                        time_since_last = current_time - last_detection_times[model_name]
+                        if time_since_last < DETECTION_COOLDOWN:
+                            logger.debug(f"Debouncing {model_name}: {time_since_last:.1f}s since last detection (cooldown: {DETECTION_COOLDOWN}s)")
+                            continue
+                    
+                    # Update last detection time
+                    last_detection_times[model_name] = current_time
+                    
                     logger.info(f"🎯 WAKE WORD DETECTED (MULTI-TRIGGER)! Confidence: {trigger_info['confidence']:.6f} (threshold: {trigger_info['threshold']:.6f}) - Source: {trigger_info['wakeword']}")
                     logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
                     
@@ -1090,6 +1106,18 @@ def main():
                         logger.warning(f"Model '{best_model}' not found in active configs, using default threshold")
                 
                 if max_confidence >= detection_threshold:
+                    # Check debounce cooldown
+                    current_time = time.time()
+                    if config_name and config_name in last_detection_times:
+                        time_since_last = current_time - last_detection_times[config_name]
+                        if time_since_last < DETECTION_COOLDOWN:
+                            logger.debug(f"Debouncing {config_name}: {time_since_last:.1f}s since last detection (cooldown: {DETECTION_COOLDOWN}s)")
+                            continue  # Skip to next audio chunk
+                    
+                    # Update last detection time
+                    if config_name:
+                        last_detection_times[config_name] = current_time
+                    
                     logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
                     logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
                     logger.debug(f"Detection details: model={best_model}, config_name={config_name}, stt_enabled={active_model_configs[config_name].stt_enabled if config_name and config_name in active_model_configs else False}")
