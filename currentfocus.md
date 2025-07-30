@@ -1,23 +1,43 @@
-# Current Focus: Audio Quality & Parameter Verification
+# Current Focus: Integrate Audio Preprocessing Implementation
 
-## 🎯 Current Priority: Audio Quality Improvements
+## 🚨 TOP PRIORITY: Complete Audio Preprocessing Integration
 
-### 1. **Fix Voice Clipping Issues** (Priority: HIGH)
-Improve audio preprocessing to eliminate clipping:
-- **Dynamic Range Compression** - Reduce volume peaks that cause clipping
-- **Automatic Gain Control (AGC)** - Normalize audio levels for consistent processing
-- **Low-pass filtering** - Remove high-frequency noise interference
-- **Peak limiting** - Prevent audio values exceeding valid range
-- **Test with various speaking volumes** - Ensure no clipping at hardware level
+### **[IMMEDIATE ACTION REQUIRED]** 
+The audio preprocessing modules have been implemented but need to be integrated into the main detection loop. This is blocking the audio quality improvements needed for better STT accuracy.
+
+**📋 Detailed Integration Plan**: See [REFACTOR_AND_INTEGRATE_PREPROCESSING.md](REFACTOR_AND_INTEGRATE_PREPROCESSING.md)
+
+### Quick Status:
+- ✅ **Preprocessing modules implemented** - AGC, compression, limiting ready
+- ✅ **Configuration support added** - Settings structure updated
+- ✅ **Modules tested and working** - Verified on Pi
+- ❌ **Not integrated into main loop** - Blocking audio quality improvements
+- ⚠️ **Current audio levels are low** - RMS ~10-12, would benefit from AGC
+
+### Next Immediate Steps:
+1. **Create PreprocessingManager** - Centralized management with fallback
+2. **Add feature flag** - Safe rollout with instant rollback
+3. **Extract audio functions** - Refactor for cleaner integration
+4. **Integrate conditionally** - Use preprocessing when enabled
+5. **Test thoroughly** - Ensure no regression
+
+---
+
+## Previous Focus: Audio Quality Improvements (NOW READY TO COMPLETE)
+
+### 1. **Fix Voice Clipping Issues** ✅ READY
+Preprocessing modules implemented:
+- **Dynamic Range Compression** ✅ - Implemented with 4:1 ratio
+- **Automatic Gain Control (AGC)** ✅ - Target level 0.3, max gain 10dB
+- **Peak limiting** ✅ - Threshold at 0.95 to prevent clipping
+- **Awaiting integration** ⚠️ - See plan above
 
 ### 2. **Parameter Verification & Testing** (Priority: HIGH)
-Verify all configuration parameters are working correctly:
-- **RMS Filter** - Test audio level filtering functionality
-- **Cooldown Timer** - Verify detection spacing prevents duplicate triggers
-- **VAD Threshold** - Test OpenWakeWord voice activity detection sensitivity
-- **Per-Model Threshold** - Verify individual model activation thresholds work properly
-- **Save preprocessed audio** for comparison and analysis
-- **Monitor RMS levels throughout pipeline** for debugging
+After preprocessing integration:
+- **Test RMS levels** with AGC active
+- **Verify no clipping** at high volumes
+- **Compare STT accuracy** before/after
+- **Monitor audio metrics** in real-time
 
 ## 🔧 Technical Status
 
