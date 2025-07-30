@@ -52,6 +52,8 @@ class PreprocessingManager:
         # Check if preprocessing is enabled
         with self.settings_manager.get_config() as config:
             preprocessing_enabled = getattr(config.system, 'enable_audio_preprocessing', False)
+            self.logger.debug(f"Config system attributes: {dir(config.system)}")
+            self.logger.debug(f"Preprocessing enabled flag: {preprocessing_enabled}")
         
         if not preprocessing_enabled:
             self.logger.info("Audio preprocessing disabled by configuration")
