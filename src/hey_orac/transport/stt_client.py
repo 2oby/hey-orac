@@ -66,7 +66,8 @@ class STTClient:
     def transcribe(self, 
                    audio_data: np.ndarray, 
                    language: Optional[str] = None,
-                   task: str = "transcribe") -> Tuple[bool, Dict[str, Any]]:
+                   task: str = "transcribe",
+                   webhook_url: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
         """
         Send audio to STT service for transcription.
         
@@ -74,6 +75,7 @@ class STTClient:
             audio_data: Audio samples as numpy array
             language: Language code (e.g., "en", "es", "fr")
             task: "transcribe" or "translate"
+            webhook_url: Override base URL with specific webhook URL
             
         Returns:
             Tuple of (success, result_dict)
@@ -96,8 +98,16 @@ class STTClient:
             
             logger.debug(f"Request parameters: language={language}, task={task}")
             
-            # Make request
-            url = f"{self.base_url}/stt/v1/stream"
+            # Make request - use webhook_url if provided, otherwise use base_url
+            if webhook_url:
+                # Extract just the base URL from webhook URL (remove any path)
+                from urllib.parse import urlparse
+                parsed = urlparse(webhook_url)
+                base_url = f"{parsed.scheme}://{parsed.netloc}"
+                url = f"{base_url}/stt/v1/stream"
+                logger.debug(f"Using webhook URL for STT: {url} (from {webhook_url})")
+            else:
+                url = f"{self.base_url}/stt/v1/stream"
             logger.debug(f"Making POST request to: {url}")
             
             start_time = datetime.now()
@@ -144,16 +154,27 @@ class STTClient:
             logger.error(error_msg)
             return False, {'error': error_msg}
     
-    def health_check(self) -> bool:
+    def health_check(self, webhook_url: Optional[str] = None) -> bool:
         """
         Check if STT service is healthy.
         
+        Args:
+            webhook_url: Optional webhook URL to check health for
+            
         Returns:
             True if service is healthy, False otherwise
         """
         try:
-            health_url = f"{self.base_url}/stt/v1/health"
-            logger.debug(f"Checking STT health at: {health_url}")
+            if webhook_url:
+                # Extract base URL from webhook URL
+                from urllib.parse import urlparse
+                parsed = urlparse(webhook_url)
+                base_url = f"{parsed.scheme}://{parsed.netloc}"
+                health_url = f"{base_url}/stt/v1/health"
+                logger.debug(f"Checking STT health at webhook URL: {health_url}")
+            else:
+                health_url = f"{self.base_url}/stt/v1/health"
+                logger.debug(f"Checking STT health at: {health_url}")
             
             response = self.session.get(
                 health_url,

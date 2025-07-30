@@ -49,7 +49,8 @@ class SpeechRecorder:
                        audio_stream,
                        wake_word: str,
                        confidence: float,
-                       language: Optional[str] = None) -> None:
+                       language: Optional[str] = None,
+                       webhook_url: Optional[str] = None) -> None:
         """
         Start recording speech in a separate thread.
         
@@ -58,6 +59,7 @@ class SpeechRecorder:
             wake_word: The detected wake word
             confidence: Detection confidence
             language: Language code for STT
+            webhook_url: Optional webhook URL for STT service
         """
         with self.recording_lock:
             if self.is_recording:
@@ -72,7 +74,7 @@ class SpeechRecorder:
         # Start recording in a separate thread
         self.recording_thread = threading.Thread(
             target=self._record_and_transcribe,
-            args=(audio_stream, wake_word, confidence, language),
+            args=(audio_stream, wake_word, confidence, language, webhook_url),
             daemon=True
         )
         self.recording_thread.start()
@@ -82,7 +84,8 @@ class SpeechRecorder:
                               audio_stream,
                               wake_word: str,
                               confidence: float,
-                              language: Optional[str] = None) -> None:
+                              language: Optional[str] = None,
+                              webhook_url: Optional[str] = None) -> None:
         """
         Record speech and send to STT (runs in separate thread).
         
@@ -91,6 +94,7 @@ class SpeechRecorder:
             wake_word: The detected wake word
             confidence: Detection confidence
             language: Language code for STT
+            webhook_url: Optional webhook URL for STT service
         """
         try:
             logger.info(f"🎙️ Starting speech recording after '{wake_word}' (confidence: {confidence:.3f})")
@@ -170,10 +174,13 @@ class SpeechRecorder:
                 # Send to STT
                 logger.info(f"📤 Sending {duration:.2f}s audio to STT service...")
                 logger.debug(f"Audio format: 16kHz, mono, {len(full_audio)} samples")
+                if webhook_url:
+                    logger.debug(f"Using webhook URL for STT: {webhook_url}")
                 
                 success, result = self.stt_client.transcribe(
                     full_audio,
-                    language=language
+                    language=language,
+                    webhook_url=webhook_url
                 )
                 logger.debug(f"STT response received: success={success}")
                 

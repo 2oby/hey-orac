@@ -619,6 +619,16 @@ def main():
                 enable_speex_noise_suppression=False
             )
             
+            # Perform health checks for models with webhook URLs
+            logger.info("🏥 Performing per-model STT health checks...")
+            for name, cfg in active_model_configs.items():
+                if cfg.webhook_url and stt_client:
+                    logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
+                    if stt_client.health_check(webhook_url=cfg.webhook_url):
+                        logger.info(f"✅ STT healthy for model '{name}'")
+                    else:
+                        logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
+            
             # Update shared data with loaded models info
             shared_data['loaded_models'] = list(active_model_configs.keys())
             shared_data['models_config'] = {name: {
@@ -718,53 +728,50 @@ def main():
         with settings_manager.get_config() as config:
             stt_config = config.stt
         
-        if stt_config.enabled:
-            logger.info("🎙️ Initializing STT components...")
-            logger.debug(f"STT Configuration: base_url={stt_config.base_url}, timeout={stt_config.timeout}s")
-            logger.debug(f"STT Endpoint settings: pre_roll={stt_config.pre_roll_duration}s, silence_threshold={stt_config.silence_threshold}, silence_duration={stt_config.silence_duration}s")
+        # Always initialize STT components
+        logger.info("🎙️ Initializing STT components...")
+        logger.debug(f"STT Configuration: base_url={stt_config.base_url}, timeout={stt_config.timeout}s")
+        logger.debug(f"STT Endpoint settings: pre_roll={stt_config.pre_roll_duration}s, silence_threshold={stt_config.silence_threshold}, silence_duration={stt_config.silence_duration}s")
+        
+        # Initialize ring buffer for pre-roll audio
+        ring_buffer = RingBuffer(
+            capacity_seconds=10.0,  # Keep 10 seconds of audio history
+            sample_rate=audio_config.sample_rate
+        )
+        logger.debug(f"RingBuffer initialized with capacity={10.0}s, sample_rate={audio_config.sample_rate}Hz")
+        
+        # Initialize STT client
+        stt_client = STTClient(
+            base_url=stt_config.base_url,
+            timeout=stt_config.timeout
+        )
+        
+        # Check STT service health
+        logger.debug(f"Checking STT service health at {stt_config.base_url}/stt/v1/health")
+        if stt_client.health_check():
+            logger.info("✅ STT service is healthy")
+            logger.debug("STT health check passed, service is ready for transcription")
             
-            # Initialize ring buffer for pre-roll audio
-            ring_buffer = RingBuffer(
-                capacity_seconds=10.0,  # Keep 10 seconds of audio history
-                sample_rate=audio_config.sample_rate
+            # Initialize speech recorder with endpointing config
+            endpoint_config = EndpointConfig(
+                silence_threshold=stt_config.silence_threshold,
+                silence_duration=stt_config.silence_duration,
+                grace_period=stt_config.grace_period,
+                max_duration=stt_config.max_recording_duration,
+                pre_roll=stt_config.pre_roll_duration
             )
-            logger.debug(f"RingBuffer initialized with capacity={10.0}s, sample_rate={audio_config.sample_rate}Hz")
             
-            # Initialize STT client
-            stt_client = STTClient(
-                base_url=stt_config.base_url,
-                timeout=stt_config.timeout
+            speech_recorder = SpeechRecorder(
+                ring_buffer=ring_buffer,
+                stt_client=stt_client,
+                endpoint_config=endpoint_config
             )
             
-            # Check STT service health
-            logger.debug(f"Checking STT service health at {stt_config.base_url}/stt/v1/health")
-            if stt_client.health_check():
-                logger.info("✅ STT service is healthy")
-                logger.debug("STT health check passed, service is ready for transcription")
-                
-                # Initialize speech recorder with endpointing config
-                endpoint_config = EndpointConfig(
-                    silence_threshold=stt_config.silence_threshold,
-                    silence_duration=stt_config.silence_duration,
-                    grace_period=stt_config.grace_period,
-                    max_duration=stt_config.max_recording_duration,
-                    pre_roll=stt_config.pre_roll_duration
-                )
-                
-                speech_recorder = SpeechRecorder(
-                    ring_buffer=ring_buffer,
-                    stt_client=stt_client,
-                    endpoint_config=endpoint_config
-                )
-                
-                logger.info("✅ STT components initialized successfully")
-            else:
-                logger.warning("⚠️ STT service is not healthy, disabling STT functionality")
-                stt_config.enabled = False
-                ring_buffer = None
-                stt_client = None
+            logger.info("✅ STT components initialized successfully")
         else:
-            logger.info("ℹ️ STT is disabled in configuration")
+            logger.warning("⚠️ STT service is not healthy, STT functionality will be limited")
+            # Don't null out components - keep them for per-model URL attempts
+            speech_recorder = None
         
         # Function to reload models when configuration changes
         def reload_models():
@@ -816,6 +823,16 @@ def main():
                 test_audio = np.zeros(1280, dtype=np.float32)
                 test_predictions = new_model.predict(test_audio)
                 logger.info(f"✅ New model test successful - predictions: {list(test_predictions.keys())}")
+                
+                # Perform health checks for models with webhook URLs
+                logger.info("🏥 Performing per-model STT health checks for reloaded models...")
+                for name, cfg in new_active_configs.items():
+                    if cfg.webhook_url and stt_client:
+                        logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
+                        if stt_client.health_check(webhook_url=cfg.webhook_url):
+                            logger.info(f"✅ STT healthy for model '{name}'")
+                        else:
+                            logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
                 
                 # Replace old model and configs
                 old_model = model
@@ -1128,28 +1145,30 @@ def main():
                         except Exception as e:
                             logger.error(f"❌ Unexpected error during webhook call: {e}")
                     
-                    # Trigger STT recording if enabled
+                    # Trigger STT recording based on webhook URL presence
+                    model_has_webhook = config_name and active_model_configs[config_name].webhook_url
+                    
                     if (speech_recorder is not None and 
-                        config_name and 
-                        active_model_configs[config_name].stt_enabled and
+                        model_has_webhook and
                         not speech_recorder.is_busy()):
-                        logger.info(f"🎤 Triggering STT recording for wake word '{config_name}'")
-                        logger.debug(f"STT recording conditions met: speech_recorder={speech_recorder is not None}, config_name={config_name}, stt_enabled={active_model_configs[config_name].stt_enabled}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
+                        logger.info(f"🎤 Triggering STT recording for wake word '{config_name}' (webhook URL: {active_model_configs[config_name].webhook_url})")
+                        logger.debug(f"STT recording conditions met: speech_recorder={speech_recorder is not None}, config_name={config_name}, webhook_url={active_model_configs[config_name].webhook_url}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
                         
                         # Get STT language from config
                         with settings_manager.get_config() as config:
                             stt_language = config.stt.language
                         
                         logger.debug(f"Starting recording with language={stt_language}")
-                        # Start recording in background thread
+                        # Start recording in background thread with webhook URL
                         speech_recorder.start_recording(
                             audio_stream=stream,
                             wake_word=config_name,
                             confidence=max_confidence,
-                            language=stt_language
+                            language=stt_language,
+                            webhook_url=active_model_configs[config_name].webhook_url
                         )
                     else:
-                        logger.debug(f"STT recording NOT triggered. Conditions: speech_recorder={speech_recorder is not None}, config_name={config_name}, stt_enabled={active_model_configs[config_name].stt_enabled if config_name and config_name in active_model_configs else False}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
+                        logger.debug(f"STT recording NOT triggered. Conditions: speech_recorder={speech_recorder is not None}, config_name={config_name}, webhook_url={active_model_configs[config_name].webhook_url if config_name and config_name in active_model_configs else None}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
                 else:
                     # Enhanced debugging - log more frequent confidence updates
                     if chunk_count % 50 == 0:  # Every 50 chunks instead of 100
