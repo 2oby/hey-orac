@@ -166,6 +166,10 @@ class AudioCapture:
         
         logger.info("Audio capture stopped")
     
+    def is_active(self) -> bool:
+        """Check if audio capture is currently active."""
+        return self.is_running and self.stream is not None
+    
     def _audio_callback(self, in_data, frame_count, time_info, status):
         """PyAudio callback for audio data."""
         if status:
