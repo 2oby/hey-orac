@@ -531,6 +531,8 @@ def main():
     stt_client = None
     stream = None
     audio_manager = None
+    preprocessing_active = False
+    preprocessing_manager = None
 
     try:
         # Handle test pipeline mode FIRST - don't need audio manager for testing
@@ -784,8 +786,16 @@ def main():
         print("DEBUG: After audio stream test log", flush=True)
         sys.stdout.flush()
         try:
-            test_data = stream.read(1280, exception_on_overflow=False)
-            logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
+            if preprocessing_active:
+                # Test preprocessing manager instead of direct stream
+                test_data = preprocessing_manager.get_audio_chunk(1280)
+                if test_data is not None:
+                    logger.info(f"✅ Audio preprocessing test successful, read {len(test_data) * 2} bytes")
+                else:
+                    logger.warning("⚠️ Audio preprocessing returned no data in test")
+            else:
+                test_data = stream.read(1280, exception_on_overflow=False)
+                logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
             sys.stdout.flush()
         except Exception as e:
             logger.error(f"❌ Audio stream test failed: {e}")
