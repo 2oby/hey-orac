@@ -26,7 +26,6 @@ from hey_orac.audio.ring_buffer import RingBuffer  # Import RingBuffer for pre-r
 from hey_orac.audio.speech_recorder import SpeechRecorder  # Import SpeechRecorder
 from hey_orac.audio.endpointing import EndpointConfig  # Import EndpointConfig
 from hey_orac.audio.preprocessor import AudioPreprocessorConfig  # Import preprocessor config
-from hey_orac.audio.preprocessing_manager import PreprocessingManager  # Import PreprocessingManager
 from hey_orac.transport.stt_client import STTClient  # Import STT client
 from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
 from hey_orac.web.app import create_app, socketio
@@ -133,85 +132,6 @@ class WavFileStream:
     def close(self):
         """Compatibility method - does nothing for WAV file."""
         pass
-
-
-def read_audio_chunk(args, stream, audio_capture, chunk_size=1280):
-    """
-    Read audio chunk from appropriate source.
-    
-    Args:
-        args: Command line arguments
-        stream: PyAudio stream or WavFileStream
-        audio_capture: AudioCapture instance (may be None)
-        chunk_size: Number of samples to read
-        
-    Returns:
-        tuple: (raw_data, source_type) or (None, None) on error
-    """
-    try:
-        if args.input_wav:
-            # WAV file reading
-            data = stream.read(chunk_size, exception_on_overflow=False)
-            return data, 'wav_file'
-        elif audio_capture and audio_capture.is_active():
-            # Preprocessed audio from AudioCapture
-            chunk = audio_capture.get_audio_chunk()
-            if chunk is not None and len(chunk) == chunk_size:
-                # Convert float32 back to int16 bytes for compatibility
-                audio_int16 = (chunk * 32768.0).astype(np.int16)
-                return audio_int16.tobytes(), 'preprocessed'
-            else:
-                return None, None
-        else:
-            # Raw stream reading (current approach)
-            data = stream.read(chunk_size, exception_on_overflow=False)
-            return data, 'microphone'
-    except Exception as e:
-        logger.error(f"Error reading audio chunk: {e}")
-        return None, None
-
-
-def process_audio_data(raw_data, source_type='microphone', wav_channels=None):
-    """
-    Process raw audio data to format expected by OpenWakeWord.
-    
-    Args:
-        raw_data: Raw audio bytes
-        source_type: 'microphone', 'wav_file', or 'preprocessed'
-        wav_channels: Number of channels for WAV files
-        
-    Returns:
-        numpy array of float32 audio data or None on error
-    """
-    if raw_data is None or len(raw_data) == 0:
-        return None
-        
-    try:
-        # Convert bytes to numpy array
-        audio_array = np.frombuffer(raw_data, dtype=np.int16)
-        
-        # Handle channel conversion based on source
-        if source_type == 'wav_file' and wav_channels == 2 and len(audio_array) > 1280:
-            # Stereo WAV file - convert to mono
-            stereo_data = audio_array.reshape(-1, 2)
-            audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-        elif source_type == 'preprocessed':
-            # Already processed, just convert
-            audio_data = audio_array.astype(np.float32)
-        else:
-            # Microphone input - check if stereo
-            if len(audio_array) > 1280:  # Stereo data
-                stereo_data = audio_array.reshape(-1, 2)
-                audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-            else:
-                # Already mono
-                audio_data = audio_array.astype(np.float32)
-                
-        return audio_data
-    except Exception as e:
-        logger.error(f"Error processing audio data: {e}")
-        return None
-
 
 def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename='test_recording.wav'):
     """Record 10 seconds of test audio with countdown and metadata generation."""
@@ -525,14 +445,6 @@ def main():
 
     # Try to explicitly load specific models
     logger.info("Attempting to load pre-trained models...")
-    
-    # Initialize variables that might be accessed in exception handlers
-    speech_recorder = None
-    stt_client = None
-    stream = None
-    audio_manager = None
-    preprocessing_active = False
-    preprocessing_manager = None
 
     try:
         # Handle test pipeline mode FIRST - don't need audio manager for testing
@@ -602,6 +514,8 @@ def main():
             return
 
         # Initialize audio source - either WAV file or microphone
+        stream = None
+        audio_manager = None
         usb_mic = None
         
         if args.input_wav:
@@ -646,43 +560,18 @@ def main():
                 logger.error("❌ Recording failed. Exiting.")
             return
 
-        # Initialize preprocessing manager
-        preprocessing_manager = PreprocessingManager(settings_manager, logger)
-        
         # Start audio stream if using microphone (skip if using WAV file)
         if not args.input_wav:
-            # Try to initialize preprocessing first (it will create its own stream)
-            preprocessing_active = preprocessing_manager.initialize(
-                usb_mic=usb_mic, 
-                stream=None,  # Don't pass a stream - let preprocessing create its own
-                audio_config={
-                    'channels': audio_config.channels,
-                    'sample_rate': audio_config.sample_rate,
-                    'chunk_size': audio_config.chunk_size,
-                    'preprocessing': audio_config.preprocessing.__dict__ if audio_config.preprocessing else {}
-                }
+            # Start audio stream with parameters from configuration
+            stream = audio_manager.start_stream(
+                device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
+                sample_rate=audio_config.sample_rate,
+                channels=audio_config.channels,
+                chunk_size=audio_config.chunk_size
             )
-            
-            # If preprocessing is not active, create a regular stream
-            if not preprocessing_active:
-                # Start audio stream with parameters from configuration
-                stream = audio_manager.start_stream(
-                    device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
-                    sample_rate=audio_config.sample_rate,
-                    channels=audio_config.channels,
-                    chunk_size=audio_config.chunk_size
-                )
-                if not stream:
-                    logger.error("Failed to start audio stream. Exiting.")
-                    raise RuntimeError("Failed to start audio stream")
-            else:
-                # Preprocessing is active, no need for separate stream
-                stream = None
-            
-            if preprocessing_active:
-                logger.info("✅ Audio preprocessing is active")
-            else:
-                logger.info("ℹ️  Audio preprocessing is disabled or unavailable")
+            if not stream:
+                logger.error("Failed to start audio stream. Exiting.")
+                raise RuntimeError("Failed to start audio stream")
 
         # Initialize the OpenWakeWord model with enabled models from configuration
         print("DEBUG: About to create Model()", flush=True)
@@ -786,16 +675,8 @@ def main():
         print("DEBUG: After audio stream test log", flush=True)
         sys.stdout.flush()
         try:
-            if preprocessing_active:
-                # Test preprocessing manager instead of direct stream
-                test_data = preprocessing_manager.get_audio_chunk(1280)
-                if test_data is not None:
-                    logger.info(f"✅ Audio preprocessing test successful, read {len(test_data) * 2} bytes")
-                else:
-                    logger.warning("⚠️ Audio preprocessing returned no data in test")
-            else:
-                test_data = stream.read(1280, exception_on_overflow=False)
-                logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
+            test_data = stream.read(1280, exception_on_overflow=False)
+            logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
             sys.stdout.flush()
         except Exception as e:
             logger.error(f"❌ Audio stream test failed: {e}")
@@ -833,6 +714,8 @@ def main():
         
         # Initialize STT components if enabled
         ring_buffer = None
+        speech_recorder = None
+        stt_client = None
         
         with settings_manager.get_config() as config:
             stt_config = config.stt
@@ -984,10 +867,6 @@ def main():
         last_config_check = time.time()
         CONFIG_CHECK_INTERVAL = 1.0  # Check for config changes every second
         
-        # Debouncing: track last detection time per model
-        last_detection_times = {}
-        DETECTION_COOLDOWN = 2.0  # Minimum seconds between detections for same model
-        
         while True:
             try:
                 # Check for configuration changes
@@ -1002,25 +881,35 @@ def main():
                             logger.error("❌ Failed to apply configuration change")
                     last_config_check = current_time
                 
-                # Read audio chunk using our extracted function
-                data, source_type = read_audio_chunk(
-                    args, 
-                    stream, 
-                    preprocessing_manager.audio_capture if preprocessing_manager.is_preprocessing_active() else None,
-                    chunk_size=1280
-                )
-                
-                if data is None:
+                # Read one chunk of audio data (1280 samples)
+                data = stream.read(1280, exception_on_overflow=False)
+                if data is None or len(data) == 0:
                     logger.warning("No audio data read from stream")
                     continue
 
-                # Process audio data using our extracted function
-                wav_channels = stream.channels if args.input_wav and hasattr(stream, 'channels') else None
-                audio_data = process_audio_data(data, source_type, wav_channels)
+                # Convert bytes to numpy array - now handling stereo input
+                audio_array = np.frombuffer(data, dtype=np.int16)
                 
-                if audio_data is None:
-                    logger.warning("Failed to process audio data")
-                    continue
+                # Handle channel conversion based on input source
+                if args.input_wav and hasattr(stream, 'channels'):
+                    # For WAV files, check the stream's channel count
+                    if stream.channels == 2 and len(audio_array) > 1280:
+                        # Stereo WAV file - convert to mono
+                        stereo_data = audio_array.reshape(-1, 2)
+                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                    else:
+                        # Mono WAV file
+                        audio_data = audio_array.astype(np.float32)
+                else:
+                    # Microphone input - use original logic
+                    if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
+                        # Reshape to separate left and right channels, then average
+                        stereo_data = audio_array.reshape(-1, 2)
+                        # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
+                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                    else:
+                        # Already mono - CRITICAL FIX: no normalization!
+                        audio_data = audio_array.astype(np.float32)
 
                 # Calculate RMS for web GUI display
                 rms = np.sqrt(np.mean(audio_data**2))
@@ -1041,10 +930,8 @@ def main():
                     audio_volume = np.abs(audio_data).mean()
                     logger.info(f"📊 Processed {chunk_count} audio chunks")
                     logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}, RMS: {rms:.4f}")
-                    logger.info(f"   Source: {source_type}, Raw data size: {len(data)} bytes")
-                    if preprocessing_manager.is_preprocessing_active():
-                        logger.info(f"   ✅ Audio preprocessing active (AGC, compression, limiting)")
-                    elif source_type == 'microphone' and len(data) > 2560:
+                    logger.info(f"   Raw data size: {len(data)} bytes, samples: {len(audio_array)}")
+                    if len(audio_array) > 1280:
                         logger.info(f"   ✅ Stereo→Mono conversion active")
 
                 # Pass the audio data to the model for wake word prediction
@@ -1093,18 +980,6 @@ def main():
                 
                 # Process each triggered model
                 for trigger_info in triggered_models:
-                    # Check debounce cooldown
-                    model_name = trigger_info['config_name']
-                    current_time = time.time()
-                    if model_name in last_detection_times:
-                        time_since_last = current_time - last_detection_times[model_name]
-                        if time_since_last < DETECTION_COOLDOWN:
-                            logger.debug(f"Debouncing {model_name}: {time_since_last:.1f}s since last detection (cooldown: {DETECTION_COOLDOWN}s)")
-                            continue
-                    
-                    # Update last detection time
-                    last_detection_times[model_name] = current_time
-                    
                     logger.info(f"🎯 WAKE WORD DETECTED (MULTI-TRIGGER)! Confidence: {trigger_info['confidence']:.6f} (threshold: {trigger_info['threshold']:.6f}) - Source: {trigger_info['wakeword']}")
                     logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
                     
@@ -1215,18 +1090,6 @@ def main():
                         logger.warning(f"Model '{best_model}' not found in active configs, using default threshold")
                 
                 if max_confidence >= detection_threshold:
-                    # Check debounce cooldown
-                    current_time = time.time()
-                    if config_name and config_name in last_detection_times:
-                        time_since_last = current_time - last_detection_times[config_name]
-                        if time_since_last < DETECTION_COOLDOWN:
-                            logger.debug(f"Debouncing {config_name}: {time_since_last:.1f}s since last detection (cooldown: {DETECTION_COOLDOWN}s)")
-                            continue  # Skip to next audio chunk
-                    
-                    # Update last detection time
-                    if config_name:
-                        last_detection_times[config_name] = current_time
-                    
                     logger.info(f"🎯 WAKE WORD DETECTED! Confidence: {max_confidence:.6f} (threshold: {detection_threshold:.6f}) - Source: {best_model}")
                     logger.info(f"   All model scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
                     logger.debug(f"Detection details: model={best_model}, config_name={config_name}, stt_enabled={active_model_configs[config_name].stt_enabled if config_name and config_name in active_model_configs else False}")
