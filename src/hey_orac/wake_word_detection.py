@@ -649,27 +649,33 @@ def main():
         
         # Start audio stream if using microphone (skip if using WAV file)
         if not args.input_wav:
-            # Start audio stream with parameters from configuration
-            stream = audio_manager.start_stream(
-                device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
-                sample_rate=audio_config.sample_rate,
-                channels=audio_config.channels,
-                chunk_size=audio_config.chunk_size
-            )
-            if not stream:
-                logger.error("Failed to start audio stream. Exiting.")
-                raise RuntimeError("Failed to start audio stream")
-                
-            # Initialize preprocessing if enabled
+            # Try to initialize preprocessing first (it will create its own stream)
             preprocessing_active = preprocessing_manager.initialize(
                 usb_mic=usb_mic, 
-                stream=stream,
+                stream=None,  # Don't pass a stream - let preprocessing create its own
                 audio_config={
                     'channels': audio_config.channels,
                     'sample_rate': audio_config.sample_rate,
-                    'chunk_size': audio_config.chunk_size
+                    'chunk_size': audio_config.chunk_size,
+                    'preprocessing': audio_config.preprocessing.__dict__ if audio_config.preprocessing else {}
                 }
             )
+            
+            # If preprocessing is not active, create a regular stream
+            if not preprocessing_active:
+                # Start audio stream with parameters from configuration
+                stream = audio_manager.start_stream(
+                    device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
+                    sample_rate=audio_config.sample_rate,
+                    channels=audio_config.channels,
+                    chunk_size=audio_config.chunk_size
+                )
+                if not stream:
+                    logger.error("Failed to start audio stream. Exiting.")
+                    raise RuntimeError("Failed to start audio stream")
+            else:
+                # Preprocessing is active, no need for separate stream
+                stream = None
             
             if preprocessing_active:
                 logger.info("✅ Audio preprocessing is active")
