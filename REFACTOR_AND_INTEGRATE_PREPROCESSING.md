@@ -278,6 +278,84 @@ If issues arise:
 3. System reverts to original behavior
 4. Debug offline with saved audio samples
 
+## Progress Update (2025-07-30)
+
+### Completed Tasks
+
+#### Phase 1: Create Integration Layer ✅
+- **1.1**: Created `PreprocessingManager` in `src/hey_orac/audio/preprocessing_manager.py`
+  - Implemented full fallback support
+  - Provides unified interface for audio with/without preprocessing
+  - Handles graceful degradation if preprocessing fails
+
+- **1.2**: Added feature flag to `config/settings.json.template`
+  - Added `enable_audio_preprocessing: false` to system config
+  - Updated `SystemConfig` dataclass to include the new field
+  - Fixed config loading to properly handle the new field
+
+#### Phase 2: Refactor Audio Pipeline ✅
+- **2.1**: Extracted audio reading logic in `wake_word_detection.py`
+  - Created `read_audio_chunk()` function
+  - Handles WAV file, preprocessed, and raw stream sources
+  
+- **2.2**: Extracted audio processing logic
+  - Created `process_audio_data()` function
+  - Properly handles stereo-to-mono conversion
+  - Maintains compatibility with existing format
+
+#### Phase 3: Integrate AudioCapture ✅
+- **3.1**: Added conditional AudioCapture initialization
+  - Integrated PreprocessingManager into main detection loop
+  - Properly detects USB microphone and passes to manager
+  - Falls back to raw stream if preprocessing unavailable
+
+- **3.2**: Updated main detection loop
+  - Now uses PreprocessingManager for all audio reading
+  - Maintains backward compatibility with WAV input
+  - Properly updates audio metrics
+
+### Additional Fixes Implemented
+
+1. **Rapid Wake Word Detection Crash** ✅
+   - Added 2-second debouncing mechanism
+   - Prevents multiple rapid detections from same model
+   - Removed beep.mp3 audio code (device has no speaker)
+
+2. **Configuration Issues** ✅
+   - Fixed `AudioConfig` object not being iterable
+   - Fixed `SystemConfig` attribute access issues
+   - Fixed `AudioDevice` object subscripting
+   - Added proper field to SystemConfig dataclass
+
+3. **Web Client Updates** ✅
+   - Removed beep audio notification code
+   - Maintained all other functionality
+
+### Current Status
+
+#### In Progress
+- **AudioCapture Constructor Issue**: The PreprocessingManager is trying to pass incorrect parameters to AudioCapture
+  - AudioCapture expects: `sample_rate`, `chunk_size`, `ring_buffer_seconds`, `device_index`, `preprocessor_config`
+  - PreprocessingManager is passing: `device_index`, `channels`, `rate`, `chunk_size`, `settings_manager`
+  - Need to fix the initialization call in PreprocessingManager
+
+#### Pending Tasks
+- Fix AudioCapture initialization parameters
+- Complete testing with preprocessing enabled
+- Fix model caching issue (models download every time)
+- Update speech recording integration (Phase 4)
+
+### Deployment Status
+- Code deployed to Pi with preprocessing disabled
+- Container running healthy
+- Ready to test with preprocessing once constructor issue fixed
+
+### Next Steps
+1. Fix AudioCapture constructor parameters in PreprocessingManager
+2. Test with preprocessing enabled
+3. Monitor audio quality improvements
+4. Address model caching issue
+
 ## Conclusion
 
 This plan provides a safe, gradual approach to integrating audio preprocessing while maintaining system stability. The use of feature flags and fallback mechanisms ensures we can deploy with confidence and roll back if needed.
