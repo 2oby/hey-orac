@@ -155,7 +155,7 @@ def read_audio_chunk(args, stream, audio_capture, chunk_size=1280):
             return data, 'wav_file'
         elif audio_capture and audio_capture.is_active():
             # Preprocessed audio from AudioCapture
-            chunk = audio_capture.read_chunk()
+            chunk = audio_capture.get_audio_chunk()
             if chunk is not None and len(chunk) == chunk_size:
                 # Convert float32 back to int16 bytes for compatibility
                 audio_int16 = (chunk * 32768.0).astype(np.int16)

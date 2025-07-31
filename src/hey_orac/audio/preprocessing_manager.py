@@ -138,7 +138,7 @@ class PreprocessingManager:
         try:
             if not self.fallback_mode and self.audio_capture and self.audio_capture.is_active():
                 # Get preprocessed audio from AudioCapture
-                chunk = self.audio_capture.read_chunk()
+                chunk = self.audio_capture.get_audio_chunk()
                 if chunk is not None and len(chunk) == chunk_size:
                     return chunk
                 else:
