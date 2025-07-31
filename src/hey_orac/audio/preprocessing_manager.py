@@ -73,12 +73,31 @@ class PreprocessingManager:
             
             # Create AudioCapture instance
             from hey_orac.audio.microphone import AudioCapture
+            from hey_orac.audio.preprocessor import AudioPreprocessorConfig
+            
+            # Get preprocessing config
+            preprocessing_config = audio_config.get('preprocessing', {})
+            preprocessor_config = AudioPreprocessorConfig(
+                enable_agc=preprocessing_config.get('enable_agc', True),
+                agc_target_level=preprocessing_config.get('agc_target_level', 0.3),
+                agc_max_gain=preprocessing_config.get('agc_max_gain', 10.0),
+                agc_attack_time=preprocessing_config.get('agc_attack_time', 0.01),
+                agc_release_time=preprocessing_config.get('agc_release_time', 0.1),
+                enable_compression=preprocessing_config.get('enable_compression', True),
+                compression_threshold=preprocessing_config.get('compression_threshold', 0.5),
+                compression_ratio=preprocessing_config.get('compression_ratio', 4.0),
+                enable_limiter=preprocessing_config.get('enable_limiter', True),
+                limiter_threshold=preprocessing_config.get('limiter_threshold', 0.95),
+                enable_noise_gate=preprocessing_config.get('enable_noise_gate', False),
+                noise_gate_threshold=preprocessing_config.get('noise_gate_threshold', 0.01)
+            )
+            
             self.audio_capture = AudioCapture(
-                device_index=usb_mic.index,
-                channels=audio_config.get('channels', 2),
-                rate=audio_config.get('sample_rate', 16000),
+                sample_rate=audio_config.get('sample_rate', 16000),
                 chunk_size=audio_config.get('chunk_size', 1280),
-                settings_manager=self.settings_manager
+                ring_buffer_seconds=10.0,
+                device_index=usb_mic.index,
+                preprocessor_config=preprocessor_config
             )
             
             # Start the audio capture
