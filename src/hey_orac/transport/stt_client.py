@@ -184,8 +184,10 @@ class STTClient:
             if response.status_code == 200:
                 health = response.json()
                 logger.debug(f"Health check response: {health}")
-                if health.get('status') == 'healthy' and health.get('model_loaded'):
-                    logger.info(f"✅ STT service healthy: model={health.get('model_name')}, backend={health.get('backend')}, device={health.get('device')}")
+                # Consider service healthy if it responds, even if still initializing
+                status = health.get('status', 'unknown')
+                if status in ['healthy', 'ready', 'initializing']:
+                    logger.info(f"✅ STT service accessible: status={status}, model={health.get('model_name')}, backend={health.get('backend')}, device={health.get('device')}")
                     return True
                 else:
                     logger.warning(f"⚠️ STT service unhealthy: {health}")
