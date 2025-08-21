@@ -94,12 +94,6 @@ The hey-orac project will be deployed to:
 - Update this file as environment changes occur
 - Keep sensitive information like IP addresses and credentials here instead of in public documentation 
 
-## Picovoice Access Key
-https://console.picovoice.ai/
-
-eY+P1g+xx9tW3dK2f5A+ktg8K3Zc8bmgrjVSvtnJ9gn2VRJgt/v3yQ==
-
-
 
 
 
