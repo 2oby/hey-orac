@@ -111,6 +111,12 @@ function updateConnectionStatus(connected) {
         statusElement.textContent = connected ? 'Connected' : 'Disconnected';
         statusElement.style.color = connected ? '#00ff41' : '#ff0000';
     }
+    
+    // Update the indicator dot
+    const indicator = document.getElementById('connectionStatus');
+    if (indicator) {
+        indicator.classList.toggle('error', !connected);
+    }
 }
 
 // Update system status
@@ -123,6 +129,52 @@ function updateSystemStatus(status) {
     const activeElement = document.querySelector('.audio-status');
     if (activeElement) {
         activeElement.textContent = status.active ? `Active (RMS: ${currentVolume.toFixed(0)})` : 'Inactive';
+    }
+    
+    // Update audio indicator
+    const audioIndicator = document.getElementById('audioStatus');
+    if (audioIndicator) {
+        audioIndicator.classList.toggle('error', !status.active);
+    }
+    
+    // Update activation indicator
+    const activationIndicator = document.getElementById('activationStatus');
+    if (activationIndicator) {
+        activationIndicator.classList.toggle('error', !status.listening);
+    }
+    
+    // Update STT health status if provided
+    if (status.stt_health !== undefined) {
+        updateSTTStatus(status.stt_health);
+    }
+}
+
+// Update STT connection status
+function updateSTTStatus(health) {
+    const statusElement = document.querySelector('.stt-status');
+    const indicator = document.getElementById('sttStatus');
+    
+    if (statusElement && indicator) {
+        // Remove all status classes
+        indicator.classList.remove('error', 'partial');
+        
+        switch (health) {
+            case 'connected':
+                statusElement.textContent = 'STT: Connected';
+                // Default green, no special class needed
+                break;
+            case 'partial':
+                statusElement.textContent = 'STT: Partial';
+                indicator.classList.add('partial');
+                break;
+            case 'disconnected':
+                statusElement.textContent = 'STT: Disconnected';
+                indicator.classList.add('error');
+                break;
+            default:
+                statusElement.textContent = 'STT: Checking...';
+                indicator.classList.add('partial');
+        }
     }
 }
 

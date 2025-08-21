@@ -597,3 +597,33 @@ Wake Word Detection → Speech Recording → STT Transcription → Webhook Deliv
 - Complete Hey ORAC → ORAC STT integration working
 - Ready for audio quality improvements and parameter verification  
 - Production-ready speech-to-text pipeline operational
+
+## 2025-08-21 - STT Connection Indicator Implementation
+
+### STT Health Status Indicator Added to Web Interface
+- **Duration**: ~30 minutes
+- **Result**: Visual STT connection status indicator in footer with real-time updates
+- **Status**: ✅ Implementation complete, ready for testing
+
+### Implementation Details:
+1. **HTML Structure** - Added new status item in footer with indicator dot and text
+2. **CSS Styling** - Three states: green (connected), orange (partial), red (disconnected)
+3. **Health Check Logic** - Aggregates health status from all configured webhook URLs
+4. **WebSocket Updates** - Added stt_health field to status broadcasts
+5. **JavaScript Handler** - Updates indicator color and text based on health status
+6. **Periodic Checks** - Health status checked every 30 seconds automatically
+7. **Edge Case Handling** - Proper handling of no URLs, timeouts, and config changes
+
+### Technical Implementation:
+- **check_all_stt_health()** function in wake_word_detection.py
+  - Returns 'connected' if all webhook URLs healthy
+  - Returns 'partial' if some webhook URLs healthy
+  - Returns 'disconnected' if no webhook URLs healthy or none configured
+- **WebSocket Integration** - stt_health included in status_update broadcasts
+- **UI Updates** - Real-time indicator updates without page refresh
+- **Status Persistence** - Health status tracked in shared_data dictionary
+
+### Next Steps:
+- Deploy to Pi and test all three indicator states
+- Verify indicator updates on webhook URL changes
+- Test network disconnection scenarios

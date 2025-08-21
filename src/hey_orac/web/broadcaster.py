@@ -128,6 +128,7 @@ class WebSocketBroadcaster:
                     'listening': self.shared_data.get('is_listening', False),
                     'active': self.shared_data.get('is_active', False),
                     'status': self.shared_data.get('status', 'Not connected'),
+                    'stt_health': self.shared_data.get('stt_health', 'disconnected'),
                     'timestamp': datetime.utcnow().isoformat() + 'Z'
                 }
                 

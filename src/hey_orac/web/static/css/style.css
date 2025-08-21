@@ -584,6 +584,11 @@ body::before {
     box-shadow: 0 0 10px #ff0066;
 }
 
+.status-indicator.partial {
+    background: #ff9500;
+    box-shadow: 0 0 10px #ff9500;
+}
+
 /* Glitch effect for detected models */
 .model-card.detected .model-name {
     animation: glitch 0.3s ease-in-out;

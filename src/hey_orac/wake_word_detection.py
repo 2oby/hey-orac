@@ -402,6 +402,42 @@ def test_pipeline_with_audio(model, audio_data):
 # This ensures models like "alexa", "hey jarvis", etc., are available
 openwakeword.utils.download_models()
 
+def check_all_stt_health(active_model_configs, stt_client):
+    """
+    Check health status of all configured webhook URLs.
+    
+    Returns:
+        str: 'connected' if all healthy, 'partial' if some healthy, 'disconnected' if none healthy
+    """
+    webhook_urls = []
+    for name, cfg in active_model_configs.items():
+        if cfg.webhook_url:
+            webhook_urls.append((name, cfg.webhook_url))
+    
+    if not webhook_urls:
+        logger.debug("No webhook URLs configured")
+        return 'disconnected'
+    
+    healthy_count = 0
+    total_count = len(webhook_urls)
+    
+    for name, webhook_url in webhook_urls:
+        try:
+            if stt_client.health_check(webhook_url=webhook_url):
+                healthy_count += 1
+                logger.debug(f"✅ STT healthy for model '{name}' at {webhook_url}")
+            else:
+                logger.debug(f"❌ STT unhealthy for model '{name}' at {webhook_url}")
+        except Exception as e:
+            logger.debug(f"❌ STT health check failed for model '{name}': {e}")
+    
+    if healthy_count == total_count:
+        return 'connected'
+    elif healthy_count > 0:
+        return 'partial'
+    else:
+        return 'disconnected'
+
 def main():
     """Main function to run the wake word detection system."""
     # Log git commit if available
@@ -425,7 +461,8 @@ def main():
         'last_detection': None,
         'recent_detections': [],
         'config_changed': False,
-        'status_changed': True
+        'status_changed': True,
+        'stt_health': 'disconnected'
     })
     event_queue = Queue(maxsize=100)
     
@@ -773,6 +810,12 @@ def main():
                         logger.info(f"✅ STT healthy for model '{name}'")
                     else:
                         logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
+            
+            # Update initial STT health status
+            stt_health_status = check_all_stt_health(active_model_configs, stt_client)
+            shared_data['stt_health'] = stt_health_status
+            shared_data['status_changed'] = True
+            logger.info(f"🏥 Initial STT health status: {stt_health_status}")
         
         # Function to reload models when configuration changes
         def reload_models():
@@ -853,6 +896,12 @@ def main():
                 # Clean up old model (helps with memory)
                 del old_model
                 
+                # Update STT health status after reload
+                stt_health_status = check_all_stt_health(active_model_configs, stt_client)
+                shared_data['stt_health'] = stt_health_status
+                shared_data['status_changed'] = True
+                logger.info(f"🏥 STT health after reload: {stt_health_status}")
+                
                 logger.info("✅ Models reloaded successfully")
                 return True
                 
@@ -865,7 +914,9 @@ def main():
         sys.stdout.flush()
         chunk_count = 0
         last_config_check = time.time()
+        last_health_check = time.time()
         CONFIG_CHECK_INTERVAL = 1.0  # Check for config changes every second
+        HEALTH_CHECK_INTERVAL = 30.0  # Check STT health every 30 seconds
         
         while True:
             try:
@@ -880,6 +931,18 @@ def main():
                         else:
                             logger.error("❌ Failed to apply configuration change")
                     last_config_check = current_time
+                
+                # Check STT health periodically
+                if current_time - last_health_check >= HEALTH_CHECK_INTERVAL:
+                    if stt_client:
+                        stt_health_status = check_all_stt_health(active_model_configs, stt_client)
+                        if shared_data.get('stt_health') != stt_health_status:
+                            shared_data['stt_health'] = stt_health_status
+                            shared_data['status_changed'] = True
+                            logger.info(f"🏥 STT health status changed to: {stt_health_status}")
+                        else:
+                            logger.debug(f"🏥 Periodic STT health check: {stt_health_status}")
+                    last_health_check = current_time
                 
                 # Read one chunk of audio data (1280 samples)
                 data = stream.read(1280, exception_on_overflow=False)
