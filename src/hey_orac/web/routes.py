@@ -241,14 +241,25 @@ def register_socketio_handlers(socketio):
         logger.info(f"Client {request.sid} joined 'realtime' room")
         emit('subscribed', {'status': 'subscribed to updates'})
         
-        # Send immediate RMS update to newly subscribed client (reduced logging)
+        # Send immediate status and RMS updates to newly subscribed client
         if shared_data:
             try:
+                # Send status update
+                status_data = {
+                    'listening': shared_data.get('is_listening', False),
+                    'active': shared_data.get('is_active', False),
+                    'status': shared_data.get('status', 'Not connected'),
+                    'stt_health': shared_data.get('stt_health', 'disconnected'),
+                    'timestamp': datetime.utcnow().isoformat() + 'Z'
+                }
+                emit('status_update', status_data)
+                
+                # Send RMS update
                 current_rms = shared_data.get('rms', 0.0)
                 if current_rms is not None and current_rms > 0:
                     emit('rms_update', {'rms': current_rms, 'timestamp': datetime.utcnow().isoformat() + 'Z'})
             except Exception as e:
-                logger.warning(f"Could not send immediate RMS update: {e}")
+                logger.warning(f"Could not send immediate updates: {e}")
     
     @socketio.on('ping')
     def handle_ping(data):
