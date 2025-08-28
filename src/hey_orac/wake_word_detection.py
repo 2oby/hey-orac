@@ -1112,7 +1112,9 @@ def main():
                             audio_stream=stream,
                             wake_word=trigger_info['config_name'],
                             confidence=trigger_info['confidence'],
-                            language=stt_language
+                            language=stt_language,
+                            webhook_url=trigger_info['model_config'].webhook_url,
+                            topic=trigger_info['model_config'].topic
                         )
             
             else:
@@ -1230,7 +1232,8 @@ def main():
                             wake_word=config_name,
                             confidence=max_confidence,
                             language=stt_language,
-                            webhook_url=active_model_configs[config_name].webhook_url
+                            webhook_url=active_model_configs[config_name].webhook_url,
+                            topic=active_model_configs[config_name].topic
                         )
                     else:
                         logger.debug(f"STT recording NOT triggered. Conditions: speech_recorder={speech_recorder is not None}, config_name={config_name}, webhook_url={active_model_configs[config_name].webhook_url if config_name and config_name in active_model_configs else None}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")

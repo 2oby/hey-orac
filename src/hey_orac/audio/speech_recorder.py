@@ -50,7 +50,8 @@ class SpeechRecorder:
                        wake_word: str,
                        confidence: float,
                        language: Optional[str] = None,
-                       webhook_url: Optional[str] = None) -> None:
+                       webhook_url: Optional[str] = None,
+                       topic: str = "general") -> None:
         """
         Start recording speech in a separate thread.
         
@@ -74,7 +75,7 @@ class SpeechRecorder:
         # Start recording in a separate thread
         self.recording_thread = threading.Thread(
             target=self._record_and_transcribe,
-            args=(audio_stream, wake_word, confidence, language, webhook_url),
+            args=(audio_stream, wake_word, confidence, language, webhook_url, topic),
             daemon=True
         )
         self.recording_thread.start()
@@ -85,7 +86,8 @@ class SpeechRecorder:
                               wake_word: str,
                               confidence: float,
                               language: Optional[str] = None,
-                              webhook_url: Optional[str] = None) -> None:
+                              webhook_url: Optional[str] = None,
+                              topic: str = "general") -> None:
         """
         Record speech and send to STT (runs in separate thread).
         
@@ -182,7 +184,8 @@ class SpeechRecorder:
                 success, result = self.stt_client.transcribe(
                     full_audio,
                     language=language,
-                    webhook_url=webhook_url
+                    webhook_url=webhook_url,
+                    topic=topic
                 )
                 logger.debug(f"STT response received: success={success}")
                 

@@ -91,6 +91,8 @@ def update_model_config(model_name):
             updates['threshold'] = float(data['threshold'])
         if 'webhook_url' in data:
             updates['webhook_url'] = data['webhook_url']
+        if 'topic' in data:
+            updates['topic'] = data['topic']
         if 'enabled' in data:
             updates['enabled'] = bool(data['enabled'])
         

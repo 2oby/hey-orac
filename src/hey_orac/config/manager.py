@@ -27,6 +27,7 @@ class ModelConfig:
     webhook_url: str = ""
     priority: int = 1
     stt_enabled: bool = True
+    topic: str = "general"  # Topic for ORAC Core routing
 
 
 @dataclass
@@ -331,6 +332,7 @@ class SettingsManager:
                     enabled=model_dict.get('enabled', True),
                     threshold=model_dict.get('threshold', 0.3),
                     webhook_url=model_dict.get('webhook_url', ''),
+                    topic=model_dict.get('topic', 'general'),
                     priority=model_dict.get('priority', 1),
                     stt_enabled=model_dict.get('stt_enabled', True)
                 )
@@ -677,6 +679,7 @@ class SettingsManager:
             enabled=False,  # Default to disabled for new models
             threshold=0.3,
             webhook_url="",
+            topic="general",
             priority=priority
         )
     
@@ -775,6 +778,8 @@ class SettingsManager:
                         model.threshold = float(updates['threshold'])
                     if 'webhook_url' in updates:
                         model.webhook_url = str(updates['webhook_url'])
+                    if 'topic' in updates:
+                        model.topic = str(updates['topic'])
                     if 'enabled' in updates:
                         model.enabled = bool(updates['enabled'])
                     if 'framework' in updates:

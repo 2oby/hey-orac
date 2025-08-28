@@ -67,7 +67,8 @@ class STTClient:
                    audio_data: np.ndarray, 
                    language: Optional[str] = None,
                    task: str = "transcribe",
-                   webhook_url: Optional[str] = None) -> Tuple[bool, Dict[str, Any]]:
+                   webhook_url: Optional[str] = None,
+                   topic: str = "general") -> Tuple[bool, Dict[str, Any]]:
         """
         Send audio to STT service for transcription.
         
@@ -76,6 +77,7 @@ class STTClient:
             language: Language code (e.g., "en", "es", "fr")
             task: "transcribe" or "translate"
             webhook_url: Override base URL with specific webhook URL
+            topic: Topic ID for ORAC Core routing (default: "general")
             
         Returns:
             Tuple of (success, result_dict)
@@ -99,16 +101,17 @@ class STTClient:
             logger.debug(f"Request parameters: language={language}, task={task}")
             
             # Make request - use webhook_url if provided, otherwise use base_url
+            # Include topic in the URL path
             if webhook_url:
                 # Extract just the base URL from webhook URL (remove any path)
                 from urllib.parse import urlparse
                 parsed = urlparse(webhook_url)
                 base_url = f"{parsed.scheme}://{parsed.netloc}"
-                url = f"{base_url}/stt/v1/stream"
+                url = f"{base_url}/stt/v1/stream/{topic}"
                 logger.debug(f"Using webhook URL for STT: {url} (from {webhook_url})")
             else:
-                url = f"{self.base_url}/stt/v1/stream"
-            logger.debug(f"Making POST request to: {url}")
+                url = f"{self.base_url}/stt/v1/stream/{topic}"
+            logger.debug(f"Making POST request to: {url} with topic: {topic}")
             
             start_time = datetime.now()
             response = self.session.post(
