@@ -627,3 +627,9 @@ Wake Word Detection → Speech Recording → STT Transcription → Webhook Deliv
 - Deploy to Pi and test all three indicator states
 - Verify indicator updates on webhook URL changes
 - Test network disconnection scenarios
+
+### Status: ✅ COMPLETED
+- Successfully deployed to Pi device
+- STT indicator showing correct status (green when ORAC STT is online)
+- Fixed health check to accept 'initializing' status as healthy
+- All changes committed and pushed to repository
