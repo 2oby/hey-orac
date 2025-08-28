@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Hey Orac - Wake Word Monitor</title>
     <link rel="stylesheet" href="/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
         * {
             margin: 0;
@@ -805,15 +806,15 @@
                 <div class="setting-group" style="margin-bottom: 20px;">
                     <label for="model-threshold" style="display: block; margin-bottom: 10px; color: #00ff41;">Threshold</label>
                     <input type="range" id="model-threshold" min="0" max="1" step="0.01" value="0.3" style="width: 100%;">
-                    <span class="value-display" id="model-threshold-display" style="color: #00ff41;">0.3</span>
+                    <span class="value-display" id="model-threshold-display" style="color: #00ff41; font-family: 'Orbitron', monospace;">0.3</span>
                 </div>
                 <div class="setting-group">
                     <label for="model-api-url" style="display: block; margin-bottom: 10px; color: #00ff41;">Webhook URL</label>
-                    <input type="text" id="model-api-url" placeholder="https://example.com/webhook" style="width: 100%; padding: 10px; background: #0a0a0a; border: 1px solid #00ff41; color: #00ff41; border-radius: 5px;">
+                    <input type="text" id="model-api-url" placeholder="https://example.com/webhook" style="width: 100%; padding: 10px; background-color: #0a0a0a; border: 1px solid #00ff41; color: #00ff41; border-radius: 5px; font-family: 'Orbitron', monospace; font-size: 14px;">
                 </div>
                 <div class="setting-group" style="margin-bottom: 20px;">
                     <label for="model-topic" style="display: block; margin-bottom: 10px; color: #00ff41;">Topic</label>
-                    <input type="text" id="model-topic" placeholder="general" style="width: 100%; padding: 10px; background: #0a0a0a; border: 1px solid #00ff41; color: #00ff41; border-radius: 5px;">
+                    <input type="text" id="model-topic" placeholder="general" style="width: 100%; padding: 10px; background-color: #0a0a0a; border: 1px solid #00ff41; color: #00ff41; border-radius: 5px; font-family: 'Orbitron', monospace; font-size: 14px;">
                     <small style="color: #00ff41; opacity: 0.7; display: block; margin-top: 5px;">Topic name for ORAC Core routing (e.g., general, home_assistant)</small>
                 </div>
             </div>
