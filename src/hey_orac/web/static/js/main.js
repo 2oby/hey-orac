@@ -232,6 +232,7 @@ async function loadConfig() {
                 active: model.enabled,
                 threshold: model.threshold,
                 apiUrl: model.webhook_url,
+                topic: model.topic || 'general',
                 framework: model.framework,
                 path: model.path
             };
@@ -328,8 +329,9 @@ async function saveModelSettings() {
     
     const threshold = parseFloat(document.getElementById('model-threshold').value);
     const apiUrl = document.getElementById('model-api-url').value;
+    const topic = document.getElementById('model-topic').value || 'general';
     
-    console.log('Saving model settings:', {model: currentEditingModel, threshold, apiUrl});
+    console.log('Saving model settings:', {model: currentEditingModel, threshold, apiUrl, topic});
     
     try {
         const response = await fetch(`${API_BASE}/config/models/${currentEditingModel}`, {
@@ -337,7 +339,8 @@ async function saveModelSettings() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 threshold: threshold,
-                webhook_url: apiUrl
+                webhook_url: apiUrl,
+                topic: topic
             })
         });
         
@@ -348,6 +351,7 @@ async function saveModelSettings() {
             if (model) {
                 model.threshold = threshold;
                 model.apiUrl = apiUrl;
+                model.topic = topic;
                 console.log('Updated local model:', model);
             }
             closeModelSettings();
@@ -412,9 +416,11 @@ function openModelSettings(modelName) {
         // Set slider values and verify they were set correctly
         const thresholdSlider = document.getElementById('model-threshold');
         const apiUrlField = document.getElementById('model-api-url');
+        const topicField = document.getElementById('model-topic');
         
         thresholdSlider.value = model.threshold;
         apiUrlField.value = model.apiUrl || '';
+        topicField.value = model.topic || 'general';
         
         console.log('Set threshold slider to:', model.threshold, 'actual value:', thresholdSlider.value);
         
