@@ -89,18 +89,16 @@ class HeartbeatSender:
         logger.info(f"Initialized heartbeat sender for {self.instance_id}")
         logger.info(f"ORAC STT endpoint: {self.heartbeat_endpoint}")
     
-    def register_model(self, name: str, wake_word: str, enabled: bool = True) -> None:
+    def register_model(self, name: str, topic: str, wake_word: str, enabled: bool = True) -> None:
         """Register a wake word model for heartbeat tracking.
         
         Args:
             name: Model name (e.g., "hey_jarvis")
+            topic: Topic for routing (e.g., "general", "Alexa__5")
             wake_word: Wake word (e.g., "jarvis")
             enabled: Whether model is enabled
         """
         with self._lock:
-            # Extract topic from wake word (lowercase)
-            topic = wake_word.lower().replace("hey ", "").replace("_", "")
-            
             self._models[name] = ModelHeartbeat(
                 name=name,
                 topic=topic,

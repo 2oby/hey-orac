@@ -713,14 +713,14 @@ def main():
         
         # Register all enabled models with the heartbeat sender
         for model_cfg in enabled_models:
-            # Extract wake word from model name (e.g., "hey_jarvis" -> "jarvis")
-            wake_word = model_cfg.name.replace("hey_", "").replace("_", " ")
+            # Use the actual topic from the model configuration
             heartbeat_sender.register_model(
                 name=model_cfg.name,
-                wake_word=wake_word,
+                topic=model_cfg.topic,  # Use the configured topic (e.g., "general", "Alexa__5")
+                wake_word=model_cfg.name,  # Use the full model name as wake word
                 enabled=model_cfg.enabled
             )
-            logger.info(f"   Registered model '{model_cfg.name}' with wake word '{wake_word}'")
+            logger.info(f"   Registered model '{model_cfg.name}' with topic '{model_cfg.topic}'")
         
         # Start heartbeat sender
         heartbeat_sender.start()
@@ -901,6 +901,19 @@ def main():
                     'threshold': cfg.threshold,
                     'webhook_url': cfg.webhook_url
                 } for name, cfg in active_model_configs.items()}
+                
+                # Update heartbeat sender with new models
+                if 'heartbeat_sender' in locals():
+                    # Clear existing models and re-register
+                    heartbeat_sender._models.clear()
+                    for model_cfg in enabled_models:
+                        heartbeat_sender.register_model(
+                            name=model_cfg.name,
+                            topic=model_cfg.topic,
+                            wake_word=model_cfg.name,
+                            enabled=model_cfg.enabled
+                        )
+                    logger.info(f"✅ Updated heartbeat sender with {len(enabled_models)} models")
                 
                 # Perform health checks for reloaded models with webhook URLs
                 if stt_client:
