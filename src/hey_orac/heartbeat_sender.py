@@ -67,7 +67,7 @@ class HeartbeatSender:
         # Threading control
         self._running = False
         self._thread: Optional[threading.Thread] = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()  # Use RLock to avoid deadlock
         
         # Heartbeat interval and backoff
         self.interval = 30  # seconds
