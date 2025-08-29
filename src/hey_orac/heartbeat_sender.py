@@ -35,6 +35,8 @@ class ModelHeartbeat:
             "topic": self.topic,
             "type": self.type,
             "status": self.status,
+            "wake_word": self.wake_word,
+            "trigger_count": self.trigger_count,
             "metadata": {
                 "wake_word": self.wake_word,
                 "trigger_phrase": f"hey {self.wake_word}",
@@ -45,7 +47,6 @@ class ModelHeartbeat:
         # Add last_triggered if available
         if self.last_triggered:
             data["last_triggered"] = self.last_triggered.isoformat()
-            data["trigger_count"] = self.trigger_count
         
         return data
 
