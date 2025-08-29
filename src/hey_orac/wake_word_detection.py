@@ -31,6 +31,7 @@ from hey_orac.config.manager import SettingsManager  # Import the SettingsManage
 from hey_orac.web.app import create_app, socketio
 from hey_orac.web.routes import init_routes
 from hey_orac.web.broadcaster import WebSocketBroadcaster
+from hey_orac.heartbeat_sender import HeartbeatSender  # Import heartbeat sender
 
 # Configure logging for debugging
 logging.basicConfig(
@@ -705,6 +706,25 @@ def main():
         # Force log flush
         sys.stdout.flush()
         print("DEBUG: After sys.stdout.flush()", flush=True)
+        
+        # Initialize heartbeat sender for ORAC STT integration
+        logger.info("💓 Initializing heartbeat sender for ORAC STT...")
+        heartbeat_sender = HeartbeatSender()
+        
+        # Register all enabled models with the heartbeat sender
+        for model_cfg in enabled_models:
+            # Extract wake word from model name (e.g., "hey_jarvis" -> "jarvis")
+            wake_word = model_cfg.name.replace("hey_", "").replace("_", " ")
+            heartbeat_sender.register_model(
+                name=model_cfg.name,
+                wake_word=wake_word,
+                enabled=model_cfg.enabled
+            )
+            logger.info(f"   Registered model '{model_cfg.name}' with wake word '{wake_word}'")
+        
+        # Start heartbeat sender
+        heartbeat_sender.start()
+        logger.info("✅ Heartbeat sender started")
 
         # Test audio stream first
         print("DEBUG: About to test audio stream", flush=True)
@@ -1065,6 +1085,10 @@ def main():
                     except:
                         pass  # Queue full, skip
                     
+                    # Record activation in heartbeat sender
+                    if 'heartbeat_sender' in locals():
+                        heartbeat_sender.record_activation(trigger_info['config_name'])
+                    
                     # Call webhook if configured
                     if trigger_info['model_config'].webhook_url:
                         try:
@@ -1178,6 +1202,10 @@ def main():
                     except:
                         pass  # Queue full, skip
                     
+                    # Record activation in heartbeat sender
+                    if 'heartbeat_sender' in locals():
+                        heartbeat_sender.record_activation(config_name or best_model)
+                    
                     # Call webhook if configured
                     if config_name and active_model_configs[config_name].webhook_url:
                         try:
@@ -1255,6 +1283,11 @@ def main():
         # Handle graceful shutdown on Ctrl+C
         logger.info("Stopping audio stream and terminating AudioManager...")
         
+        # Stop heartbeat sender
+        if 'heartbeat_sender' in locals():
+            heartbeat_sender.stop()
+            logger.info("Heartbeat sender stopped")
+        
         # Stop speech recorder if active
         if speech_recorder:
             speech_recorder.stop()
@@ -1274,6 +1307,11 @@ def main():
         import traceback
         logger.error(f"Error during execution: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Stop heartbeat sender
+        if 'heartbeat_sender' in locals():
+            heartbeat_sender.stop()
+            logger.info("Heartbeat sender stopped")
         
         # Stop speech recorder if active
         if speech_recorder:
