@@ -33,7 +33,7 @@ services:
       - ALSA_CARD=1
       - AUDIO_DEVICE=/dev/snd
       - PULSE_RUNTIME_PATH=/tmp
-      - ORAC_STT_URL=http://orac-stt:7272  # For Docker network, use service name
+      - ORAC_STT_URL=http://192.168.8.192:7272  # Updated Orin IP address
     
     # Port mappings for web GUI
     ports:
