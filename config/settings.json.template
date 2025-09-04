@@ -69,7 +69,7 @@
   },
   "stt": {
     "enabled": true,
-    "base_url": "http://192.168.8.191:7272",
+    "base_url": "http://192.168.8.192:7272",
     "timeout": 30,
     "language": null,
     "pre_roll_duration": 1.0,
