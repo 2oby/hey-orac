@@ -1026,14 +1026,14 @@ def main():
                     if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
                         # Reshape to separate left and right channels, then average
                         stereo_data = audio_array.reshape(-1, 2)
-                        # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
-                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                        # OpenWakeWord expects normalized float32 values in range [-1.0, 1.0]
+                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32) / 32768.0
                     else:
-                        # Already mono - CRITICAL FIX: no normalization!
-                        audio_data = audio_array.astype(np.float32)
+                        # Already mono - normalize to [-1.0, 1.0] range
+                        audio_data = audio_array.astype(np.float32) / 32768.0
 
-                # Calculate RMS for web GUI display
-                rms = np.sqrt(np.mean(audio_data**2))
+                # Calculate RMS for web GUI display (scale back to int16 range for display)
+                rms = np.sqrt(np.mean(audio_data**2)) * 32768.0
                 shared_data['rms'] = float(rms)
                 
                 # Check for stuck RMS values (indicates frozen audio thread)
@@ -1053,8 +1053,8 @@ def main():
                 
                 # Feed audio to ring buffer if STT is enabled
                 if ring_buffer is not None:
-                    # Convert to int16 for ring buffer storage
-                    audio_int16 = audio_data.astype(np.int16)
+                    # Convert normalized float32 back to int16 for ring buffer storage
+                    audio_int16 = (audio_data * 32768.0).astype(np.int16)
                     ring_buffer.write(audio_int16)
                 
                 # Log every 100 chunks to show we're processing audio
