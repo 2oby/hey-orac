@@ -10,6 +10,7 @@ import argparse
 import time
 import wave
 import json
+import signal
 from datetime import datetime
 # Use environment variable for unbuffered output instead
 os.environ['PYTHONUNBUFFERED'] = '1'
@@ -951,6 +952,20 @@ def main():
         CONFIG_CHECK_INTERVAL = 1.0  # Check for config changes every second
         HEALTH_CHECK_INTERVAL = 30.0  # Check STT health every 30 seconds
         
+        # Timeout handler for audio read operations
+        def timeout_handler(signum, frame):
+            logger.error("Audio read timeout - stream may be frozen")
+            raise TimeoutError("Audio stream read timeout")
+        
+        # Set up signal handler for timeout (only on Unix systems)
+        if hasattr(signal, 'SIGALRM'):
+            signal.signal(signal.SIGALRM, timeout_handler)
+        
+        # Variables for detecting stuck RMS
+        last_rms = None
+        stuck_rms_count = 0
+        max_stuck_count = 10  # After 10 identical RMS values, restart
+        
         while True:
             try:
                 # Check for configuration changes
@@ -977,8 +992,18 @@ def main():
                             logger.debug(f"🏥 Periodic STT health check: {stt_health_status}")
                     last_health_check = current_time
                 
-                # Read one chunk of audio data (1280 samples)
-                data = stream.read(1280, exception_on_overflow=False)
+                # Read one chunk of audio data (1280 samples) with timeout protection
+                try:
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.alarm(2)  # 2 second timeout
+                    data = stream.read(1280, exception_on_overflow=False)
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.alarm(0)  # Cancel the alarm
+                except TimeoutError:
+                    logger.error("Audio stream read timed out - possible frozen audio thread")
+                    # Force exit to trigger container restart
+                    sys.exit(1)
+                    
                 if data is None or len(data) == 0:
                     logger.warning("No audio data read from stream")
                     continue
@@ -1010,6 +1035,18 @@ def main():
                 # Calculate RMS for web GUI display
                 rms = np.sqrt(np.mean(audio_data**2))
                 shared_data['rms'] = float(rms)
+                
+                # Check for stuck RMS values (indicates frozen audio thread)
+                if last_rms is not None and abs(rms - last_rms) < 0.0001:
+                    stuck_rms_count += 1
+                    if stuck_rms_count >= max_stuck_count:
+                        logger.error(f"RMS stuck at {rms} for {stuck_rms_count} iterations - audio thread frozen")
+                        logger.error("Forcing exit to trigger container restart")
+                        sys.exit(1)  # Exit to trigger Docker restart
+                else:
+                    stuck_rms_count = 0
+                
+                last_rms = rms
                 
                 # Update listening state
                 shared_data['is_listening'] = True

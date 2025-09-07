@@ -1,16 +1,18 @@
 # Hey ORAC Wake-Word Module
 
-A Raspberry Pi container for continuous wake-word detection using OpenWakeWord with full Speech-to-Text integration.
+A Raspberry Pi container for continuous wake-word detection using OpenWakeWord with full Speech-to-Text integration and topic-based routing.
 
 ## Features
 
 - **Real-time Wake-Word Detection**: Multiple OpenWakeWord models with configurable thresholds
+- **Topic-Based Routing**: Per-model topic configuration for context-aware processing
 - **STT Integration**: Automatic speech recording and transcription after wake word detection
 - **Web Administration**: Real-time monitoring dashboard with configuration management
 - **Hot-Reloadable Configuration**: Dynamic model and parameter updates without restart
 - **Audio Streaming**: Configurable webhook endpoints for downstream processing
 - **Docker Containerized**: Easy deployment with automated scripts
 - **Prometheus Metrics**: Comprehensive observability and monitoring
+- **Heartbeat System**: Active connection monitoring with ORAC STT
 
 ## STT Integration
 
@@ -43,7 +45,8 @@ Configure STT in your `settings.json`:
     {
       "name": "hey_computer",
       "stt_enabled": true,
-      "webhook_url": "http://192.168.8.191:7272/stt/v1/stream"
+      "webhook_url": "http://192.168.8.191:7272/stt/v1/stream",
+      "topic": "home_assistant"
     }
   ]
 }
