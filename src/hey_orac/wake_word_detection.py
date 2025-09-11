@@ -543,17 +543,17 @@ class CallbackAudioProcessor:
                 # Handle stereo to mono conversion if needed
                 if len(audio_array) > 1280:  # Stereo data (2560 samples)
                     stereo_data = audio_array.reshape(-1, 2)
-                    audio_int16 = np.mean(stereo_data, axis=1).astype(np.int16)
+                    # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
+                    audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                    audio_int16 = audio_data.astype(np.int16)  # For ring buffer
                 else:
-                    # Already mono
+                    # Already mono - CRITICAL FIX: no normalization!
+                    audio_data = audio_array.astype(np.float32)
                     audio_int16 = audio_array
                 
-                # Calculate RMS for monitoring (on int16 data for consistent monitoring)
-                rms = np.sqrt(np.mean(audio_int16.astype(np.float32)**2))
+                # Calculate RMS for monitoring
+                rms = np.sqrt(np.mean(audio_data**2))
                 self.shared_data['rms'] = float(rms)
-                
-                # Convert to float32 and normalize to [-1, 1] range for OpenWakeWord
-                audio_data = audio_int16.astype(np.float32) / 32768.0
                 
                 # Check for stuck RMS values (indicates problem)
                 if self.last_rms is not None and abs(rms - self.last_rms) < 0.0001:
