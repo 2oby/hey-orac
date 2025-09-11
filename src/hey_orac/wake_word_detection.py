@@ -582,6 +582,11 @@ class CallbackAudioProcessor:
                 # Pass audio to wake word model for prediction
                 prediction = self.model.predict(audio_data)
                 
+                # Debug: Log prediction scores periodically
+                if self.chunk_count % 500 == 0:
+                    logger.debug(f"🔍 Prediction scores: {prediction}")
+                    logger.debug(f"   Audio min/max: {audio_data.min():.2f}/{audio_data.max():.2f}")
+                
                 # Process wake word predictions
                 self.process_predictions(prediction)
                 
@@ -606,6 +611,10 @@ class CallbackAudioProcessor:
                 
                 if config_name and config_name in self.active_model_configs:
                     model_config = self.active_model_configs[config_name]
+                    
+                    # Debug high scores
+                    if score > 0.1:
+                        logger.debug(f"📈 Score above 0.1: {wakeword}={score:.6f} (threshold: {model_config.threshold:.6f})")
                     
                     # Check if detection threshold is met
                     if score >= model_config.threshold:
