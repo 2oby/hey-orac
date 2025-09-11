@@ -338,6 +338,52 @@ class AudioManager:
             logger.error(f"   Exception details: {str(e)}")
             return None
     
+    def start_callback_stream(self, device_index: int, callback, sample_rate: int = 16000,
+                            channels: int = 1, chunk_size: int = 512):
+        """Start audio stream with callback for non-blocking audio capture.
+        
+        The callback function should have the signature:
+        callback(in_data, frame_count, time_info, status) -> (out_data, flag)
+        
+        Returns:
+            PyAudio stream object or None on error
+        """
+        try:
+            logger.info(f"🔍 Creating callback-based audio stream:")
+            logger.info(f"   Device index: {device_index}")
+            logger.info(f"   Sample rate: {sample_rate}")
+            logger.info(f"   Channels: {channels}")
+            logger.info(f"   Chunk size: {chunk_size}")
+            
+            # Get device info
+            try:
+                device_info = self.pyaudio.get_device_info_by_index(device_index)
+                logger.info(f"   Device name: {device_info['name']}")
+            except Exception as e:
+                logger.error(f"❌ Error getting device info: {e}")
+            
+            # Create stream with callback
+            stream = self.pyaudio.open(
+                format=pyaudio.paInt16,
+                channels=channels,
+                rate=sample_rate,
+                input=True,
+                input_device_index=device_index,
+                frames_per_buffer=chunk_size,
+                stream_callback=callback
+            )
+            
+            logger.info(f"✅ Callback-based audio stream created successfully")
+            logger.info(f"   Stream active: {stream.is_active()}")
+            
+            return stream
+            
+        except Exception as e:
+            logger.error(f"❌ Error starting callback stream: {e}")
+            logger.error(f"   Exception type: {type(e).__name__}")
+            logger.error(f"   Exception details: {str(e)}")
+            return None
+    
     def read_audio_chunk(self) -> Optional[bytes]:
         """Read one chunk of audio data."""
         if not self.current_stream:
