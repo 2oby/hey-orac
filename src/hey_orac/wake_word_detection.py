@@ -850,8 +850,8 @@ def main():
         use_callback_mode = True  # Enable non-blocking callback mode to prevent freezing
         logger.info(f"🔄 Audio capture mode: {'callback (non-blocking)' if use_callback_mode else 'blocking'}")
         
-        if not args.input_wav:
-            # Start audio stream with parameters from configuration
+        if not args.input_wav and not use_callback_mode:
+            # Only start blocking stream if not using callback mode
             stream = audio_manager.start_stream(
                 device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
                 sample_rate=audio_config.sample_rate,
@@ -977,19 +977,20 @@ def main():
         heartbeat_sender.start()
         logger.info("✅ Heartbeat sender started")
 
-        # Test audio stream first
-        print("DEBUG: About to test audio stream", flush=True)
-        logger.info("🧪 Testing audio stream...")
-        print("DEBUG: After audio stream test log", flush=True)
-        sys.stdout.flush()
-        try:
-            test_data = stream.read(1280, exception_on_overflow=False)
-            logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
+        # Test audio stream first (skip for callback mode)
+        if not use_callback_mode and stream:
+            print("DEBUG: About to test audio stream", flush=True)
+            logger.info("🧪 Testing audio stream...")
+            print("DEBUG: After audio stream test log", flush=True)
             sys.stdout.flush()
-        except Exception as e:
-            logger.error(f"❌ Audio stream test failed: {e}")
-            sys.stdout.flush()
-            raise
+            try:
+                test_data = stream.read(1280, exception_on_overflow=False)
+                logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
+                sys.stdout.flush()
+            except Exception as e:
+                logger.error(f"❌ Audio stream test failed: {e}")
+                sys.stdout.flush()
+                raise
 
         # Initialize web server in a separate thread
         logger.info("🌐 Starting web server on port 7171...")
