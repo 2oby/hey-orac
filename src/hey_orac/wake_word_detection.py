@@ -20,7 +20,6 @@ import logging
 import numpy as np
 import requests
 import threading
-import pyaudio
 from multiprocessing import Manager, Queue
 from hey_orac.audio.utils import AudioManager  # Import the AudioManager class
 from hey_orac.audio.microphone import AudioCapture  # Import AudioCapture for preprocessing
@@ -441,263 +440,6 @@ def check_all_stt_health(active_model_configs, stt_client):
     else:
         return 'disconnected'
 
-class CallbackAudioProcessor:
-    """Handles audio processing in a callback-based manner to prevent blocking."""
-    
-    def __init__(self, shared_data, event_queue, model, active_model_configs, 
-                 model_name_mapping, stt_client, speech_recorder, ring_buffer,
-                 settings_manager, heartbeat_sender, args):
-        """Initialize the callback processor with all required components."""
-        self.shared_data = shared_data
-        self.event_queue = event_queue
-        self.model = model
-        self.active_model_configs = active_model_configs
-        self.model_name_mapping = model_name_mapping
-        self.stt_client = stt_client
-        self.speech_recorder = speech_recorder
-        self.ring_buffer = ring_buffer
-        self.settings_manager = settings_manager
-        self.heartbeat_sender = heartbeat_sender
-        self.args = args  # Need access to args for WAV file handling
-        
-        # Audio processing state
-        self.chunk_count = 0
-        self.last_rms = None
-        self.stuck_rms_count = 0
-        self.max_stuck_count = 10
-        self.audio_buffer = bytearray()  # Buffer for accumulating audio data
-        self.target_chunk_size = 1280 * 2  # Size in bytes for int16 mono audio (1280 samples * 2 bytes)
-        
-        # Timing for periodic checks
-        self.last_config_check = time.time()
-        self.last_health_check = time.time()
-        self.CONFIG_CHECK_INTERVAL = 1.0
-        self.HEALTH_CHECK_INTERVAL = 30.0
-        
-        # Processing lock to prevent concurrent callback execution
-        self.processing_lock = threading.Lock()
-        self.last_callback_time = time.time()
-        
-        logger.info("✅ CallbackAudioProcessor initialized")
-    
-    def audio_callback(self, in_data, frame_count, time_info, status):
-        """PyAudio callback - called when audio data is available.
-        
-        This runs in PyAudio's internal thread, so we must be careful
-        about thread safety and avoid blocking operations.
-        """
-        try:
-            # Add incoming data to buffer
-            self.audio_buffer.extend(in_data)
-            
-            # Process complete chunks of 1280 samples (2560 bytes)
-            while len(self.audio_buffer) >= self.target_chunk_size:
-                # Extract a complete chunk
-                chunk_data = bytes(self.audio_buffer[:self.target_chunk_size])
-                self.audio_buffer = self.audio_buffer[self.target_chunk_size:]
-                
-                # Process in a separate thread to avoid blocking the callback
-                if not self.processing_lock.locked():
-                    processing_thread = threading.Thread(
-                        target=self.process_audio_chunk,
-                        args=(chunk_data,),
-                        daemon=True
-                    )
-                    processing_thread.start()
-            
-            # Always return continue flag to keep stream active
-            return (None, pyaudio.paContinue)
-            
-        except Exception as e:
-            logger.error(f"Error in audio callback: {e}")
-            # Return continue even on error to keep stream alive
-            return (None, pyaudio.paContinue)
-    
-    def process_audio_chunk(self, data):
-        """Process a chunk of audio data - runs in separate thread."""
-        with self.processing_lock:
-            try:
-                current_time = time.time()
-                
-                # Check for configuration changes periodically
-                if current_time - self.last_config_check >= self.CONFIG_CHECK_INTERVAL:
-                    if self.shared_data.get('config_changed', False):
-                        logger.info("📢 Configuration change detected in callback processor")
-                        # Note: Full model reloading would require coordination with main thread
-                        self.shared_data['config_changed'] = False
-                    self.last_config_check = current_time
-                
-                # Check STT health periodically
-                if current_time - self.last_health_check >= self.HEALTH_CHECK_INTERVAL:
-                    if self.stt_client:
-                        stt_health_status = check_all_stt_health(self.active_model_configs, self.stt_client)
-                        if self.shared_data.get('stt_health') != stt_health_status:
-                            self.shared_data['stt_health'] = stt_health_status
-                            self.shared_data['status_changed'] = True
-                            logger.info(f"🏥 STT health status changed to: {stt_health_status}")
-                    self.last_health_check = current_time
-                
-                # Convert bytes to numpy array
-                audio_array = np.frombuffer(data, dtype=np.int16)
-                
-                # Handle stereo to mono conversion if needed
-                if len(audio_array) > 1280:  # Stereo data (2560 samples)
-                    stereo_data = audio_array.reshape(-1, 2)
-                    # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
-                    audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                    audio_int16 = audio_data.astype(np.int16)  # For ring buffer
-                else:
-                    # Already mono - CRITICAL FIX: no normalization!
-                    audio_data = audio_array.astype(np.float32)
-                    audio_int16 = audio_array
-                
-                # Calculate RMS for monitoring
-                rms = np.sqrt(np.mean(audio_data**2))
-                self.shared_data['rms'] = float(rms)
-                
-                # Check for stuck RMS values (indicates problem)
-                if self.last_rms is not None and abs(rms - self.last_rms) < 0.0001:
-                    self.stuck_rms_count += 1
-                    if self.stuck_rms_count >= self.max_stuck_count:
-                        logger.error(f"RMS stuck at {rms} for {self.stuck_rms_count} iterations")
-                        logger.error("Audio may be frozen - but callback is still running")
-                        # Don't exit - let watchdog handle if needed
-                else:
-                    self.stuck_rms_count = 0
-                
-                self.last_rms = rms
-                self.shared_data['is_listening'] = True
-                
-                # Feed to ring buffer for STT if enabled (use original int16 data)
-                if self.ring_buffer is not None:
-                    self.ring_buffer.write(audio_int16)
-                
-                # Log progress periodically
-                self.chunk_count += 1
-                if self.chunk_count % 100 == 0:
-                    audio_volume = np.abs(audio_data).mean()
-                    logger.info(f"📊 Processed {self.chunk_count} audio chunks (callback mode)")
-                    logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}, RMS: {rms:.4f}")
-                
-                # Pass audio to wake word model for prediction
-                prediction = self.model.predict(audio_data)
-                
-                # Debug: Log prediction scores periodically
-                if self.chunk_count % 500 == 0:
-                    logger.debug(f"🔍 Prediction scores: {prediction}")
-                    logger.debug(f"   Audio min/max: {audio_data.min():.2f}/{audio_data.max():.2f}")
-                
-                # Process wake word predictions
-                self.process_predictions(prediction)
-                
-            except Exception as e:
-                logger.error(f"Error processing audio chunk: {e}")
-    
-    def process_predictions(self, prediction):
-        """Process wake word predictions and trigger actions."""
-        try:
-            # Get system config for multi-trigger setting
-            with self.settings_manager.get_config() as config:
-                multi_trigger_enabled = config.system.multi_trigger
-            
-            # Check each prediction against thresholds
-            for wakeword, score in prediction.items():
-                # Map prediction key to config name
-                config_name = None
-                if wakeword in self.model_name_mapping:
-                    config_name = self.model_name_mapping[wakeword]
-                elif wakeword in self.active_model_configs:
-                    config_name = wakeword
-                
-                if config_name and config_name in self.active_model_configs:
-                    model_config = self.active_model_configs[config_name]
-                    
-                    # Debug high scores
-                    if score > 0.1:
-                        logger.debug(f"📈 Score above 0.1: {wakeword}={score:.6f} (threshold: {model_config.threshold:.6f})")
-                    
-                    # Check if detection threshold is met
-                    if score >= model_config.threshold:
-                        logger.info(f"🎯 WAKE WORD DETECTED! {wakeword}: {score:.6f} (threshold: {model_config.threshold:.6f})")
-                        
-                        # Create detection event
-                        detection_event = {
-                            'type': 'detection',
-                            'model': config_name,
-                            'confidence': float(score),
-                            'timestamp': datetime.utcnow().isoformat() + 'Z',
-                            'threshold': model_config.threshold
-                        }
-                        
-                        # Update shared data
-                        self.shared_data['last_detection'] = detection_event
-                        
-                        # Add to event queue if space available
-                        try:
-                            self.event_queue.put_nowait(detection_event)
-                        except:
-                            pass  # Queue full, skip
-                        
-                        # Record activation in heartbeat sender
-                        if self.heartbeat_sender:
-                            self.heartbeat_sender.record_activation(config_name)
-                        
-                        # Trigger webhook if configured
-                        if model_config.webhook_url:
-                            self.trigger_webhook(wakeword, config_name, score, model_config, prediction)
-                        
-                        # Trigger STT recording if enabled and not busy
-                        if (self.speech_recorder is not None and 
-                            model_config.stt_enabled and
-                            not self.speech_recorder.is_busy()):
-                            
-                            # Get STT language from config
-                            with self.settings_manager.get_config() as config:
-                                stt_language = config.stt.language
-                            
-                            # Start recording in background thread
-                            logger.info(f"🎤 Starting STT recording for '{config_name}'")
-                            recording_thread = threading.Thread(
-                                target=self.speech_recorder.record_speech,
-                                args=(model_config.webhook_url, model_config.topic, wakeword),
-                                daemon=True
-                            )
-                            recording_thread.start()
-                        
-                        # In single-trigger mode, stop after first detection
-                        if not multi_trigger_enabled:
-                            break
-                            
-        except Exception as e:
-            logger.error(f"Error processing predictions: {e}")
-    
-    def trigger_webhook(self, wakeword, config_name, score, model_config, all_predictions):
-        """Trigger webhook in background thread."""
-        try:
-            webhook_data = {
-                "wake_word": wakeword,
-                "confidence": float(score),
-                "threshold": float(model_config.threshold),
-                "timestamp": time.time(),
-                "model_name": config_name,
-                "all_scores": {k: float(v) for k, v in all_predictions.items()}
-            }
-            
-            logger.info(f"📞 Calling webhook: {model_config.webhook_url}")
-            response = requests.post(
-                model_config.webhook_url,
-                json=webhook_data,
-                timeout=5
-            )
-            
-            if response.status_code == 200:
-                logger.info("✅ Webhook call successful")
-            else:
-                logger.warning(f"⚠️ Webhook returned status: {response.status_code}")
-                
-        except Exception as e:
-            logger.error(f"❌ Webhook call failed: {e}")
-
 def main():
     """Main function to run the wake word detection system."""
     # Log git commit if available
@@ -858,11 +600,8 @@ def main():
             return
 
         # Start audio stream if using microphone (skip if using WAV file)
-        use_callback_mode = True  # Enable non-blocking callback mode to prevent freezing
-        logger.info(f"🔄 Audio capture mode: {'callback (non-blocking)' if use_callback_mode else 'blocking'}")
-        
-        if not args.input_wav and not use_callback_mode:
-            # Only start blocking stream if not using callback mode
+        if not args.input_wav:
+            # Start audio stream with parameters from configuration
             stream = audio_manager.start_stream(
                 device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
                 sample_rate=audio_config.sample_rate,
@@ -988,20 +727,19 @@ def main():
         heartbeat_sender.start()
         logger.info("✅ Heartbeat sender started")
 
-        # Test audio stream first (skip for callback mode)
-        if not use_callback_mode and stream:
-            print("DEBUG: About to test audio stream", flush=True)
-            logger.info("🧪 Testing audio stream...")
-            print("DEBUG: After audio stream test log", flush=True)
+        # Test audio stream first
+        print("DEBUG: About to test audio stream", flush=True)
+        logger.info("🧪 Testing audio stream...")
+        print("DEBUG: After audio stream test log", flush=True)
+        sys.stdout.flush()
+        try:
+            test_data = stream.read(1280, exception_on_overflow=False)
+            logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
             sys.stdout.flush()
-            try:
-                test_data = stream.read(1280, exception_on_overflow=False)
-                logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
-                sys.stdout.flush()
-            except Exception as e:
-                logger.error(f"❌ Audio stream test failed: {e}")
-                sys.stdout.flush()
-                raise
+        except Exception as e:
+            logger.error(f"❌ Audio stream test failed: {e}")
+            sys.stdout.flush()
+            raise
 
         # Initialize web server in a separate thread
         logger.info("🌐 Starting web server on port 7171...")
@@ -1205,205 +943,144 @@ def main():
                 logger.error(f"❌ Error reloading models: {e}")
                 return False
         
-        # Choose between callback mode and blocking mode
-        if use_callback_mode and not args.input_wav:
-            # CALLBACK MODE - Non-blocking audio processing
-            logger.info("🎤 Starting wake word detection with callback mode (non-blocking)...")
-            
-            # Create callback processor with all required components
-            callback_processor = CallbackAudioProcessor(
-                shared_data=shared_data,
-                event_queue=event_queue,
-                model=model,
-                active_model_configs=active_model_configs,
-                model_name_mapping=model_name_mapping,
-                stt_client=stt_client,
-                speech_recorder=speech_recorder,
-                ring_buffer=ring_buffer,
-                settings_manager=settings_manager,
-                heartbeat_sender=heartbeat_sender,
-                args=args
-            )
-            
-            # Start callback-based stream
-            stream = audio_manager.start_callback_stream(
-                device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
-                sample_rate=audio_config.sample_rate,
-                channels=audio_config.channels,
-                chunk_size=audio_config.chunk_size,
-                callback=callback_processor.audio_callback
-            )
-            
-            if not stream:
-                logger.error("Failed to start callback-based audio stream")
-                raise RuntimeError("Failed to start callback audio stream")
-            
-            logger.info("✅ Callback-based audio stream started successfully")
-            logger.info("🎧 Audio processing running in background thread")
-            
-            # Main thread now just monitors the stream and handles shutdown
+        # Continuously listen to the audio stream and detect wake words
+        logger.info("🎤 Starting wake word detection loop...")
+        sys.stdout.flush()
+        chunk_count = 0
+        last_config_check = time.time()
+        last_health_check = time.time()
+        CONFIG_CHECK_INTERVAL = 1.0  # Check for config changes every second
+        HEALTH_CHECK_INTERVAL = 30.0  # Check STT health every 30 seconds
+        
+        # Timeout handler for audio read operations
+        def timeout_handler(signum, frame):
+            logger.error("Audio read timeout - stream may be frozen")
+            raise TimeoutError("Audio stream read timeout")
+        
+        # Set up signal handler for timeout (only on Unix systems)
+        if hasattr(signal, 'SIGALRM'):
+            signal.signal(signal.SIGALRM, timeout_handler)
+        
+        # Variables for detecting stuck RMS
+        last_rms = None
+        stuck_rms_count = 0
+        max_stuck_count = 10  # After 10 identical RMS values, restart
+        
+        while True:
             try:
-                while True:
-                    time.sleep(1)  # Check every second
-                    
-                    # Monitor stream health
-                    if not stream.is_active():
-                        logger.error("❌ Audio stream stopped unexpectedly")
-                        break
-                    
-                    # Check for model reload requests (from config changes)
+                # Check for configuration changes
+                current_time = time.time()
+                if current_time - last_config_check >= CONFIG_CHECK_INTERVAL:
                     if shared_data.get('config_changed', False):
-                        logger.info("📢 Configuration change detected - restart required for model reload")
-                        # In callback mode, model reloading requires restart
-                        shared_data['config_changed'] = False
-                        
-            except KeyboardInterrupt:
-                logger.info("🛑 Keyboard interrupt received")
-            finally:
-                if stream:
-                    stream.stop_stream()
-                    stream.close()
-                logger.info("✅ Callback stream closed")
+                        logger.info("📢 Configuration change detected")
+                        if reload_models():
+                            shared_data['config_changed'] = False
+                            logger.info("✅ Configuration change applied")
+                        else:
+                            logger.error("❌ Failed to apply configuration change")
+                    last_config_check = current_time
                 
-        else:
-            # BLOCKING MODE - Original implementation
-            logger.info("🎤 Starting wake word detection loop (blocking mode)...")
-            sys.stdout.flush()
-            chunk_count = 0
-            last_config_check = time.time()
-            last_health_check = time.time()
-            CONFIG_CHECK_INTERVAL = 1.0  # Check for config changes every second
-            HEALTH_CHECK_INTERVAL = 30.0  # Check STT health every 30 seconds
-            
-            # Timeout handler for audio read operations
-            def timeout_handler(signum, frame):
-                logger.error("Audio read timeout - stream may be frozen")
-                raise TimeoutError("Audio stream read timeout")
-            
-            # Set up signal handler for timeout (only on Unix systems)
-            if hasattr(signal, 'SIGALRM'):
-                signal.signal(signal.SIGALRM, timeout_handler)
-            
-            # Variables for detecting stuck RMS
-            last_rms = None
-            stuck_rms_count = 0
-            max_stuck_count = 10  # After 10 identical RMS values, restart
-            
-            while True:
+                # Check STT health periodically
+                if current_time - last_health_check >= HEALTH_CHECK_INTERVAL:
+                    if stt_client:
+                        stt_health_status = check_all_stt_health(active_model_configs, stt_client)
+                        if shared_data.get('stt_health') != stt_health_status:
+                            shared_data['stt_health'] = stt_health_status
+                            shared_data['status_changed'] = True
+                            logger.info(f"🏥 STT health status changed to: {stt_health_status}")
+                        else:
+                            logger.debug(f"🏥 Periodic STT health check: {stt_health_status}")
+                    last_health_check = current_time
+                
+                # Read one chunk of audio data (1280 samples) with timeout protection
                 try:
-                    # Check for configuration changes
-                    current_time = time.time()
-                    if current_time - last_config_check >= CONFIG_CHECK_INTERVAL:
-                        if shared_data.get('config_changed', False):
-                            logger.info("📢 Configuration change detected")
-                            if reload_models():
-                                shared_data['config_changed'] = False
-                                logger.info("✅ Configuration change applied")
-                            else:
-                                logger.error("❌ Failed to apply configuration change")
-                        last_config_check = current_time
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.alarm(2)  # 2 second timeout
+                    data = stream.read(1280, exception_on_overflow=False)
+                    if hasattr(signal, 'SIGALRM'):
+                        signal.alarm(0)  # Cancel the alarm
+                except TimeoutError:
+                    logger.error("Audio stream read timed out - possible frozen audio thread")
+                    # Force exit to trigger container restart
+                    sys.exit(1)
                     
-                    # Check STT health periodically
-                    if current_time - last_health_check >= HEALTH_CHECK_INTERVAL:
-                        if stt_client:
-                            stt_health_status = check_all_stt_health(active_model_configs, stt_client)
-                            if shared_data.get('stt_health') != stt_health_status:
-                                shared_data['stt_health'] = stt_health_status
-                                shared_data['status_changed'] = True
-                                logger.info(f"🏥 STT health status changed to: {stt_health_status}")
-                            else:
-                                logger.debug(f"🏥 Periodic STT health check: {stt_health_status}")
-                        last_health_check = current_time
-                    
-                    # Read one chunk of audio data (1280 samples) with timeout protection
-                    try:
-                        if hasattr(signal, 'SIGALRM'):
-                            signal.alarm(2)  # 2 second timeout
-                        data = stream.read(1280, exception_on_overflow=False)
-                        if hasattr(signal, 'SIGALRM'):
-                            signal.alarm(0)  # Cancel the alarm
-                    except TimeoutError:
-                        logger.error("Audio stream read timed out - possible frozen audio thread")
-                        # Force exit to trigger container restart
-                        sys.exit(1)
-                        
-                    if data is None or len(data) == 0:
-                        logger.warning("No audio data read from stream")
-                        continue
-
-                    # Convert bytes to numpy array - now handling stereo input
-                    audio_array = np.frombuffer(data, dtype=np.int16)
-                
-                    # Handle channel conversion based on input source
-                    if args.input_wav and hasattr(stream, 'channels'):
-                        # For WAV files, check the stream's channel count
-                        if stream.channels == 2 and len(audio_array) > 1280:
-                            # Stereo WAV file - convert to mono
-                            stereo_data = audio_array.reshape(-1, 2)
-                            audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                        else:
-                            # Mono WAV file
-                            audio_data = audio_array.astype(np.float32)
-                    else:
-                        # Microphone input - use original logic
-                        if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
-                            # Reshape to separate left and right channels, then average
-                            stereo_data = audio_array.reshape(-1, 2)
-                            # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
-                            audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                        else:
-                            # Already mono - CRITICAL FIX: no normalization!
-                            audio_data = audio_array.astype(np.float32)
-    
-                    # Calculate RMS for web GUI display
-                    rms = np.sqrt(np.mean(audio_data**2))
-                    shared_data['rms'] = float(rms)
-                    
-                    # Check for stuck RMS values (indicates frozen audio thread)
-                    if last_rms is not None and abs(rms - last_rms) < 0.0001:
-                        stuck_rms_count += 1
-                        if stuck_rms_count >= max_stuck_count:
-                            logger.error(f"RMS stuck at {rms} for {stuck_rms_count} iterations - audio thread frozen")
-                            logger.error("Forcing exit to trigger container restart")
-                            sys.exit(1)  # Exit to trigger Docker restart
-                    else:
-                        stuck_rms_count = 0
-                    
-                    last_rms = rms
-                    
-                    # Update listening state
-                    shared_data['is_listening'] = True
-                    
-                    # Feed audio to ring buffer if STT is enabled
-                    if ring_buffer is not None:
-                        # Convert to int16 for ring buffer storage
-                        audio_int16 = audio_data.astype(np.int16)
-                        ring_buffer.write(audio_int16)
-                    
-                    # Log every 100 chunks to show we're processing audio
-                    chunk_count += 1
-                    if chunk_count % 100 == 0:
-                        audio_volume = np.abs(audio_data).mean()
-                        logger.info(f"📊 Processed {chunk_count} audio chunks")
-                        logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}, RMS: {rms:.4f}")
-                        logger.info(f"   Raw data size: {len(data)} bytes, samples: {len(audio_array)}")
-                        if len(audio_array) > 1280:
-                            logger.info(f"   ✅ Stereo→Mono conversion active")
-    
-                    # Pass the audio data to the model for wake word prediction
-                    prediction = model.predict(audio_data)
-                    
-                    # Log ALL confidence scores after each processed chunk
-                    if chunk_count % 100 == 0:
-                        all_scores = {word: f"{score:.6f}" for word, score in prediction.items()}
-                        logger.debug(f"🎯 All confidence scores: {all_scores}")
-                        # Also log what models are in active_model_configs for debugging
-                        if chunk_count == 100:
-                            logger.debug(f"Active model configs: {list(active_model_configs.keys())}")
-                            logger.debug(f"Model paths: {[cfg.path for cfg in active_model_configs.values()]}")
-                except Exception as e:
-                    logger.error(f"Error processing audio data: {e}")
+                if data is None or len(data) == 0:
+                    logger.warning("No audio data read from stream")
                     continue
+
+                # Convert bytes to numpy array - now handling stereo input
+                audio_array = np.frombuffer(data, dtype=np.int16)
+                
+                # Handle channel conversion based on input source
+                if args.input_wav and hasattr(stream, 'channels'):
+                    # For WAV files, check the stream's channel count
+                    if stream.channels == 2 and len(audio_array) > 1280:
+                        # Stereo WAV file - convert to mono
+                        stereo_data = audio_array.reshape(-1, 2)
+                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                    else:
+                        # Mono WAV file
+                        audio_data = audio_array.astype(np.float32)
+                else:
+                    # Microphone input - use original logic
+                    if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
+                        # Reshape to separate left and right channels, then average
+                        stereo_data = audio_array.reshape(-1, 2)
+                        # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
+                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
+                    else:
+                        # Already mono - CRITICAL FIX: no normalization!
+                        audio_data = audio_array.astype(np.float32)
+
+                # Calculate RMS for web GUI display
+                rms = np.sqrt(np.mean(audio_data**2))
+                shared_data['rms'] = float(rms)
+                
+                # Check for stuck RMS values (indicates frozen audio thread)
+                if last_rms is not None and abs(rms - last_rms) < 0.0001:
+                    stuck_rms_count += 1
+                    if stuck_rms_count >= max_stuck_count:
+                        logger.error(f"RMS stuck at {rms} for {stuck_rms_count} iterations - audio thread frozen")
+                        logger.error("Forcing exit to trigger container restart")
+                        sys.exit(1)  # Exit to trigger Docker restart
+                else:
+                    stuck_rms_count = 0
+                
+                last_rms = rms
+                
+                # Update listening state
+                shared_data['is_listening'] = True
+                
+                # Feed audio to ring buffer if STT is enabled
+                if ring_buffer is not None:
+                    # Convert to int16 for ring buffer storage
+                    audio_int16 = audio_data.astype(np.int16)
+                    ring_buffer.write(audio_int16)
+                
+                # Log every 100 chunks to show we're processing audio
+                chunk_count += 1
+                if chunk_count % 100 == 0:
+                    audio_volume = np.abs(audio_data).mean()
+                    logger.info(f"📊 Processed {chunk_count} audio chunks")
+                    logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}, RMS: {rms:.4f}")
+                    logger.info(f"   Raw data size: {len(data)} bytes, samples: {len(audio_array)}")
+                    if len(audio_array) > 1280:
+                        logger.info(f"   ✅ Stereo→Mono conversion active")
+
+                # Pass the audio data to the model for wake word prediction
+                prediction = model.predict(audio_data)
+                
+                # Log ALL confidence scores after each processed chunk
+                if chunk_count % 100 == 0:
+                    all_scores = {word: f"{score:.6f}" for word, score in prediction.items()}
+                    logger.debug(f"🎯 All confidence scores: {all_scores}")
+                    # Also log what models are in active_model_configs for debugging
+                    if chunk_count == 100:
+                        logger.debug(f"Active model configs: {list(active_model_configs.keys())}")
+                        logger.debug(f"Model paths: {[cfg.path for cfg in active_model_configs.values()]}")
+            except Exception as e:
+                logger.error(f"Error processing audio data: {e}")
+                continue
 
             # Get system config for multi-trigger setting
             with settings_manager.get_config() as config:
