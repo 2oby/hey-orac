@@ -27,6 +27,7 @@ from hey_orac.audio.ring_buffer import RingBuffer  # Import RingBuffer for pre-r
 from hey_orac.audio.speech_recorder import SpeechRecorder  # Import SpeechRecorder
 from hey_orac.audio.endpointing import EndpointConfig  # Import EndpointConfig
 from hey_orac.audio.preprocessor import AudioPreprocessorConfig  # Import preprocessor config
+from hey_orac.audio.audio_reader_thread import AudioReaderThread  # Import audio reader thread
 from hey_orac.transport.stt_client import STTClient  # Import STT client
 from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
 from hey_orac.web.app import create_app, socketio
@@ -943,23 +944,22 @@ def main():
                 logger.error(f"❌ Error reloading models: {e}")
                 return False
         
+        # Initialize audio reader thread for non-blocking audio capture
+        audio_reader = AudioReaderThread(stream, chunk_size=1280, queue_maxsize=10)
+        if not audio_reader.start():
+            logger.error("Failed to start audio reader thread")
+            raise RuntimeError("Failed to start audio reader thread")
+        
         # Continuously listen to the audio stream and detect wake words
-        logger.info("🎤 Starting wake word detection loop...")
+        logger.info("🎤 Starting wake word detection loop with queue-based audio...")
         sys.stdout.flush()
         chunk_count = 0
         last_config_check = time.time()
         last_health_check = time.time()
+        last_thread_check = time.time()
         CONFIG_CHECK_INTERVAL = 1.0  # Check for config changes every second
         HEALTH_CHECK_INTERVAL = 30.0  # Check STT health every 30 seconds
-        
-        # Timeout handler for audio read operations
-        def timeout_handler(signum, frame):
-            logger.error("Audio read timeout - stream may be frozen")
-            raise TimeoutError("Audio stream read timeout")
-        
-        # Set up signal handler for timeout (only on Unix systems)
-        if hasattr(signal, 'SIGALRM'):
-            signal.signal(signal.SIGALRM, timeout_handler)
+        THREAD_CHECK_INTERVAL = 5.0  # Check thread health every 5 seconds
         
         # Variables for detecting stuck RMS
         last_rms = None
@@ -992,20 +992,35 @@ def main():
                             logger.debug(f"🏥 Periodic STT health check: {stt_health_status}")
                     last_health_check = current_time
                 
-                # Read one chunk of audio data (1280 samples) with timeout protection
-                try:
-                    if hasattr(signal, 'SIGALRM'):
-                        signal.alarm(2)  # 2 second timeout
-                    data = stream.read(1280, exception_on_overflow=False)
-                    if hasattr(signal, 'SIGALRM'):
-                        signal.alarm(0)  # Cancel the alarm
-                except TimeoutError:
-                    logger.error("Audio stream read timed out - possible frozen audio thread")
-                    # Force exit to trigger container restart
-                    sys.exit(1)
+                # Check audio thread health periodically
+                if current_time - last_thread_check >= THREAD_CHECK_INTERVAL:
+                    if not audio_reader.is_healthy():
+                        logger.warning("⚠️ Audio thread unhealthy, attempting restart...")
+                        stats = audio_reader.get_stats()
+                        logger.info(f"Thread stats before restart: {stats}")
+                        
+                        if audio_reader.restart():
+                            logger.info("✅ Audio thread restarted successfully")
+                        else:
+                            logger.error("❌ Failed to restart audio thread - exiting")
+                            sys.exit(1)
+                    last_thread_check = current_time
+                
+                # Get audio data from queue with timeout
+                data = audio_reader.get_audio(timeout=2.0)
+                
+                if data is None:
+                    logger.warning("No audio data received from queue (timeout)")
+                    # Check if thread is still alive
+                    if not audio_reader.is_healthy():
+                        logger.error("Audio thread appears dead, attempting restart...")
+                        if not audio_reader.restart():
+                            logger.error("Failed to restart audio thread - exiting")
+                            sys.exit(1)
+                    continue
                     
-                if data is None or len(data) == 0:
-                    logger.warning("No audio data read from stream")
+                if len(data) == 0:
+                    logger.warning("Empty audio data from queue")
                     continue
 
                 # Convert bytes to numpy array - now handling stereo input
@@ -1333,6 +1348,11 @@ def main():
         # Handle graceful shutdown on Ctrl+C
         logger.info("Stopping audio stream and terminating AudioManager...")
         
+        # Stop audio reader thread
+        if 'audio_reader' in locals():
+            audio_reader.stop()
+            logger.info("Audio reader thread stopped")
+        
         # Stop heartbeat sender
         if 'heartbeat_sender' in locals():
             heartbeat_sender.stop()
@@ -1357,6 +1377,11 @@ def main():
         import traceback
         logger.error(f"Error during execution: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
+        
+        # Stop audio reader thread
+        if 'audio_reader' in locals():
+            audio_reader.stop()
+            logger.info("Audio reader thread stopped")
         
         # Stop heartbeat sender
         if 'heartbeat_sender' in locals():
