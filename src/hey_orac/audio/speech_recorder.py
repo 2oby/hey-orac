@@ -121,11 +121,24 @@ class SpeechRecorder:
             start_time = time.time()
             chunk_size = 1280  # Same as main detection loop
             
+            # Register as consumer if using AudioReaderThread
+            recorder_queue = None
+            if hasattr(audio_stream, 'register_consumer'):
+                # This is an AudioReaderThread - register as a consumer
+                recorder_queue = audio_stream.register_consumer("speech_recorder")
+                logger.info("✅ Speech recorder registered as audio consumer")
+            
             while True:
                 try:
                     # Read audio chunk - handle both stream and AudioReaderThread
-                    if hasattr(audio_stream, 'get_audio'):
-                        # This is an AudioReaderThread with queue-based audio
+                    if recorder_queue is not None:
+                        # Using registered consumer queue
+                        try:
+                            data = recorder_queue.get(timeout=2.0)
+                        except:
+                            data = None
+                    elif hasattr(audio_stream, 'get_audio'):
+                        # Legacy AudioReaderThread without consumer registration
                         data = audio_stream.get_audio(timeout=2.0)
                     else:
                         # Regular PyAudio stream
@@ -220,6 +233,11 @@ class SpeechRecorder:
             logger.error(f"Error during recording/transcription: {e}", exc_info=True)
             
         finally:
+            # Unregister as consumer if we registered
+            if recorder_queue is not None and hasattr(audio_stream, 'unregister_consumer'):
+                audio_stream.unregister_consumer("speech_recorder")
+                logger.info("🚮 Speech recorder unregistered as audio consumer")
+            
             with self.recording_lock:
                 self.is_recording = False
             if hasattr(self, '_speech_started'):

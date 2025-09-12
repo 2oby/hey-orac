@@ -950,8 +950,12 @@ def main():
             logger.error("Failed to start audio reader thread")
             raise RuntimeError("Failed to start audio reader thread")
         
+        # Register main loop as a consumer
+        main_consumer_queue = audio_reader.register_consumer("main_loop")
+        logger.info("✅ Main loop registered as audio consumer")
+        
         # Continuously listen to the audio stream and detect wake words
-        logger.info("🎤 Starting wake word detection loop with queue-based audio...")
+        logger.info("🎤 Starting wake word detection loop with multi-consumer audio distribution...")
         sys.stdout.flush()
         chunk_count = 0
         last_config_check = time.time()
@@ -1006,8 +1010,11 @@ def main():
                             sys.exit(1)
                     last_thread_check = current_time
                 
-                # Get audio data from queue with timeout
-                data = audio_reader.get_audio(timeout=2.0)
+                # Get audio data from consumer queue with timeout
+                try:
+                    data = main_consumer_queue.get(timeout=2.0)
+                except:
+                    data = None
                 
                 if data is None:
                     logger.warning("No audio data received from queue (timeout)")
@@ -1350,8 +1357,10 @@ def main():
         # Handle graceful shutdown on Ctrl+C
         logger.info("Stopping audio stream and terminating AudioManager...")
         
-        # Stop audio reader thread
+        # Unregister main loop consumer and stop audio reader thread
         if 'audio_reader' in locals():
+            audio_reader.unregister_consumer("main_loop")
+            logger.info("Main loop unregistered as audio consumer")
             audio_reader.stop()
             logger.info("Audio reader thread stopped")
         
@@ -1380,8 +1389,10 @@ def main():
         logger.error(f"Error during execution: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         
-        # Stop audio reader thread
+        # Unregister main loop consumer and stop audio reader thread
         if 'audio_reader' in locals():
+            audio_reader.unregister_consumer("main_loop")
+            logger.info("Main loop unregistered as audio consumer")
             audio_reader.stop()
             logger.info("Audio reader thread stopped")
         
