@@ -1197,8 +1197,9 @@ def main():
                             stt_language = config.stt.language
                         
                         # Start recording in background thread
+                        # Pass audio_reader instead of stream for queue-based audio
                         speech_recorder.start_recording(
-                            audio_stream=stream,
+                            audio_stream=audio_reader,  # Changed from stream to audio_reader
                             wake_word=trigger_info['config_name'],
                             confidence=trigger_info['confidence'],
                             language=stt_language,
@@ -1320,8 +1321,9 @@ def main():
                         
                         logger.debug(f"Starting recording with language={stt_language}")
                         # Start recording in background thread with webhook URL
+                        # Pass audio_reader instead of stream for queue-based audio
                         speech_recorder.start_recording(
-                            audio_stream=stream,
+                            audio_stream=audio_reader,  # Changed from stream to audio_reader
                             wake_word=config_name,
                             confidence=max_confidence,
                             language=stt_language,

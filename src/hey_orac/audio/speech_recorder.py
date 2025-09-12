@@ -123,10 +123,16 @@ class SpeechRecorder:
             
             while True:
                 try:
-                    # Read audio chunk
-                    data = audio_stream.read(chunk_size, exception_on_overflow=False)
+                    # Read audio chunk - handle both stream and AudioReaderThread
+                    if hasattr(audio_stream, 'get_audio'):
+                        # This is an AudioReaderThread with queue-based audio
+                        data = audio_stream.get_audio(timeout=2.0)
+                    else:
+                        # Regular PyAudio stream
+                        data = audio_stream.read(chunk_size, exception_on_overflow=False)
+                    
                     if data is None or len(data) == 0:
-                        logger.warning("No audio data from stream")
+                        logger.warning("No audio data from stream/queue")
                         break
                     
                     # Convert to numpy array
