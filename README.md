@@ -277,16 +277,39 @@ The module follows a modular architecture optimized for real-time performance:
 - **Transport Module**: STT client and webhook integration for downstream processing
 - **Web Module**: REST API, WebSocket interface, and real-time dashboard
 - **Speech Recorder**: Post-wake-word audio capture with endpointing
+- **Audio Reader Thread**: Non-blocking audio capture with multi-consumer distribution
 
 ### Audio Processing Pipeline
 ```
-Microphone → Ring Buffer → OpenWakeWord → Threshold Filter → Wake Detection
-                ↓              ↓              ↓               ↓
-            Pre-roll       VAD Filter    Model Scoring   Event Trigger
-              Audio         (global)     (per-model)        ↓
-                ↓                                    Speech Recording
-            STT Client ← Audio Stream ← Endpointing ← Active Recording
+Microphone → AudioReaderThread → Multi-Consumer Distribution
+                    ↓                        ↓
+            Producer Thread          Consumer Queues
+                    ↓                    ↓         ↓
+            stream.read()         main_loop   speech_recorder
+                    ↓                    ↓         ↓ 
+            Audio Chunks →      Wake Detection  Recording
+                                     ↓              ↓
+                                Ring Buffer    STT Stream
 ```
+
+### Multi-Consumer Audio Architecture
+The system uses a sophisticated audio distribution mechanism to ensure all components receive complete audio streams:
+
+- **AudioReaderThread**: Dedicated thread for non-blocking audio capture
+  - Isolates blocking `stream.read()` calls in separate thread
+  - Distributes audio to multiple registered consumers
+  - Each consumer gets its own queue with complete audio data
+  
+- **Consumer Registration**: Components register/unregister dynamically
+  - Main wake word detection loop: `main_loop` consumer
+  - Speech recorder: `speech_recorder` consumer (on-demand)
+  - Extensible for future consumers
+  
+- **Benefits**:
+  - No audio data loss or competition between components
+  - Clear, complete audio for all consumers
+  - Thread-safe with automatic health monitoring
+  - Backward compatible with legacy single-queue mode
 
 ## API Reference
 

@@ -633,3 +633,52 @@ Wake Word Detection → Speech Recording → STT Transcription → Webhook Deliv
 - STT indicator showing correct status (green when ORAC STT is online)
 - Fixed health check to accept 'initializing' status as healthy
 - All changes committed and pushed to repository
+
+## 2025-09-12 - Fixed Choppy Audio with Multi-Consumer Distribution
+
+### Problem Identified:
+- **Duration**: ~1.5 hours investigation and implementation
+- **Issue**: Audio reaching ORAC STT was choppy/broken
+- **Root Cause**: Single queue being consumed by multiple components
+  - Main wake word detection loop consuming from queue
+  - Speech recorder also consuming from same queue
+  - Result: Each got alternating chunks (chunk #1 → main, chunk #2 → recorder, etc.)
+
+### Solution Implemented:
+**Multi-Consumer Audio Distribution System**
+
+1. **AudioReaderThread Enhanced** (audio_reader_thread.py)
+   - Added consumer registration/unregistration system
+   - Each consumer gets dedicated queue with complete audio stream
+   - Audio chunks distributed to ALL registered consumers
+   - Maintains backward compatibility with legacy single-queue mode
+   - Thread-safe consumer management with locks
+
+2. **Wake Word Detection Updated** (wake_word_detection.py)
+   - Main loop registers as "main_loop" consumer on startup
+   - Uses dedicated queue instead of shared get_audio() method
+   - Properly unregisters on cleanup/shutdown
+
+3. **Speech Recorder Updated** (speech_recorder.py)
+   - Dynamically registers as "speech_recorder" when recording starts
+   - Gets complete audio stream from its own queue
+   - Unregisters when recording completes
+   - Handles both new multi-consumer and legacy modes
+
+### Testing & Verification:
+- Created test_multi_consumer.py to verify distribution logic
+- Test confirmed all consumers receive identical audio chunks
+- Deployed to Raspberry Pi and tested with real voice commands
+- **Result**: Clear audio, accurate STT transcriptions
+
+### Technical Details:
+- Consumer queues created with same maxsize as original
+- Audio distribution uses very short timeout (0.01s) to prevent blocking
+- Queue overflow handled by dropping oldest chunk and retrying
+- Health monitoring and stats remain functional
+
+### Status: ✅ FIXED AND VERIFIED
+- Audio is now clear and complete
+- STT transcriptions are accurate
+- No more choppy/garbled audio
+- System stable and running in production
