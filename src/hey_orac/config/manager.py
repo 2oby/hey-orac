@@ -28,6 +28,9 @@ class ModelConfig:
     priority: int = 1
     stt_enabled: bool = True
     topic: str = "general"  # Topic for ORAC Core routing
+    base_url: Optional[str] = None  # Per-model base URL override
+    stream_path: Optional[str] = None  # Per-model stream path override
+    heartbeat_path: Optional[str] = None  # Per-model heartbeat path override
 
 
 @dataclass
@@ -67,6 +70,9 @@ class STTConfig:
     """Speech-to-Text configuration."""
     enabled: bool = True
     base_url: str = "http://localhost:8000"
+    default_base_url: str = "http://192.168.8.192:7272"  # Default base URL for all models
+    stream_path: str = "/stt/v1/stream"  # Default stream path
+    heartbeat_path: str = "/stt/v1/heartbeat"  # Default heartbeat path
     timeout: int = 30
     language: Optional[str] = None
     pre_roll_duration: float = 1.0
@@ -334,7 +340,10 @@ class SettingsManager:
                     webhook_url=model_dict.get('webhook_url', ''),
                     topic=model_dict.get('topic', 'general'),
                     priority=model_dict.get('priority', 1),
-                    stt_enabled=model_dict.get('stt_enabled', True)
+                    stt_enabled=model_dict.get('stt_enabled', True),
+                    base_url=model_dict.get('base_url'),
+                    stream_path=model_dict.get('stream_path'),
+                    heartbeat_path=model_dict.get('heartbeat_path')
                 )
                 models.append(model)
             
@@ -392,6 +401,9 @@ class SettingsManager:
             stt = STTConfig(
                 enabled=stt_dict.get('enabled', True),
                 base_url=stt_dict.get('base_url', 'http://localhost:8000'),
+                default_base_url=stt_dict.get('default_base_url', 'http://192.168.8.192:7272'),
+                stream_path=stt_dict.get('stream_path', '/stt/v1/stream'),
+                heartbeat_path=stt_dict.get('heartbeat_path', '/stt/v1/heartbeat'),
                 timeout=stt_dict.get('timeout', 30),
                 language=stt_dict.get('language'),
                 pre_roll_duration=stt_dict.get('pre_roll_duration', 1.0),
@@ -786,13 +798,19 @@ class SettingsManager:
                         model.framework = str(updates['framework'])
                     if 'priority' in updates:
                         model.priority = int(updates['priority'])
+                    if 'base_url' in updates:
+                        model.base_url = updates['base_url'] if updates['base_url'] else None
+                    if 'stream_path' in updates:
+                        model.stream_path = updates['stream_path'] if updates['stream_path'] else None
+                    if 'heartbeat_path' in updates:
+                        model.heartbeat_path = updates['heartbeat_path'] if updates['heartbeat_path'] else None
                     logger.info(f"Updated model '{model_name}' config: {updates}")
                     break
             else:
                 logger.warning(f"Model '{model_name}' not found for update")
-            
+
             return config
-        
+
         return self.update_config(updater)
     
     def update_system_config(self, **updates) -> bool:
@@ -834,7 +852,51 @@ class SettingsManager:
             return config
         
         return self.update_config(updater)
-    
+
+    def update_stt_config(self, **updates) -> bool:
+        """
+        Update STT configuration.
+
+        Args:
+            **updates: STT configuration fields to update
+
+        Returns:
+            True if successful, False otherwise
+        """
+        def updater(config: HeyOracConfig) -> HeyOracConfig:
+            # Update STT config with provided values
+            if 'enabled' in updates:
+                config.stt.enabled = bool(updates['enabled'])
+            if 'base_url' in updates:
+                config.stt.base_url = str(updates['base_url'])
+            if 'default_base_url' in updates:
+                config.stt.default_base_url = str(updates['default_base_url'])
+            if 'stream_path' in updates:
+                config.stt.stream_path = str(updates['stream_path'])
+            if 'heartbeat_path' in updates:
+                config.stt.heartbeat_path = str(updates['heartbeat_path'])
+            if 'timeout' in updates:
+                config.stt.timeout = int(updates['timeout'])
+            if 'language' in updates:
+                config.stt.language = str(updates['language']) if updates['language'] else None
+            if 'pre_roll_duration' in updates:
+                config.stt.pre_roll_duration = float(updates['pre_roll_duration'])
+            if 'silence_threshold' in updates:
+                config.stt.silence_threshold = float(updates['silence_threshold'])
+            if 'silence_duration' in updates:
+                config.stt.silence_duration = float(updates['silence_duration'])
+            if 'grace_period' in updates:
+                config.stt.grace_period = float(updates['grace_period'])
+            if 'max_recording_duration' in updates:
+                config.stt.max_recording_duration = float(updates['max_recording_duration'])
+            if 'enable_per_model' in updates:
+                config.stt.enable_per_model = bool(updates['enable_per_model'])
+
+            logger.info(f"Updated STT config: {updates}")
+            return config
+
+        return self.update_config(updater)
+
     def save(self) -> bool:
         """
         Convenience method to save current configuration to file.
