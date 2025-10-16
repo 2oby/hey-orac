@@ -383,7 +383,7 @@ VERY_WEAK_SIGNAL_THRESHOLD = 0.01
 - [x] Sprint 1: Delete Redundant Files ✅ (Removed 953 lines of dead code)
 - [x] Sprint 2: Remove Debug Prints ✅ (Removed 6 debug print statements)
 - [x] Sprint 3: Fix Resource Cleanup ✅ (Added close() method, fixed 2 __del__() calls)
-- [ ] Sprint 4: Fix Error Handling
+- [x] Sprint 4: Fix Error Handling ✅ (Replaced 3 bare except blocks with specific exceptions, added logging)
 - [ ] Sprint 5: Resolve Dual Entry Points
 - [ ] Sprint 6: Extract Constants
 - [ ] Sprint 7: Consolidate Audio Conversion
@@ -397,7 +397,7 @@ VERY_WEAK_SIGNAL_THRESHOLD = 0.01
 
 ### Statistics
 - **Total Sprints**: 14
-- **Completed**: 3
+- **Completed**: 4
 - **In Progress**: None
 - **Blocked**: None
 
