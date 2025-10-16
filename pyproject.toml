@@ -49,9 +49,6 @@ dev = [
     "pre-commit>=3.5.0",
 ]
 
-[project.scripts]
-hey-orac = "hey_orac.cli:main"
-
 [project.urls]
 "Homepage" = "https://github.com/2oby/hey-orac"
 "Bug Tracker" = "https://github.com/2oby/hey-orac/issues"
