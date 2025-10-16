@@ -1299,7 +1299,8 @@ def main():
         with open('/app/git_commit.txt', 'r') as f:
             commit = f.read().strip()
             logger.info(f"🔧 Running code from git commit: {commit}")
-    except:
+    except (FileNotFoundError, IOError, OSError) as e:
+        logger.debug(f"Git commit info not available: {e}")
         logger.info("🔧 Git commit info not available")
     
     # Parse command line arguments
