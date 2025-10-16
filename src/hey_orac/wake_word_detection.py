@@ -614,7 +614,6 @@ def main():
                 raise RuntimeError("Failed to start audio stream")
 
         # Initialize the OpenWakeWord model with enabled models from configuration
-        print("DEBUG: About to create Model()", flush=True)
         try:
             # Get enabled models from configuration
             enabled_models = [model for model in models_config if model.enabled]
@@ -668,8 +667,7 @@ def main():
                 'threshold': cfg.threshold,
                 'webhook_url': cfg.webhook_url
             } for name, cfg in active_model_configs.items()}
-            
-            print("DEBUG: Model created successfully", flush=True)
+
             logger.info("OpenWakeWord model initialized")
             
             # Check what models are actually loaded
@@ -699,16 +697,14 @@ def main():
             except Exception as e:
                 logger.error(f"❌ Error testing model after creation: {e}")
                 raise
-            
-            print("DEBUG: After model initialized log", flush=True)
+
         except Exception as e:
             print(f"ERROR: Model creation failed: {e}", flush=True)
             raise
         
         # Force log flush
         sys.stdout.flush()
-        print("DEBUG: After sys.stdout.flush()", flush=True)
-        
+
         # Initialize heartbeat sender for ORAC STT integration
         logger.info("💓 Initializing heartbeat sender for ORAC STT...")
         heartbeat_sender = HeartbeatSender()
@@ -729,9 +725,7 @@ def main():
         logger.info("✅ Heartbeat sender started")
 
         # Test audio stream first
-        print("DEBUG: About to test audio stream", flush=True)
         logger.info("🧪 Testing audio stream...")
-        print("DEBUG: After audio stream test log", flush=True)
         sys.stdout.flush()
         try:
             test_data = stream.read(1280, exception_on_overflow=False)
