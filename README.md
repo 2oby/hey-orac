@@ -305,8 +305,8 @@ Microphone → AudioReaderThread → Multi-Consumer Distribution
             Producer Thread          Consumer Queues
                     ↓                    ↓         ↓
             stream.read()         main_loop   speech_recorder
-                    ↓                    ↓         ↓ 
-            Audio Chunks →      Wake Detection  Recording
+                    ↓                    ↓         ↓
+            Audio Chunks        Wake Detection  Recording
                                      ↓              ↓
                                 Ring Buffer    STT Stream
 ```
