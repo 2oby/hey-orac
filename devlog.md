@@ -682,3 +682,58 @@ Wake Word Detection → Speech Recording → STT Transcription → Webhook Deliv
 - STT transcriptions are accurate
 - No more choppy/garbled audio
 - System stable and running in production
+## 2025-10-16 - Sprint 7: Consolidated Audio Conversion Logic
+
+### Changes Made:
+- **Duration**: ~30 minutes
+- **Sprint**: 7 of 14 in code cleanup project
+- **Status**: ✅ COMPLETE - All functionality working on Raspberry Pi
+
+### What Was Done:
+**Created Centralized Conversion Module** (`src/hey_orac/audio/conversion.py`):
+- Added `convert_to_openwakeword_format()` - Un-normalized conversion for wake word detection
+- Added `convert_to_normalized_format()` - Normalized conversion for STT
+- Extensive documentation about the CRITICAL no-normalization requirement for OpenWakeWord
+
+**Updated wake_word_detection.py**:
+- Replaced 3 duplicate conversion code locations with single-line function calls:
+  - Location 1: `record_test_audio()` function (lines 203-208) → 1 line
+  - Location 2: `load_test_audio()` function (lines 329-338) → 1 line
+  - Location 3: Main detection loop (lines 1030-1051) → 1 line
+- Removed ~35 lines of duplicate code total
+- Preserved CRITICAL FIX documentation about OpenWakeWord requirements
+
+### Why This Matters:
+**DRY Principle Applied**:
+- Single source of truth for audio conversion logic
+- Easier to maintain and debug
+- Centralized documentation of critical requirements
+- Reduced code duplication
+
+**Historical Context Preserved**:
+- The OpenWakeWord normalization bug (documented in devlog.md) is now explained in one central location
+- Module docstring, function docstring, and inline comments all emphasize the no-normalization requirement
+- Future developers will see this critical information immediately
+
+### Testing & Verification:
+- Deployed to Raspberry Pi successfully
+- Container built and started without errors
+- Wake word detection still functioning correctly
+- No regression in functionality
+
+### Code Quality Improvements:
+- Removed ~35 lines of duplicate code
+- Added comprehensive documentation
+- Improved maintainability
+- Made codebase more professional
+
+### Progress Update:
+- **Sprints Completed**: 7/14 (50%)
+- **All HIGH PRIORITY sprints**: ✅ COMPLETE
+- **Next**: MEDIUM PRIORITY sprints (Refactoring)
+
+### Git Commits:
+- Created conversion.py module
+- Updated wake_word_detection.py to use centralized functions
+- Deployed and tested successfully on Pi
+- Documentation updated (CLEANUP.md and devlog.md)
