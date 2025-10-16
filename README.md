@@ -2,6 +2,14 @@
 
 A Raspberry Pi container for continuous wake-word detection using OpenWakeWord with full Speech-to-Text integration and topic-based routing.
 
+## Documentation
+
+- **[User Guide](USER_GUIDE.md)** - Complete guide for end users and system administrators
+- **[Developer Guide](DEVELOPER_GUIDE.md)** - Architecture, development setup, and contribution guidelines
+- **[STT API Reference](STT_API_REFERENCE.md)** - ORAC STT Service API documentation
+- **[Code Cleanup History](CLEANUP.md)** - Complete refactoring sprint documentation
+- **[Development Log](devlog.md)** - Chronological development history and decisions
+
 ## Features
 
 - **Real-time Wake-Word Detection**: Multiple OpenWakeWord models with configurable thresholds
