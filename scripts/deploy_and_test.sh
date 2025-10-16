@@ -32,8 +32,11 @@ if ! ssh -q -o BatchMode=yes -o ConnectTimeout=5 "$REMOTE_ALIAS" exit; then
 fi
 echo -e "${GREEN}✓ Connected to $REMOTE_ALIAS${NC}"
 
+# Get current commit hash and branch FIRST
+BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+
 # 1) Local: commit and push
-echo -e "${YELLOW}👉 Pushing local commits to master...${NC}"
+echo -e "${YELLOW}👉 Pushing local commits to $BRANCH_NAME...${NC}"
 
 # Add all changes
 echo -e "${YELLOW}Adding all changes${NC}"
@@ -45,14 +48,13 @@ if git diff --cached --quiet; then
 else
     echo -e "${YELLOW}Committing with message: $COMMIT_MSG${NC}"
     git commit -m "$COMMIT_MSG"
-    
-    echo -e "${YELLOW}Pushing to origin/master${NC}"
-    git push origin master
+
+    echo -e "${YELLOW}Pushing to origin/$BRANCH_NAME${NC}"
+    git push origin "$BRANCH_NAME"
 fi
 
-# Get current commit hash and branch
+# Get current commit hash (after potential commit)
 COMMIT_HASH=$(git rev-parse HEAD)
-BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
 
 echo -e "${YELLOW}Deploying commit: $COMMIT_HASH on branch: $BRANCH_NAME${NC}"
 
