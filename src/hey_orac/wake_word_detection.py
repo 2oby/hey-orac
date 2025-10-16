@@ -35,6 +35,7 @@ from hey_orac.web.app import create_app, socketio
 from hey_orac.web.routes import init_routes
 from hey_orac.web.broadcaster import WebSocketBroadcaster
 from hey_orac.heartbeat_sender import HeartbeatSender  # Import heartbeat sender
+from hey_orac import constants  # Import constants
 
 # Configure logging for debugging
 logging.basicConfig(
@@ -70,7 +71,7 @@ def generate_timestamp_filename():
 
 class WavFileStream:
     """A class that mimics audio stream interface but reads from WAV file."""
-    def __init__(self, filename, chunk_size=1280):
+    def __init__(self, filename, chunk_size=constants.CHUNK_SIZE):
         self.chunk_size = chunk_size
         self.filename = filename
         self.audio_data = None
@@ -89,8 +90,8 @@ class WavFileStream:
                 
                 logger.info(f"   Audio format: {self.channels} channels, {sample_width} bytes/sample, {framerate} Hz")
                 
-                if framerate != 16000:
-                    logger.warning(f"⚠️  Sample rate is {framerate} Hz, expected 16000 Hz")
+                if framerate != constants.SAMPLE_RATE:
+                    logger.warning(f"⚠️  Sample rate is {framerate} Hz, expected {constants.SAMPLE_RATE} Hz")
                 
                 # Read all frames
                 frames = wf.readframes(wf.getnframes())
@@ -146,10 +147,10 @@ def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename=
         "recording_info": {
             "timestamp": datetime.now().isoformat(),
             "filename": filename,
-            "duration_seconds": 10,
-            "sample_rate": 16000,
-            "channels": 2,
-            "chunk_size": 1280,
+            "duration_seconds": constants.TEST_RECORDING_DURATION_SECONDS,
+            "sample_rate": constants.SAMPLE_RATE,
+            "channels": constants.CHANNELS_STEREO,
+            "chunk_size": constants.CHUNK_SIZE,
             "microphone_info": {
                 "name": usb_mic.name,
                 "index": usb_mic.index
@@ -180,7 +181,7 @@ def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename=
     
     # Countdown
     logger.info("📡 Starting countdown...")
-    for i in range(5, 0, -1):
+    for i in range(constants.TEST_RECORDING_COUNTDOWN_SECONDS, 0, -1):
         logger.info(f"   {i}...")
         time.sleep(1)
     
@@ -189,18 +190,18 @@ def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename=
     
     # Record audio data and process in real-time
     frames = []
-    chunks_per_second = 16000 // 1280  # ~12.5 chunks per second
-    total_chunks = chunks_per_second * 10  # 10 seconds
+    chunks_per_second = constants.SAMPLE_RATE // constants.CHUNK_SIZE  # ~12.5 chunks per second
+    total_chunks = chunks_per_second * constants.TEST_RECORDING_DURATION_SECONDS  # 10 seconds
     
     for i in range(total_chunks):
         try:
-            data = stream.read(1280, exception_on_overflow=False)
+            data = stream.read(constants.CHUNK_SIZE, exception_on_overflow=False)
             if data:
                 frames.append(data)
-                
+
                 # Convert to audio data for real-time processing
                 audio_array = np.frombuffer(data, dtype=np.int16)
-                if len(audio_array) > 1280:  # Stereo
+                if len(audio_array) > constants.CHUNK_SIZE:  # Stereo
                     stereo_data = audio_array.reshape(-1, 2)
                     audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
                 else:
@@ -238,7 +239,7 @@ def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename=
                 metadata["detection_results"]["confidence_scores"].append(confidence_entry)
                 
                 # Check for wake word detection
-                detection_threshold = 0.3
+                detection_threshold = constants.DETECTION_THRESHOLD_DEFAULT
                 if max_confidence >= detection_threshold:
                     detection = {
                         "timestamp": timestamp,
@@ -250,9 +251,9 @@ def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename=
                     logger.info(f"🎯 DETECTED during recording at {timestamp:.2f}s: {best_model} = {max_confidence:.6f}")
                 
                 # Progress indicator
-                if i % (chunks_per_second * 2) == 0:  # Every 2 seconds
+                if i % (chunks_per_second * constants.TEST_RECORDING_STATUS_INTERVAL_SECONDS) == 0:  # Every 2 seconds
                     seconds_elapsed = i // chunks_per_second
-                    logger.info(f"   Recording... {seconds_elapsed}/10 seconds (RMS: {rms:.4f})")
+                    logger.info(f"   Recording... {seconds_elapsed}/{constants.TEST_RECORDING_DURATION_SECONDS} seconds (RMS: {rms:.4f})")
                 
         except Exception as e:
             logger.error(f"Error during recording: {e}")
@@ -269,9 +270,9 @@ def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename=
     logger.info(f"💾 Saving recording to {filename}...")
     try:
         with wave.open(filename, 'wb') as wf:
-            wf.setnchannels(2)  # Stereo
-            wf.setsampwidth(2)  # 16-bit
-            wf.setframerate(16000)
+            wf.setnchannels(constants.CHANNELS_STEREO)  # Stereo
+            wf.setsampwidth(constants.SAMPLE_WIDTH_BYTES)  # 16-bit
+            wf.setframerate(constants.SAMPLE_RATE)
             wf.writeframes(b''.join(frames))
         
         logger.info(f"✅ Recording saved successfully to {filename}")
@@ -286,9 +287,9 @@ def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename=
         # Log summary
         total_detections = metadata["detection_results"]["total_detections"]
         avg_rms = np.mean([entry["rms"] for entry in metadata["rms_data"]])
-        
+
         logger.info(f"📈 Recording Summary:")
-        logger.info(f"   Duration: 10 seconds")
+        logger.info(f"   Duration: {constants.TEST_RECORDING_DURATION_SECONDS} seconds")
         logger.info(f"   Average RMS: {avg_rms:.4f}")
         logger.info(f"   Wake words detected: {total_detections}")
         
@@ -317,9 +318,9 @@ def load_test_audio(filename):
             framerate = wf.getframerate()
             
             logger.info(f"   Audio format: {channels} channels, {sample_width} bytes/sample, {framerate} Hz")
-            
-            if framerate != 16000:
-                logger.warning(f"⚠️  Sample rate is {framerate} Hz, expected 16000 Hz")
+
+            if framerate != constants.SAMPLE_RATE:
+                logger.warning(f"⚠️  Sample rate is {framerate} Hz, expected {constants.SAMPLE_RATE} Hz")
             
             # Read all frames
             frames = wf.readframes(wf.getnframes())
@@ -335,8 +336,8 @@ def load_test_audio(filename):
             else:
                 audio_data = audio_array.astype(np.float32)
                 logger.info(f"   Mono audio: {len(audio_data)} samples")
-                
-            duration = len(audio_data) / 16000
+
+            duration = len(audio_data) / constants.SAMPLE_RATE
             logger.info(f"✅ Loaded {duration:.2f} seconds of audio data")
             
             return audio_data
@@ -348,8 +349,8 @@ def load_test_audio(filename):
 def test_pipeline_with_audio(model, audio_data):
     """Test the pipeline with recorded audio, processing in chunks like live audio."""
     logger.info("🧪 TESTING PIPELINE with recorded audio...")
-    
-    chunk_size = 1280
+
+    chunk_size = constants.CHUNK_SIZE
     total_chunks = len(audio_data) // chunk_size
     
     logger.info(f"   Processing {total_chunks} chunks of {chunk_size} samples each")
@@ -379,20 +380,20 @@ def test_pipeline_with_audio(model, audio_data):
                 best_model = wakeword
         
         # Log RMS and confidence every 25 chunks (~2 seconds)
-        if i % 25 == 0:
-            timestamp = (i * chunk_size) / 16000
+        if i % constants.PIPELINE_TEST_LOG_INTERVAL_CHUNKS == 0:
+            timestamp = (i * chunk_size) / constants.SAMPLE_RATE
             logger.info(f"   📊 Time: {timestamp:.2f}s, RMS: {rms:.4f}, Best: {best_model} = {max_confidence:.6f}")
-        
+
         # Detection logic (very low threshold for custom model testing)
-        detection_threshold = 0.05
+        detection_threshold = constants.PIPELINE_TEST_DETECTION_THRESHOLD
         if max_confidence >= detection_threshold:
-            timestamp = (i * chunk_size) / 16000
+            timestamp = (i * chunk_size) / constants.SAMPLE_RATE
             logger.info(f"🎯 WAKE WORD DETECTED at {timestamp:.2f}s! Confidence: {max_confidence:.6f} - Source: {best_model}")
             detected_words.append((timestamp, best_model, max_confidence))
-            
+
         # Also log moderate confidence like live pipeline
-        elif max_confidence > 0.1:
-            timestamp = (i * chunk_size) / 16000
+        elif max_confidence > constants.MODERATE_CONFIDENCE_THRESHOLD:
+            timestamp = (i * chunk_size) / constants.SAMPLE_RATE
             logger.info(f"🔍 Moderate confidence at {timestamp:.2f}s: {best_model} = {max_confidence:.6f}")
     
     # Summary
@@ -468,7 +469,7 @@ def main():
         'status_changed': True,
         'stt_health': 'disconnected'
     })
-    event_queue = Queue(maxsize=100)
+    event_queue = Queue(maxsize=constants.EVENT_QUEUE_MAXSIZE)
     
     # Initialize SettingsManager (triggers auto-discovery)
     logger.info("🔧 Initializing SettingsManager...")
@@ -678,7 +679,7 @@ def main():
             
             # Enhanced model verification - test with dummy audio like old working code
             logger.info("🔍 Testing model with dummy audio to verify initialization...")
-            test_audio = np.zeros(1280, dtype=np.float32)
+            test_audio = np.zeros(constants.CHUNK_SIZE, dtype=np.float32)
             try:
                 test_predictions = model.predict(test_audio)
                 logger.info(f"✅ Model test successful - prediction type: {type(test_predictions)}")
@@ -729,7 +730,7 @@ def main():
         logger.info("🧪 Testing audio stream...")
         sys.stdout.flush()
         try:
-            test_data = stream.read(1280, exception_on_overflow=False)
+            test_data = stream.read(constants.CHUNK_SIZE, exception_on_overflow=False)
             logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
             sys.stdout.flush()
         except Exception as e:
@@ -781,10 +782,10 @@ def main():
         
         # Initialize ring buffer for pre-roll audio
         ring_buffer = RingBuffer(
-            capacity_seconds=10.0,  # Keep 10 seconds of audio history
+            capacity_seconds=constants.RING_BUFFER_SECONDS,  # Keep 10 seconds of audio history
             sample_rate=audio_config.sample_rate
         )
-        logger.debug(f"RingBuffer initialized with capacity={10.0}s, sample_rate={audio_config.sample_rate}Hz")
+        logger.debug(f"RingBuffer initialized with capacity={constants.RING_BUFFER_SECONDS}s, sample_rate={audio_config.sample_rate}Hz")
         
         # Initialize STT client
         stt_client = STTClient(
@@ -881,7 +882,7 @@ def main():
                 )
                 
                 # Test the new model
-                test_audio = np.zeros(1280, dtype=np.float32)
+                test_audio = np.zeros(constants.CHUNK_SIZE, dtype=np.float32)
                 test_predictions = new_model.predict(test_audio)
                 logger.info(f"✅ New model test successful - predictions: {list(test_predictions.keys())}")
                 
@@ -940,7 +941,7 @@ def main():
                 return False
         
         # Initialize audio reader thread for non-blocking audio capture
-        audio_reader = AudioReaderThread(stream, chunk_size=1280, queue_maxsize=10)
+        audio_reader = AudioReaderThread(stream, chunk_size=constants.CHUNK_SIZE, queue_maxsize=constants.AUDIO_READER_QUEUE_MAXSIZE)
         if not audio_reader.start():
             logger.error("Failed to start audio reader thread")
             raise RuntimeError("Failed to start audio reader thread")
@@ -956,14 +957,14 @@ def main():
         last_config_check = time.time()
         last_health_check = time.time()
         last_thread_check = time.time()
-        CONFIG_CHECK_INTERVAL = 1.0  # Check for config changes every second
-        HEALTH_CHECK_INTERVAL = 30.0  # Check STT health every 30 seconds
-        THREAD_CHECK_INTERVAL = 5.0  # Check thread health every 5 seconds
-        
+        CONFIG_CHECK_INTERVAL = constants.CONFIG_CHECK_INTERVAL_SECONDS  # Check for config changes every second
+        HEALTH_CHECK_INTERVAL = constants.HEALTH_CHECK_INTERVAL_SECONDS  # Check STT health every 30 seconds
+        THREAD_CHECK_INTERVAL = constants.THREAD_CHECK_INTERVAL_SECONDS  # Check thread health every 5 seconds
+
         # Variables for detecting stuck RMS
         last_rms = None
         stuck_rms_count = 0
-        max_stuck_count = 10  # After 10 identical RMS values, restart
+        max_stuck_count = constants.MAX_STUCK_RMS_COUNT  # After 10 identical RMS values, restart
         
         while True:
             try:
@@ -1007,7 +1008,7 @@ def main():
                 
                 # Get audio data from consumer queue with timeout
                 try:
-                    data = main_consumer_queue.get(timeout=2.0)
+                    data = main_consumer_queue.get(timeout=constants.QUEUE_TIMEOUT_SECONDS)
                 except queue.Empty:
                     data = None
                 
@@ -1031,7 +1032,7 @@ def main():
                 # Handle channel conversion based on input source
                 if args.input_wav and hasattr(stream, 'channels'):
                     # For WAV files, check the stream's channel count
-                    if stream.channels == 2 and len(audio_array) > 1280:
+                    if stream.channels == constants.CHANNELS_STEREO and len(audio_array) > constants.CHUNK_SIZE:
                         # Stereo WAV file - convert to mono
                         stereo_data = audio_array.reshape(-1, 2)
                         audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
@@ -1040,7 +1041,7 @@ def main():
                         audio_data = audio_array.astype(np.float32)
                 else:
                     # Microphone input - use original logic
-                    if len(audio_array) > 1280:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
+                    if len(audio_array) > constants.CHUNK_SIZE:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
                         # Reshape to separate left and right channels, then average
                         stereo_data = audio_array.reshape(-1, 2)
                         # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
@@ -1054,7 +1055,7 @@ def main():
                 shared_data['rms'] = float(rms)
                 
                 # Check for stuck RMS values (indicates frozen audio thread)
-                if last_rms is not None and abs(rms - last_rms) < 0.0001:
+                if last_rms is not None and abs(rms - last_rms) < constants.STUCK_RMS_THRESHOLD:
                     stuck_rms_count += 1
                     if stuck_rms_count >= max_stuck_count:
                         logger.error(f"RMS stuck at {rms} for {stuck_rms_count} iterations - audio thread frozen")
@@ -1076,19 +1077,19 @@ def main():
                 
                 # Log every 100 chunks to show we're processing audio
                 chunk_count += 1
-                if chunk_count % 100 == 0:
+                if chunk_count % constants.AUDIO_LOG_INTERVAL_CHUNKS == 0:
                     audio_volume = np.abs(audio_data).mean()
                     logger.info(f"📊 Processed {chunk_count} audio chunks")
                     logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}, RMS: {rms:.4f}")
                     logger.info(f"   Raw data size: {len(data)} bytes, samples: {len(audio_array)}")
-                    if len(audio_array) > 1280:
+                    if len(audio_array) > constants.CHUNK_SIZE:
                         logger.info(f"   ✅ Stereo→Mono conversion active")
 
                 # Pass the audio data to the model for wake word prediction
                 prediction = model.predict(audio_data)
-                
+
                 # Log ALL confidence scores after each processed chunk
-                if chunk_count % 100 == 0:
+                if chunk_count % constants.AUDIO_LOG_INTERVAL_CHUNKS == 0:
                     all_scores = {word: f"{score:.6f}" for word, score in prediction.items()}
                     logger.debug(f"🎯 All confidence scores: {all_scores}")
                     # Also log what models are in active_model_configs for debugging
@@ -1176,7 +1177,7 @@ def main():
                             response = requests.post(
                                 trigger_info['model_config'].webhook_url,
                                 json=webhook_data,
-                                timeout=5  # 5 second timeout
+                                timeout=constants.WEBHOOK_TIMEOUT_SECONDS  # 5 second timeout
                             )
                             
                             if response.status_code == 200:
@@ -1243,7 +1244,7 @@ def main():
                     detection_threshold = model_config.threshold
                 else:
                     # Fallback threshold if model not found in config
-                    detection_threshold = 0.3
+                    detection_threshold = constants.DETECTION_THRESHOLD_DEFAULT
                     if best_model is not None:
                         logger.warning(f"Model '{best_model}' not found in active configs, using default threshold")
                 
@@ -1295,7 +1296,7 @@ def main():
                             response = requests.post(
                                 active_model_configs[config_name].webhook_url,
                                 json=webhook_data,
-                                timeout=5  # 5 second timeout
+                                timeout=constants.WEBHOOK_TIMEOUT_SECONDS  # 5 second timeout
                             )
                             
                             if response.status_code == 200:
@@ -1338,16 +1339,16 @@ def main():
                         logger.debug(f"STT recording NOT triggered. Conditions: speech_recorder={speech_recorder is not None}, config_name={config_name}, webhook_url={active_model_configs[config_name].webhook_url if config_name and config_name in active_model_configs else None}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
                 else:
                     # Enhanced debugging - log more frequent confidence updates
-                    if chunk_count % 50 == 0:  # Every 50 chunks instead of 100
+                    if chunk_count % constants.MODERATE_CONFIDENCE_LOG_INTERVAL_CHUNKS == 0:  # Every 50 chunks instead of 100
                         logger.debug(f"🎯 Best confidence: {max_confidence:.6f} from '{best_model}' (threshold: {detection_threshold:.6f})")
                         logger.debug(f"   All scores: {[f'{k}: {v:.6f}' for k, v in prediction.items()]}")
-                    
+
                     # Also check for moderate confidence levels for debugging
-                    if max_confidence > 0.1:
+                    if max_confidence > constants.MODERATE_CONFIDENCE_THRESHOLD:
                         logger.info(f"🔍 Moderate confidence detected: {best_model} = {max_confidence:.6f}")
-                    elif max_confidence > 0.05:
+                    elif max_confidence > constants.WEAK_SIGNAL_THRESHOLD:
                         logger.debug(f"🔍 Weak signal: {best_model} = {max_confidence:.6f}")
-                    elif max_confidence > 0.01:
+                    elif max_confidence > constants.VERY_WEAK_SIGNAL_THRESHOLD:
                         logger.debug(f"🔍 Very weak signal: {best_model} = {max_confidence:.6f}")
 
     except KeyboardInterrupt:
