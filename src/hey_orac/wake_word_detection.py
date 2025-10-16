@@ -1375,7 +1375,7 @@ def main():
             stream.stop_stream()
             stream.close()
         if audio_manager:
-            audio_manager.__del__()  # Explicitly clean up AudioManager
+            audio_manager.close()  # Explicitly clean up AudioManager
 
     except Exception as e:
         # Log any other errors and clean up
@@ -1407,7 +1407,7 @@ def main():
             stream.stop_stream()
             stream.close()
         if audio_manager:
-            audio_manager.__del__()
+            audio_manager.close()
 
 if __name__ == "__main__":
     main()

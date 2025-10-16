@@ -37,11 +37,27 @@ class AudioManager:
         # Enhanced system diagnostics
         self._run_system_audio_diagnostics()
         
-    def __del__(self):
-        """Cleanup PyAudio on destruction."""
+    def close(self):
+        """Explicitly cleanup PyAudio resources."""
+        if hasattr(self, 'current_stream') and self.current_stream:
+            try:
+                self.current_stream.stop_stream()
+                self.current_stream.close()
+            except Exception as e:
+                logger.warning(f"Error closing stream during cleanup: {e}")
+            finally:
+                self.current_stream = None
+
         if hasattr(self, 'pyaudio'):
-            self.pyaudio.terminate()
-    
+            try:
+                self.pyaudio.terminate()
+            except Exception as e:
+                logger.warning(f"Error terminating PyAudio during cleanup: {e}")
+
+    def __del__(self):
+        """Cleanup PyAudio on destruction - calls close()."""
+        self.close()
+
     def _run_system_audio_diagnostics(self):
         """Run comprehensive system audio diagnostics."""
         logger.info("🔧 Running system audio diagnostics...")
