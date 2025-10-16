@@ -1151,8 +1151,8 @@ def main():
                     audio_volume = np.abs(audio_data).mean()
                     logger.info(f"📊 Processed {chunk_count} audio chunks")
                     logger.info(f"   Audio data shape: {audio_data.shape}, volume: {audio_volume:.4f}, RMS: {rms:.4f}")
-                    logger.info(f"   Raw data size: {len(data)} bytes, samples: {len(audio_array)}")
-                    if len(audio_array) > constants.CHUNK_SIZE:
+                    logger.info(f"   Raw data size: {len(data)} bytes, samples: {len(audio_data)}")
+                    if len(audio_data) > constants.CHUNK_SIZE:
                         logger.info(f"   ✅ Stereo→Mono conversion active")
 
                 # Pass the audio data to the model for wake word prediction
