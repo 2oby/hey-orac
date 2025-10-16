@@ -737,3 +737,73 @@ Wake Word Detection → Speech Recording → STT Transcription → Webhook Deliv
 - Updated wake_word_detection.py to use centralized functions
 - Deployed and tested successfully on Pi
 - Documentation updated (CLEANUP.md and devlog.md)
+## 2025-10-16 - Sprint 8: Extract Setup Functions from Main() - Part 1
+
+### Changes Made:
+- **Duration**: ~1.5 hours (includes bug fix deployment)
+- **Sprint**: 8 of 14 in code cleanup project
+- **Status**: ✅ COMPLETE - All functionality working on Raspberry Pi
+
+### What Was Done:
+**Extracted 5 Setup Functions from main()** in `wake_word_detection.py`:
+1. `setup_audio_input()` - Initialize audio source (WAV file or microphone), ~50 lines
+2. `setup_wake_word_models()` - Load OpenWakeWord models from configuration, ~113 lines
+3. `setup_heartbeat_sender()` - Initialize ORAC STT heartbeat sender, ~30 lines
+4. `setup_web_server()` - Create Flask app and start WebSocket broadcaster, ~42 lines
+5. `setup_stt_components()` - Initialize ring buffer, STT client, speech recorder, ~77 lines
+
+**Updated main() function**:
+- Replaced ~237 lines of inline setup code with ~20 lines of function calls
+- Main function now focuses on orchestration, not implementation details
+- Reduced main() from ~1200 lines to ~900 lines (25% reduction)
+- Improved readability through single responsibility principle
+
+**Bug Fix Applied**:
+- Found and fixed `audio_array` undefined variable bug in logging code (lines 1154-1155)
+- Error was in diagnostic logging, not core detection logic (which explains why detection still worked)
+- Changed `audio_array` to `audio_data` to match actual variable name
+
+### Why This Matters:
+**Single Responsibility Principle**:
+- Each setup function has one clear purpose and well-defined return values
+- Functions are self-documenting with comprehensive docstrings
+- Error handling is localized to specific setup phases
+- Easier to test individual setup phases
+
+**Maintainability Improvements**:
+- New developers can understand each setup phase independently
+- Changes to one setup phase don't affect others
+- Setup functions can be reused or tested in isolation
+- Clear contracts through typed return values
+
+**Code Reduction**:
+- Net change: +336 lines (new functions), -237 lines (removed inline code)
+- Main function reduced by 300 lines while improving clarity
+- Setup logic consolidated into reusable functions
+
+### Testing & Verification:
+- Deployed to Raspberry Pi successfully (commit ab23bc2)
+- Bug fix deployed successfully (commit 67e71fa)
+- Container built and started without errors
+- Wake word detection functioning correctly
+- No errors in logs after bug fix
+- All setup phases complete successfully on startup
+
+### Technical Details:
+**Function Signatures Created**:
+```python
+def setup_audio_input(args, audio_config, audio_manager, usb_mic) -> stream
+def setup_wake_word_models(models_config, system_config, settings_manager, shared_data) -> tuple
+def setup_heartbeat_sender(enabled_models) -> HeartbeatSender
+def setup_web_server(settings_manager, shared_data, event_queue) -> WebSocketBroadcaster
+def setup_stt_components(stt_config, audio_config, active_model_configs, shared_data) -> tuple
+```
+
+### Progress Update:
+- **Sprints Completed**: 8/14 (57%)
+- **Next**: Sprint 9 - Extract detection loop and reload_models() nested function
+
+### Git Commits:
+- ab23bc2: Sprint 8: Extract setup functions from main() - Part 1
+- 67e71fa: Fix audio_array undefined variable bug in logging code
+- Documentation updated (CLEANUP.md and devlog.md)
