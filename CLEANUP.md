@@ -384,7 +384,7 @@ VERY_WEAK_SIGNAL_THRESHOLD = 0.01
 - [x] Sprint 2: Remove Debug Prints ✅ (Removed 6 debug print statements)
 - [x] Sprint 3: Fix Resource Cleanup ✅ (Added close() method, fixed 2 __del__() calls)
 - [x] Sprint 4: Fix Error Handling ✅ (Replaced 3 bare except blocks with specific exceptions, added logging)
-- [ ] Sprint 5: Resolve Dual Entry Points
+- [x] Sprint 5: Resolve Dual Entry Points ✅ (Removed unused app.py, cli.py, test_cli.py - 277 lines of dead code)
 - [ ] Sprint 6: Extract Constants
 - [ ] Sprint 7: Consolidate Audio Conversion
 - [ ] Sprint 8: Refactor Main - Part 1
@@ -397,7 +397,7 @@ VERY_WEAK_SIGNAL_THRESHOLD = 0.01
 
 ### Statistics
 - **Total Sprints**: 14
-- **Completed**: 4
+- **Completed**: 5
 - **In Progress**: None
 - **Blocked**: None
 
