@@ -36,6 +36,7 @@ from hey_orac.web.routes import init_routes
 from hey_orac.web.broadcaster import WebSocketBroadcaster
 from hey_orac.heartbeat_sender import HeartbeatSender  # Import heartbeat sender
 from hey_orac import constants  # Import constants
+from hey_orac.audio.conversion import convert_to_openwakeword_format  # Import audio conversion
 
 # Configure logging for debugging
 logging.basicConfig(
@@ -200,12 +201,7 @@ def record_test_audio(audio_manager, usb_mic, model, settings_manager, filename=
                 frames.append(data)
 
                 # Convert to audio data for real-time processing
-                audio_array = np.frombuffer(data, dtype=np.int16)
-                if len(audio_array) > constants.CHUNK_SIZE:  # Stereo
-                    stereo_data = audio_array.reshape(-1, 2)
-                    audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                else:
-                    audio_data = audio_array.astype(np.float32)
+                audio_data = convert_to_openwakeword_format(data)
                 
                 # Calculate RMS
                 rms = np.sqrt(np.mean(audio_data**2))
@@ -324,17 +320,13 @@ def load_test_audio(filename):
             
             # Read all frames
             frames = wf.readframes(wf.getnframes())
-            
-            # Convert to numpy array
-            audio_array = np.frombuffer(frames, dtype=np.int16)
-            
-            # Convert stereo to mono (same as live pipeline)
+
+            # Convert to audio data using centralized conversion function
+            audio_data = convert_to_openwakeword_format(frames, channels=channels)
+
             if channels == 2:
-                stereo_data = audio_array.reshape(-1, 2)
-                audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                logger.info(f"   Converted stereo to mono: {len(audio_array)} -> {len(audio_data)} samples")
+                logger.info(f"   Converted stereo to mono: {len(np.frombuffer(frames, dtype=np.int16))} -> {len(audio_data)} samples")
             else:
-                audio_data = audio_array.astype(np.float32)
                 logger.info(f"   Mono audio: {len(audio_data)} samples")
 
             duration = len(audio_data) / constants.SAMPLE_RATE
@@ -1026,29 +1018,8 @@ def main():
                     logger.warning("Empty audio data from queue")
                     continue
 
-                # Convert bytes to numpy array - now handling stereo input
-                audio_array = np.frombuffer(data, dtype=np.int16)
-                
-                # Handle channel conversion based on input source
-                if args.input_wav and hasattr(stream, 'channels'):
-                    # For WAV files, check the stream's channel count
-                    if stream.channels == constants.CHANNELS_STEREO and len(audio_array) > constants.CHUNK_SIZE:
-                        # Stereo WAV file - convert to mono
-                        stereo_data = audio_array.reshape(-1, 2)
-                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                    else:
-                        # Mono WAV file
-                        audio_data = audio_array.astype(np.float32)
-                else:
-                    # Microphone input - use original logic
-                    if len(audio_array) > constants.CHUNK_SIZE:  # If we got stereo data (2560 samples for stereo vs 1280 for mono)
-                        # Reshape to separate left and right channels, then average
-                        stereo_data = audio_array.reshape(-1, 2)
-                        # CRITICAL FIX: OpenWakeWord expects raw int16 values as float32, NOT normalized!
-                        audio_data = np.mean(stereo_data, axis=1).astype(np.float32)
-                    else:
-                        # Already mono - CRITICAL FIX: no normalization!
-                        audio_data = audio_array.astype(np.float32)
+                # Convert bytes to audio data using centralized conversion function
+                audio_data = convert_to_openwakeword_format(data)
 
                 # Calculate RMS for web GUI display
                 rms = np.sqrt(np.mean(audio_data**2))
