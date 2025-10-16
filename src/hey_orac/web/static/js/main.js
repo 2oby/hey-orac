@@ -234,7 +234,10 @@ async function loadConfig() {
                 apiUrl: model.webhook_url,
                 topic: model.topic || 'general',
                 framework: model.framework,
-                path: model.path
+                path: model.path,
+                base_url: model.base_url || null,
+                stream_path: model.stream_path || null,
+                heartbeat_path: model.heartbeat_path || null
             };
             
             // If we already have this model name, prefer .tflite over .onnx
@@ -258,21 +261,30 @@ async function loadConfig() {
         if (config.system) {
             const rmsSlider = document.getElementById('rms-filter');
             const cooldownSlider = document.getElementById('cooldown');
-            
+
             if (rmsSlider && config.system.rms_filter !== undefined) {
                 rmsSlider.value = rmsToSlider(config.system.rms_filter);
                 updateSliderDisplay('rms-filter', config.system.rms_filter);
             }
-            
+
             if (cooldownSlider && config.system.cooldown !== undefined) {
                 cooldownSlider.value = config.system.cooldown;
                 updateSliderDisplay('cooldown', config.system.cooldown);
             }
-            
+
             // Store VAD threshold for global settings modal
             if (config.system.vad_threshold !== undefined) {
                 window.currentVadThreshold = config.system.vad_threshold;
             }
+        }
+
+        // Store STT configuration for global settings modal
+        if (config.stt) {
+            window.currentSTTConfig = {
+                default_base_url: config.stt.default_base_url || 'http://192.168.8.192:7272',
+                stream_path: config.stt.stream_path || '/stt/v1/stream',
+                heartbeat_path: config.stt.heartbeat_path || '/stt/v1/heartbeat'
+            };
         }
         
         updateModelCards();
@@ -326,24 +338,30 @@ async function toggleModel(modelName) {
 
 async function saveModelSettings() {
     if (!currentEditingModel) return;
-    
+
     const threshold = parseFloat(document.getElementById('model-threshold').value);
     const apiUrl = document.getElementById('model-api-url').value;
     const topic = document.getElementById('model-topic').value || 'general';
-    
-    console.log('Saving model settings:', {model: currentEditingModel, threshold, apiUrl, topic});
-    
+    const baseUrl = document.getElementById('model-base-url').value || null;
+    const streamPath = document.getElementById('model-stream-path').value || null;
+    const heartbeatPath = document.getElementById('model-heartbeat-path').value || null;
+
+    console.log('Saving model settings:', {model: currentEditingModel, threshold, apiUrl, topic, baseUrl, streamPath, heartbeatPath});
+
     try {
         const response = await fetch(`${API_BASE}/config/models/${currentEditingModel}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 threshold: threshold,
-                webhook_url: apiUrl,
-                topic: topic
+                webhook_url: apiUrl || null,
+                topic: topic,
+                base_url: baseUrl,
+                stream_path: streamPath,
+                heartbeat_path: heartbeatPath
             })
         });
-        
+
         if (response.ok) {
             console.log('Model settings saved successfully');
             // Update the local model data
@@ -352,6 +370,9 @@ async function saveModelSettings() {
                 model.threshold = threshold;
                 model.apiUrl = apiUrl;
                 model.topic = topic;
+                model.base_url = baseUrl;
+                model.stream_path = streamPath;
+                model.heartbeat_path = heartbeatPath;
                 console.log('Updated local model:', model);
             }
             closeModelSettings();
@@ -408,35 +429,40 @@ function openModelSettings(modelName) {
         // If no active model found, take the first match
         model = sampleModels.find(m => m.name === modelName);
     }
-    
+
     if (model) {
         console.log('Opening settings for model:', model);
         document.getElementById('model-name').textContent = model.name;
-        
+
         // Set slider values and verify they were set correctly
         const thresholdSlider = document.getElementById('model-threshold');
         const apiUrlField = document.getElementById('model-api-url');
         const topicField = document.getElementById('model-topic');
-        
+
         thresholdSlider.value = model.threshold;
         apiUrlField.value = model.apiUrl || '';
         topicField.value = model.topic || 'general';
-        
+
         console.log('Set threshold slider to:', model.threshold, 'actual value:', thresholdSlider.value);
-        
+
         updateSliderDisplay('model-threshold', model.threshold);
-        
+
+        // Set per-model STT configuration fields
+        document.getElementById('model-base-url').value = model.base_url || '';
+        document.getElementById('model-stream-path').value = model.stream_path || '';
+        document.getElementById('model-heartbeat-path').value = model.heartbeat_path || '';
+
         // Attach event listeners for the model sliders (in case they weren't attached yet)
         console.log('Attaching event listeners to model sliders');
         console.log('Threshold slider element:', thresholdSlider);
-        
+
         // Test if sliders are the right elements
         console.log('Threshold slider ID:', thresholdSlider.id);
-        
+
         thresholdSlider.removeEventListener('input', updateModelThreshold);
         thresholdSlider.addEventListener('input', updateModelThreshold);
         console.log('Event listeners attached');
-        
+
         document.getElementById('model-settings-modal').style.display = 'block';
     }
 }
@@ -457,18 +483,28 @@ async function openGlobalSettings() {
     // Get current values from existing elements
     const rmsValue = document.getElementById('rms-filter-value').textContent;
     const cooldownValue = document.getElementById('cooldown-value').textContent;
-    
+
     // Set modal values
     document.getElementById('volume-rms-filter').value = document.getElementById('rms-filter').value;
     document.getElementById('volume-cooldown').value = document.getElementById('cooldown').value;
     document.getElementById('volume-rms-filter-value').textContent = rmsValue;
     document.getElementById('volume-cooldown-value').textContent = cooldownValue;
-    
+
     // Set VAD threshold value
     const vadThreshold = window.currentVadThreshold || 0.5;
     document.getElementById('volume-vad-threshold').value = vadThreshold;
     document.getElementById('volume-vad-threshold-value').textContent = vadThreshold.toFixed(2);
-    
+
+    // Set STT configuration fields
+    const sttConfig = window.currentSTTConfig || {
+        default_base_url: 'http://192.168.8.192:7272',
+        stream_path: '/stt/v1/stream',
+        heartbeat_path: '/stt/v1/heartbeat'
+    };
+    document.getElementById('volume-default-base-url').value = sttConfig.default_base_url;
+    document.getElementById('volume-stream-path').value = sttConfig.stream_path;
+    document.getElementById('volume-heartbeat-path').value = sttConfig.heartbeat_path;
+
     // Fetch and set multi-trigger value
     try {
         const response = await fetch(`${API_BASE}/config`);
@@ -481,7 +517,7 @@ async function openGlobalSettings() {
         console.error('Error fetching config:', error);
         document.getElementById('multi-trigger-checkbox').checked = false;
     }
-    
+
     // Show modal
     document.getElementById('volume-settings-modal').classList.add('active');
 }
@@ -492,7 +528,10 @@ async function closeGlobalSettings() {
     const cooldownValue = parseFloat(document.getElementById('volume-cooldown').value);
     const vadThreshold = parseFloat(document.getElementById('volume-vad-threshold').value);
     const multiTrigger = document.getElementById('multi-trigger-checkbox').checked;
-    
+    const defaultBaseUrl = document.getElementById('volume-default-base-url').value;
+    const streamPath = document.getElementById('volume-stream-path').value;
+    const heartbeatPath = document.getElementById('volume-heartbeat-path').value;
+
     try {
         const response = await fetch(`${API_BASE}/config/global`, {
             method: 'POST',
@@ -501,10 +540,13 @@ async function closeGlobalSettings() {
                 rms_filter: rmsValue,
                 cooldown: cooldownValue,
                 vad_threshold: vadThreshold,
-                multi_trigger: multiTrigger
+                multi_trigger: multiTrigger,
+                default_base_url: defaultBaseUrl,
+                stream_path: streamPath,
+                heartbeat_path: heartbeatPath
             })
         });
-        
+
         if (response.ok) {
             console.log('Global settings saved');
             // Update the main sliders to match
@@ -512,15 +554,20 @@ async function closeGlobalSettings() {
             document.getElementById('cooldown').value = cooldownValue;
             updateSliderDisplay('rms-filter', rmsValue);
             updateSliderDisplay('cooldown', cooldownValue);
-            // Store VAD threshold for future use
+            // Store VAD threshold and STT config for future use
             window.currentVadThreshold = vadThreshold;
+            window.currentSTTConfig = {
+                default_base_url: defaultBaseUrl,
+                stream_path: streamPath,
+                heartbeat_path: heartbeatPath
+            };
         } else {
             console.error('Failed to save global settings');
         }
     } catch (error) {
         console.error('Error saving global settings:', error);
     }
-    
+
     document.getElementById('volume-settings-modal').classList.remove('active');
 }
 
@@ -662,6 +709,28 @@ document.addEventListener('DOMContentLoaded', function() {
         // Store for global use
         window.currentVadThreshold = parseFloat(this.value);
     });
+
+    // Setup event listeners for advanced paths checkbox (global settings)
+    const advancedPathsCheckbox = document.getElementById('advanced-paths-checkbox');
+    if (advancedPathsCheckbox) {
+        advancedPathsCheckbox.addEventListener('change', function() {
+            const pathInputs = document.querySelectorAll('.advanced-path-input');
+            pathInputs.forEach(input => {
+                input.disabled = !this.checked;
+            });
+        });
+    }
+
+    // Setup event listeners for advanced paths checkbox (model settings)
+    const modelAdvancedPathsCheckbox = document.getElementById('model-advanced-paths-checkbox');
+    if (modelAdvancedPathsCheckbox) {
+        modelAdvancedPathsCheckbox.addEventListener('change', function() {
+            const pathInputs = document.querySelectorAll('.model-advanced-path-input');
+            pathInputs.forEach(input => {
+                input.disabled = !this.checked;
+            });
+        });
+    }
 
     // Setup event listeners for sliders
     document.getElementById('rms-filter').addEventListener('input', function() {

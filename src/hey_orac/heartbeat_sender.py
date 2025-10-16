@@ -54,15 +54,20 @@ class ModelHeartbeat:
 class HeartbeatSender:
     """Manages heartbeat sending to ORAC STT service."""
     
-    def __init__(self, orac_stt_url: Optional[str] = None):
+    def __init__(self, orac_stt_url: Optional[str] = None, heartbeat_path: str = "/stt/v1/heartbeat"):
         """Initialize heartbeat sender.
-        
+
         Args:
-            orac_stt_url: URL of ORAC STT service (default from env or localhost)
+            orac_stt_url: Default URL of ORAC STT service (used as fallback)
+            heartbeat_path: Path for heartbeat endpoint (default: /stt/v1/heartbeat)
         """
         self.orac_stt_url = orac_stt_url or os.getenv("ORAC_STT_URL", "http://localhost:7272")
-        self.heartbeat_endpoint = f"{self.orac_stt_url}/stt/v1/heartbeat"
+        self.heartbeat_path = heartbeat_path
+        self.heartbeat_endpoint = f"{self.orac_stt_url}{self.heartbeat_path}"
         self.instance_id = f"hey-orac-{socket.gethostname()}"
+
+        # Per-model endpoint tracking
+        self._model_endpoints: Dict[str, str] = {}
         
         # Threading control
         self._running = False
@@ -89,14 +94,15 @@ class HeartbeatSender:
         logger.info(f"Initialized heartbeat sender for {self.instance_id}")
         logger.info(f"ORAC STT endpoint: {self.heartbeat_endpoint}")
     
-    def register_model(self, name: str, topic: str, wake_word: str, enabled: bool = True) -> None:
+    def register_model(self, name: str, topic: str, wake_word: str, enabled: bool = True, webhook_url: Optional[str] = None) -> None:
         """Register a wake word model for heartbeat tracking.
-        
+
         Args:
             name: Model name (e.g., "hey_jarvis")
             topic: Topic for routing (e.g., "general", "Alexa__5")
             wake_word: Wake word (e.g., "jarvis")
             enabled: Whether model is enabled
+            webhook_url: Full webhook URL for this model (used to extract heartbeat endpoint)
         """
         with self._lock:
             self._models[name] = ModelHeartbeat(
@@ -105,11 +111,23 @@ class HeartbeatSender:
                 wake_word=wake_word,
                 status="active" if enabled else "inactive"
             )
-            
+
+            # Extract base URL from webhook_url for per-model heartbeat endpoint
+            if webhook_url:
+                from urllib.parse import urlparse
+                parsed = urlparse(webhook_url)
+                base_url = f"{parsed.scheme}://{parsed.netloc}"
+                self._model_endpoints[name] = f"{base_url}{self.heartbeat_path}"
+                logger.info(f"Registered model '{name}' with heartbeat endpoint: {self._model_endpoints[name]}")
+            else:
+                # Use default endpoint
+                self._model_endpoints[name] = self.heartbeat_endpoint
+                logger.info(f"Registered model '{name}' using default heartbeat endpoint")
+
             # Initialize activation tracking
             if topic not in self._activations_1h:
                 self._activations_1h[topic] = []
-            
+
             logger.info(f"Registered model '{name}' with topic '{topic}' (wake word: '{wake_word}')")
     
     def record_activation(self, model_name: str) -> None:
@@ -163,16 +181,30 @@ class HeartbeatSender:
             }
     
     def _send_heartbeat(self) -> bool:
-        """Send heartbeat to ORAC STT.
-        
+        """Send heartbeat to ORAC STT endpoints (per-model).
+
         Returns:
-            True if successful, False otherwise
+            True if all successful, False if any failed
         """
-        try:
-            with self._lock:
-                # Build heartbeat message
-                models_data = [model.to_dict() for model in self._models.values()]
-                
+        all_success = True
+
+        with self._lock:
+            models_list = list(self._models.items())
+
+        # Group models by endpoint
+        endpoint_models: Dict[str, List[tuple]] = {}
+        for model_name, model in models_list:
+            endpoint = self._model_endpoints.get(model_name, self.heartbeat_endpoint)
+            if endpoint not in endpoint_models:
+                endpoint_models[endpoint] = []
+            endpoint_models[endpoint].append((model_name, model))
+
+        # Send heartbeat to each unique endpoint
+        for endpoint, models in endpoint_models.items():
+            try:
+                # Build heartbeat message with models for this endpoint
+                models_data = [model.to_dict() for _, model in models]
+
                 heartbeat = {
                     "instance_id": self.instance_id,
                     "source": "hey_orac",
@@ -180,40 +212,44 @@ class HeartbeatSender:
                     "timestamp": datetime.utcnow().isoformat() + "Z",
                     "metrics": self._calculate_metrics()
                 }
-            
-            # Send heartbeat
-            response = requests.post(
-                self.heartbeat_endpoint,
-                json=heartbeat,
-                timeout=5
-            )
-            
-            if response.status_code == 200:
-                self._last_heartbeat_time = datetime.utcnow()
-                self._total_heartbeats_sent += 1
-                self._heartbeat_failures = 0
-                self.current_backoff = 0
-                
-                result = response.json()
-                logger.debug(f"Heartbeat sent successfully: {result.get('message', 'OK')}")
-                return True
-            else:
-                logger.warning(f"Heartbeat failed with status {response.status_code}: {response.text}")
+
+                # Send heartbeat
+                response = requests.post(
+                    endpoint,
+                    json=heartbeat,
+                    timeout=5
+                )
+
+                if response.status_code == 200:
+                    self._last_heartbeat_time = datetime.utcnow()
+                    self._total_heartbeats_sent += 1
+
+                    result = response.json()
+                    logger.debug(f"Heartbeat sent successfully to {endpoint}: {result.get('message', 'OK')}")
+                else:
+                    logger.warning(f"Heartbeat to {endpoint} failed with status {response.status_code}: {response.text}")
+                    self._heartbeat_failures += 1
+                    all_success = False
+
+            except requests.exceptions.ConnectionError as e:
+                logger.debug(f"Connection error sending heartbeat to {endpoint}: {e}")
                 self._heartbeat_failures += 1
-                return False
-                
-        except requests.exceptions.ConnectionError as e:
-            logger.debug(f"Connection error sending heartbeat: {e}")
-            self._heartbeat_failures += 1
-            return False
-        except requests.exceptions.Timeout:
-            logger.warning("Heartbeat request timed out")
-            self._heartbeat_failures += 1
-            return False
-        except Exception as e:
-            logger.error(f"Unexpected error sending heartbeat: {e}")
-            self._heartbeat_failures += 1
-            return False
+                all_success = False
+            except requests.exceptions.Timeout:
+                logger.warning(f"Heartbeat request to {endpoint} timed out")
+                self._heartbeat_failures += 1
+                all_success = False
+            except Exception as e:
+                logger.error(f"Unexpected error sending heartbeat to {endpoint}: {e}")
+                self._heartbeat_failures += 1
+                all_success = False
+
+        # Update backoff based on overall success
+        if all_success:
+            self._heartbeat_failures = 0
+            self.current_backoff = 0
+
+        return all_success
     
     def _heartbeat_loop(self) -> None:
         """Main heartbeat loop running in separate thread."""

@@ -809,13 +809,34 @@
                     <span class="value-display" id="model-threshold-display" style="color: #00ff41; font-family: 'Orbitron', monospace;">0.3</span>
                 </div>
                 <div class="setting-group">
-                    <label for="model-api-url" style="display: block; margin-bottom: 10px; color: #00ff41;">Webhook URL</label>
+                    <label for="model-api-url" style="display: block; margin-bottom: 10px; color: #00ff41;">Webhook URL (Legacy)</label>
                     <input type="text" id="model-api-url" placeholder="https://example.com/webhook" style="width: 100%; padding: 10px; background-color: #0a0a0a; border: 1px solid #00ff41; color: #00ff41; border-radius: 5px; font-family: 'Orbitron', monospace; font-size: 14px;">
+                    <small style="color: #00ff41; opacity: 0.7; display: block; margin-top: 5px;">Legacy full URL - use Base URL below instead</small>
                 </div>
                 <div class="setting-group" style="margin-bottom: 20px;">
                     <label for="model-topic" style="display: block; margin-bottom: 10px; color: #00ff41;">Topic</label>
                     <input type="text" id="model-topic" placeholder="general" style="width: 100%; padding: 10px; background-color: #0a0a0a; border: 1px solid #00ff41; color: #00ff41; border-radius: 5px; font-family: 'Orbitron', monospace; font-size: 14px;">
                     <small style="color: #00ff41; opacity: 0.7; display: block; margin-top: 5px;">Topic name for ORAC Core routing (e.g., general, home_assistant)</small>
+                </div>
+                <div class="setting-group" style="border-top: 1px solid #00ff41; padding-top: 20px; margin-top: 20px;">
+                    <label for="model-base-url" style="display: block; margin-bottom: 10px; color: #00ff41;">Base URL (Optional)</label>
+                    <input type="text" id="model-base-url" placeholder="Leave empty to use global default" style="width: 100%; padding: 10px; background-color: #0a0a0a; border: 1px solid #00ff41; color: #00ff41; border-radius: 5px; font-family: 'Orbitron', monospace; font-size: 14px;">
+                    <small style="color: #00ff41; opacity: 0.7; display: block; margin-top: 5px;">Override global default host:port for this model only</small>
+                </div>
+                <div class="setting-group">
+                    <label style="display: block; margin-bottom: 10px; color: #00ff41;">
+                        <input type="checkbox" id="model-advanced-paths-checkbox" style="margin-right: 10px;">
+                        Advanced API Paths
+                    </label>
+                    <small style="color: #00ff41; opacity: 0.7; display: block; margin-top: 5px;">Customize paths for this model (overrides global)</small>
+                </div>
+                <div class="setting-group">
+                    <label for="model-stream-path" style="display: block; margin-bottom: 10px; color: #00ff41;">Stream Path</label>
+                    <input type="text" id="model-stream-path" class="model-advanced-path-input" placeholder="/stt/v1/stream" disabled style="width: 100%; padding: 10px; background-color: #0a0a0a; border: 1px solid #00ff41; color: #666; border-radius: 5px; font-family: 'Orbitron', monospace; font-size: 14px;">
+                </div>
+                <div class="setting-group">
+                    <label for="model-heartbeat-path" style="display: block; margin-bottom: 10px; color: #00ff41;">Heartbeat Path</label>
+                    <input type="text" id="model-heartbeat-path" class="model-advanced-path-input" placeholder="/stt/v1/heartbeat" disabled style="width: 100%; padding: 10px; background-color: #0a0a0a; border: 1px solid #00ff41; color: #666; border-radius: 5px; font-family: 'Orbitron', monospace; font-size: 14px;">
                 </div>
             </div>
             <div class="modal-footer" style="padding: 20px; border-top: 1px solid #00ff41; text-align: right;">
@@ -855,6 +876,39 @@
                             Allow multiple wake words to trigger simultaneously (Testing Only)
                         </span>
                     </label>
+                </div>
+                <div class="form-group" style="border-top: 1px solid #00ff41; padding-top: 20px; margin-top: 20px;">
+                    <label class="form-label" for="volume-default-base-url">Default Base URL</label>
+                    <input type="text" class="form-input" id="volume-default-base-url"
+                           placeholder="http://192.168.8.192:7272"
+                           value="http://192.168.8.192:7272"
+                           style="font-family: 'Courier New', monospace; font-size: 0.85em;">
+                    <span style="font-size: 0.75em; color: #00cc33; display: block; margin-top: 5px;">
+                        Default host:port for models without specific configuration
+                    </span>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="advanced-paths-checkbox">
+                        <input type="checkbox" id="advanced-paths-checkbox" style="margin-right: 10px;">
+                        Advanced API Paths
+                        <span style="font-size: 0.8em; color: #888; display: block; margin-top: 5px;">
+                            Customize heartbeat and stream endpoint paths
+                        </span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="volume-stream-path">Stream Path</label>
+                    <input type="text" class="form-input advanced-path-input" id="volume-stream-path"
+                           value="/stt/v1/stream"
+                           disabled
+                           style="font-family: 'Courier New', monospace; font-size: 0.85em;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="volume-heartbeat-path">Heartbeat Path</label>
+                    <input type="text" class="form-input advanced-path-input" id="volume-heartbeat-path"
+                           value="/stt/v1/heartbeat"
+                           disabled
+                           style="font-family: 'Courier New', monospace; font-size: 0.85em;">
                 </div>
             </div>
             <div class="modal-actions">

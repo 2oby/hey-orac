@@ -58,7 +58,15 @@ def update_global_config():
             settings_manager.update_system_config(vad_threshold=data['vad_threshold'])
         if 'multi_trigger' in data:
             settings_manager.update_system_config(multi_trigger=data['multi_trigger'])
-        
+
+        # Update STT config fields
+        if 'default_base_url' in data:
+            settings_manager.update_stt_config(default_base_url=data['default_base_url'])
+        if 'stream_path' in data:
+            settings_manager.update_stt_config(stream_path=data['stream_path'])
+        if 'heartbeat_path' in data:
+            settings_manager.update_stt_config(heartbeat_path=data['heartbeat_path'])
+
         settings_manager.save()
         return jsonify({'status': 'success'})
     except Exception as e:
@@ -84,7 +92,7 @@ def update_model_config(model_name):
     """Update configuration for a specific model."""
     try:
         data = request.get_json()
-        
+
         # Update model configuration
         updates = {}
         if 'threshold' in data:
@@ -95,14 +103,20 @@ def update_model_config(model_name):
             updates['topic'] = data['topic']
         if 'enabled' in data:
             updates['enabled'] = bool(data['enabled'])
-        
+        if 'base_url' in data:
+            updates['base_url'] = data['base_url'] if data['base_url'] else None
+        if 'stream_path' in data:
+            updates['stream_path'] = data['stream_path'] if data['stream_path'] else None
+        if 'heartbeat_path' in data:
+            updates['heartbeat_path'] = data['heartbeat_path'] if data['heartbeat_path'] else None
+
         settings_manager.update_model_config(model_name, **updates)
         settings_manager.save()
-        
+
         # Notify about config change
         if shared_data:
             shared_data['config_changed'] = True
-        
+
         return jsonify({'status': 'success'})
     except Exception as e:
         logger.error(f"Error updating model config: {e}")

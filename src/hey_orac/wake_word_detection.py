@@ -399,25 +399,31 @@ def test_pipeline_with_audio(model, audio_data):
 # This ensures models like "alexa", "hey jarvis", etc., are available
 openwakeword.utils.download_models()
 
-def check_all_stt_health(active_model_configs, stt_client):
+def check_all_stt_health(active_model_configs, stt_client, stt_config):
     """
     Check health status of all configured webhook URLs.
-    
+
+    Args:
+        active_model_configs: Dict of active model configurations
+        stt_client: STTClient instance for health checks
+        stt_config: STT configuration from settings
+
     Returns:
         str: 'connected' if all healthy, 'partial' if some healthy, 'disconnected' if none healthy
     """
     webhook_urls = []
     for name, cfg in active_model_configs.items():
-        if cfg.webhook_url:
-            webhook_urls.append((name, cfg.webhook_url))
-    
+        webhook_url = get_effective_webhook_url(cfg, stt_config)
+        if webhook_url:
+            webhook_urls.append((name, webhook_url))
+
     if not webhook_urls:
         logger.debug("No webhook URLs configured")
         return 'disconnected'
-    
+
     healthy_count = 0
     total_count = len(webhook_urls)
-    
+
     for name, webhook_url in webhook_urls:
         try:
             if stt_client.health_check(webhook_url=webhook_url):
@@ -427,7 +433,7 @@ def check_all_stt_health(active_model_configs, stt_client):
                 logger.debug(f"❌ STT unhealthy for model '{name}' at {webhook_url}")
         except Exception as e:
             logger.debug(f"❌ STT health check failed for model '{name}': {e}")
-    
+
     if healthy_count == total_count:
         return 'connected'
     elif healthy_count > 0:
@@ -600,30 +606,72 @@ def setup_wake_word_models(models_config, system_config, settings_manager, share
         print(f"ERROR: Model creation failed: {e}", flush=True)
         raise
 
-def setup_heartbeat_sender(enabled_models):
+def get_effective_webhook_url(model_config, stt_config):
+    """
+    Construct the effective webhook URL for a model using the configuration hierarchy.
+
+    Args:
+        model_config: ModelConfig instance
+        stt_config: STT configuration from settings
+
+    Returns:
+        str: Constructed webhook URL or None if no URL configured
+    """
+    # Use model's explicit webhook_url if set (legacy support)
+    if model_config.webhook_url:
+        return model_config.webhook_url
+
+    # Check if we have per-model base URL or use global default
+    base_url = model_config.base_url if model_config.base_url else stt_config.default_base_url
+
+    # Get stream path: model override → global config → fallback
+    stream_path = model_config.stream_path if model_config.stream_path else (stt_config.stream_path or "/stt/v1/stream")
+
+    # Construct full webhook URL
+    if base_url:
+        webhook_url = f"{base_url}{stream_path}"
+        logger.debug(f"Constructed webhook URL: {webhook_url} (base_url={base_url}, stream_path={stream_path})")
+        return webhook_url
+
+    return None
+
+def setup_heartbeat_sender(enabled_models, stt_config):
     """
     Initialize and start heartbeat sender for ORAC STT integration.
 
     Args:
         enabled_models: List of enabled ModelConfig objects
+        stt_config: STT configuration from settings
 
     Returns:
         HeartbeatSender: Started heartbeat sender instance
     """
     # Initialize heartbeat sender for ORAC STT integration
     logger.info("💓 Initializing heartbeat sender for ORAC STT...")
-    heartbeat_sender = HeartbeatSender()
+
+    # Get heartbeat path from config (fallback to default)
+    heartbeat_path = stt_config.heartbeat_path or "/stt/v1/heartbeat"
+
+    # Initialize with default base URL and heartbeat path
+    heartbeat_sender = HeartbeatSender(
+        orac_stt_url=stt_config.default_base_url,
+        heartbeat_path=heartbeat_path
+    )
 
     # Register all enabled models with the heartbeat sender
     for model_cfg in enabled_models:
+        # Construct webhook URL for this model
+        webhook_url = get_effective_webhook_url(model_cfg, stt_config)
+
         # Use the actual topic from the model configuration
         heartbeat_sender.register_model(
             name=model_cfg.name,
             topic=model_cfg.topic,  # Use the configured topic (e.g., "general", "Alexa__5")
             wake_word=model_cfg.name,  # Use the full model name as wake word
-            enabled=model_cfg.enabled
+            enabled=model_cfg.enabled,
+            webhook_url=webhook_url  # Pass constructed webhook URL
         )
-        logger.info(f"   Registered model '{model_cfg.name}' with topic '{model_cfg.topic}'")
+        logger.info(f"   Registered model '{model_cfg.name}' with topic '{model_cfg.topic}' (webhook: {webhook_url})")
 
     # Start heartbeat sender
     heartbeat_sender.start()
@@ -737,15 +785,16 @@ def setup_stt_components(stt_config, audio_config, active_model_configs, shared_
     # Perform health checks for models with webhook URLs
     logger.info("🏥 Performing per-model STT health checks...")
     for name, cfg in active_model_configs.items():
-        if cfg.webhook_url:
-            logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
-            if stt_client.health_check(webhook_url=cfg.webhook_url):
+        webhook_url = get_effective_webhook_url(cfg, stt_config)
+        if webhook_url:
+            logger.debug(f"Checking STT health for model '{name}' at {webhook_url}")
+            if stt_client.health_check(webhook_url=webhook_url):
                 logger.info(f"✅ STT healthy for model '{name}'")
             else:
-                logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
+                logger.warning(f"⚠️ STT unhealthy for model '{name}' at {webhook_url}")
 
     # Update initial STT health status
-    stt_health_status = check_all_stt_health(active_model_configs, stt_client)
+    stt_health_status = check_all_stt_health(active_model_configs, stt_client, stt_config)
     shared_data['stt_health'] = stt_health_status
     shared_data['status_changed'] = True
     logger.info(f"🏥 Initial STT health status: {stt_health_status}")
@@ -781,6 +830,7 @@ def reload_models_on_config_change(settings_manager, heartbeat_sender, stt_clien
         with settings_manager.get_config() as current_config:
             models_config = current_config.models
             system_config = current_config.system
+            stt_config = current_config.stt
 
         enabled_models = [model for model in models_config if model.enabled]
         if not enabled_models:
@@ -827,18 +877,22 @@ def reload_models_on_config_change(settings_manager, heartbeat_sender, stt_clien
         shared_data['models_config'] = {name: {
             'enabled': True,
             'threshold': cfg.threshold,
-            'webhook_url': cfg.webhook_url
+            'webhook_url': get_effective_webhook_url(cfg, stt_config)
         } for name, cfg in new_active_configs.items()}
 
         # Update heartbeat sender with new models
         # Clear existing models and re-register
         heartbeat_sender._models.clear()
         for model_cfg in enabled_models:
+            # Construct webhook URL for this model
+            webhook_url = get_effective_webhook_url(model_cfg, stt_config)
+
             heartbeat_sender.register_model(
                 name=model_cfg.name,
                 topic=model_cfg.topic,
                 wake_word=model_cfg.name,
-                enabled=model_cfg.enabled
+                enabled=model_cfg.enabled,
+                webhook_url=webhook_url
             )
         logger.info(f"✅ Updated heartbeat sender with {len(enabled_models)} models")
 
@@ -846,15 +900,16 @@ def reload_models_on_config_change(settings_manager, heartbeat_sender, stt_clien
         if stt_client:
             logger.info("🏥 Performing per-model STT health checks for reloaded models...")
             for name, cfg in new_active_configs.items():
-                if cfg.webhook_url:
-                    logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
-                    if stt_client.health_check(webhook_url=cfg.webhook_url):
+                webhook_url = get_effective_webhook_url(cfg, stt_config)
+                if webhook_url:
+                    logger.debug(f"Checking STT health for model '{name}' at {webhook_url}")
+                    if stt_client.health_check(webhook_url=webhook_url):
                         logger.info(f"✅ STT healthy for model '{name}'")
                     else:
-                        logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
+                        logger.warning(f"⚠️ STT unhealthy for model '{name}' at {webhook_url}")
 
         # Update STT health status after reload
-        stt_health_status = check_all_stt_health(new_active_configs, stt_client)
+        stt_health_status = check_all_stt_health(new_active_configs, stt_client, stt_config)
         shared_data['stt_health'] = stt_health_status
         shared_data['status_changed'] = True
         logger.info(f"🏥 STT health after reload: {stt_health_status}")
@@ -945,7 +1000,10 @@ def run_detection_loop(
             # Check STT health periodically
             if current_time - last_health_check >= HEALTH_CHECK_INTERVAL:
                 if stt_client:
-                    stt_health_status = check_all_stt_health(active_model_configs, stt_client)
+                    # Get current stt_config for health checks
+                    with settings_manager.get_config() as config:
+                        stt_config = config.stt
+                    stt_health_status = check_all_stt_health(active_model_configs, stt_client, stt_config)
                     if shared_data.get('stt_health') != stt_health_status:
                         shared_data['stt_health'] = stt_health_status
                         shared_data['status_changed'] = True
@@ -1041,9 +1099,10 @@ def run_detection_loop(
             logger.error(f"Error processing audio data: {e}")
             continue
 
-        # Get system config for multi-trigger setting
+        # Get system config for multi-trigger setting and STT config
         with settings_manager.get_config() as config:
             multi_trigger_enabled = config.system.multi_trigger
+            stt_config = config.stt
 
         if multi_trigger_enabled:
             # MULTI-TRIGGER MODE: Check each model independently
@@ -1099,8 +1158,11 @@ def run_detection_loop(
                 # Record activation in heartbeat sender
                 heartbeat_sender.record_activation(trigger_info['config_name'])
 
+                # Construct effective webhook URL
+                webhook_url = get_effective_webhook_url(trigger_info['model_config'], stt_config)
+
                 # Call webhook if configured
-                if trigger_info['model_config'].webhook_url:
+                if webhook_url:
                     try:
                         # Prepare webhook payload
                         webhook_data = {
@@ -1114,9 +1176,9 @@ def run_detection_loop(
                         }
 
                         # Make webhook call
-                        logger.info(f"📞 Calling webhook (multi-trigger): {trigger_info['model_config'].webhook_url}")
+                        logger.info(f"📞 Calling webhook (multi-trigger): {webhook_url}")
                         response = requests.post(
-                            trigger_info['model_config'].webhook_url,
+                            webhook_url,
                             json=webhook_data,
                             timeout=constants.WEBHOOK_TIMEOUT_SECONDS
                         )
@@ -1147,7 +1209,7 @@ def run_detection_loop(
                         wake_word=trigger_info['config_name'],
                         confidence=trigger_info['confidence'],
                         language=stt_language,
-                        webhook_url=trigger_info['model_config'].webhook_url,
+                        webhook_url=webhook_url,
                         topic=trigger_info['model_config'].topic
                     )
 
@@ -1216,8 +1278,11 @@ def run_detection_loop(
                 # Record activation in heartbeat sender
                 heartbeat_sender.record_activation(config_name or best_model)
 
+                # Construct effective webhook URL
+                webhook_url = get_effective_webhook_url(active_model_configs[config_name], stt_config) if config_name else None
+
                 # Call webhook if configured
-                if config_name and active_model_configs[config_name].webhook_url:
+                if webhook_url:
                     try:
                         # Prepare webhook payload
                         webhook_data = {
@@ -1231,9 +1296,9 @@ def run_detection_loop(
                         }
 
                         # Make webhook call
-                        logger.info(f"📞 Calling webhook: {active_model_configs[config_name].webhook_url}")
+                        logger.info(f"📞 Calling webhook: {webhook_url}")
                         response = requests.post(
-                            active_model_configs[config_name].webhook_url,
+                            webhook_url,
                             json=webhook_data,
                             timeout=constants.WEBHOOK_TIMEOUT_SECONDS
                         )
@@ -1251,13 +1316,11 @@ def run_detection_loop(
                         logger.error(f"❌ Unexpected error during webhook call: {e}")
 
                 # Trigger STT recording based on webhook URL presence
-                model_has_webhook = config_name and active_model_configs[config_name].webhook_url
-
                 if (speech_recorder is not None and
-                    model_has_webhook and
+                    webhook_url and
                     not speech_recorder.is_busy()):
-                    logger.info(f"🎤 Triggering STT recording for wake word '{config_name}' (webhook URL: {active_model_configs[config_name].webhook_url})")
-                    logger.debug(f"STT recording conditions met: speech_recorder={speech_recorder is not None}, config_name={config_name}, webhook_url={active_model_configs[config_name].webhook_url}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
+                    logger.info(f"🎤 Triggering STT recording for wake word '{config_name}' (webhook URL: {webhook_url})")
+                    logger.debug(f"STT recording conditions met: speech_recorder={speech_recorder is not None}, config_name={config_name}, webhook_url={webhook_url}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
 
                     # Get STT language from config
                     with settings_manager.get_config() as config:
@@ -1270,11 +1333,11 @@ def run_detection_loop(
                         wake_word=config_name,
                         confidence=max_confidence,
                         language=stt_language,
-                        webhook_url=active_model_configs[config_name].webhook_url,
+                        webhook_url=webhook_url,
                         topic=active_model_configs[config_name].topic
                     )
                 else:
-                    logger.debug(f"STT recording NOT triggered. Conditions: speech_recorder={speech_recorder is not None}, config_name={config_name}, webhook_url={active_model_configs[config_name].webhook_url if config_name and config_name in active_model_configs else None}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
+                    logger.debug(f"STT recording NOT triggered. Conditions: speech_recorder={speech_recorder is not None}, config_name={config_name}, webhook_url={webhook_url}, is_busy={speech_recorder.is_busy() if speech_recorder else 'N/A'}")
             else:
                 # Enhanced debugging - log more frequent confidence updates
                 if chunk_count % constants.MODERATE_CONFIDENCE_LOG_INTERVAL_CHUNKS == 0:
@@ -1452,15 +1515,15 @@ def main():
             models_config, system_config, settings_manager, shared_data
         )
 
-        # Initialize heartbeat sender for ORAC STT integration
-        heartbeat_sender = setup_heartbeat_sender(enabled_models)
-
-        # Initialize web server in a separate thread
-        broadcaster = setup_web_server(settings_manager, shared_data, event_queue)
-
         # Get STT configuration
         with settings_manager.get_config() as config:
             stt_config = config.stt
+
+        # Initialize heartbeat sender for ORAC STT integration
+        heartbeat_sender = setup_heartbeat_sender(enabled_models, stt_config)
+
+        # Initialize web server in a separate thread
+        broadcaster = setup_web_server(settings_manager, shared_data, event_queue)
 
         # Initialize STT components
         ring_buffer, speech_recorder, stt_client, stt_health_status = setup_stt_components(

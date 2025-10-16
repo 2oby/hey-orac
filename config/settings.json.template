@@ -9,7 +9,10 @@
       "threshold": 0.5,
       "priority": 1,
       "webhook_url": null,
-      "stt_enabled": true
+      "stt_enabled": true,
+      "base_url": null,
+      "stream_path": null,
+      "heartbeat_path": null
     },
     {
       "name": "hey_jarvis",
@@ -19,7 +22,10 @@
       "threshold": 0.5,
       "priority": 2,
       "webhook_url": null,
-      "stt_enabled": true
+      "stt_enabled": true,
+      "base_url": null,
+      "stream_path": null,
+      "heartbeat_path": null
     },
     {
       "name": "alexa",
@@ -29,7 +35,10 @@
       "threshold": 0.5,
       "priority": 3,
       "webhook_url": null,
-      "stt_enabled": true
+      "stt_enabled": true,
+      "base_url": null,
+      "stream_path": null,
+      "heartbeat_path": null
     }
   ],
   "audio": {
@@ -70,6 +79,9 @@
   "stt": {
     "enabled": true,
     "base_url": "http://192.168.8.192:7272",
+    "default_base_url": "http://192.168.8.192:7272",
+    "stream_path": "/stt/v1/stream",
+    "heartbeat_path": "/stt/v1/heartbeat",
     "timeout": 30,
     "language": null,
     "pre_roll_duration": 1.0,
