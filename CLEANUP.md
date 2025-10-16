@@ -15,10 +15,16 @@ This document tracks the systematic cleanup and refactoring of the Hey Orac code
 1. **Create branch** - Work on `code-cleanup` branch
 2. **Before each mini-sprint** - Commit current state with descriptive message
 3. **Make targeted changes** - Focus on one section at a time
-4. **Test functionality** - Verify wake word detection still works
-5. **Commit changes** - Clear commit message describing what was cleaned up
+4. **Deploy and test** - Use `./scripts/deploy_and_test.sh "Sprint X: description"` to:
+   - Commit changes locally
+   - Push to `code-cleanup` branch
+   - Pull and deploy on the Pi
+   - Test functionality automatically
+5. **Verify on Pi** - Check logs to confirm wake word detection still works
 6. **If broken** - Easy rollback with `git reset --hard HEAD^`
 7. **When complete** - Merge back to master
+
+**IMPORTANT**: Always use `deploy_and_test.sh` for testing. The application runs on the Pi, not locally.
 
 ### Testing Protocol After Each Sprint
 - [ ] Application starts without errors
