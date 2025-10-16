@@ -435,6 +435,323 @@ def check_all_stt_health(active_model_configs, stt_client):
     else:
         return 'disconnected'
 
+def setup_audio_input(args, audio_config, audio_manager=None, usb_mic=None):
+    """
+    Initialize audio input source (WAV file or microphone).
+
+    Args:
+        args: Command line arguments (contains input_wav flag)
+        audio_config: Audio configuration from SettingsManager
+        audio_manager: AudioManager instance (only for microphone mode)
+        usb_mic: USB microphone info (only for microphone mode)
+
+    Returns:
+        stream: Audio stream object (WavFileStream or PyAudio stream)
+
+    Raises:
+        RuntimeError: If audio initialization fails
+    """
+    stream = None
+
+    if args.input_wav:
+        # Use WAV file as input
+        logger.info(f"🎵 Using WAV file as input: {args.input_wav}")
+        if not os.path.exists(args.input_wav):
+            logger.error(f"❌ WAV file not found: {args.input_wav}")
+            raise RuntimeError(f"WAV file not found: {args.input_wav}")
+        stream = WavFileStream(args.input_wav)
+    else:
+        # Start audio stream with parameters from configuration
+        stream = audio_manager.start_stream(
+            device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
+            sample_rate=audio_config.sample_rate,
+            channels=audio_config.channels,
+            chunk_size=audio_config.chunk_size
+        )
+        if not stream:
+            logger.error("Failed to start audio stream. Exiting.")
+            raise RuntimeError("Failed to start audio stream")
+
+    # Test audio stream
+    logger.info("🧪 Testing audio stream...")
+    sys.stdout.flush()
+    try:
+        test_data = stream.read(constants.CHUNK_SIZE, exception_on_overflow=False)
+        logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
+        sys.stdout.flush()
+    except Exception as e:
+        logger.error(f"❌ Audio stream test failed: {e}")
+        sys.stdout.flush()
+        raise
+
+    return stream
+
+def setup_wake_word_models(models_config, system_config, settings_manager, shared_data):
+    """
+    Initialize OpenWakeWord models from configuration.
+
+    Args:
+        models_config: List of model configurations from SettingsManager
+        system_config: System configuration (contains vad_threshold)
+        settings_manager: SettingsManager instance for updating configs
+        shared_data: Shared data dict for web GUI
+
+    Returns:
+        tuple: (model, active_model_configs, model_name_mapping, enabled_models)
+            - model: OpenWakeWord Model instance
+            - active_model_configs: Dict mapping config names to ModelConfig objects
+            - model_name_mapping: Dict mapping OpenWakeWord keys to config names
+            - enabled_models: List of enabled ModelConfig objects
+
+    Raises:
+        ValueError: If no valid models found
+        Exception: If model creation or testing fails
+    """
+    try:
+        # Get enabled models from configuration
+        enabled_models = [model for model in models_config if model.enabled]
+        if not enabled_models:
+            logger.warning("⚠️  No enabled models found in configuration")
+            # Auto-enable the first model if none are enabled
+            if models_config:
+                first_model = models_config[0]
+                logger.info(f"Auto-enabling first available model: {first_model.name}")
+                settings_manager.update_model_config(first_model.name, enabled=True)
+                settings_manager.save()
+                # Refresh config
+                models_config = settings_manager.get_models_config()
+                enabled_models = [model for model in models_config if model.enabled]
+            else:
+                raise ValueError("No models available in configuration")
+
+        # Load ALL enabled models
+        model_paths = []
+        active_model_configs = {}
+        model_name_mapping = {}  # Maps OpenWakeWord prediction keys to config names
+
+        for model_cfg in enabled_models:
+            if os.path.exists(model_cfg.path):
+                logger.info(f"✅ Loading model: {model_cfg.name} from {model_cfg.path}")
+                model_paths.append(model_cfg.path)
+                active_model_configs[model_cfg.name] = model_cfg
+
+                # Create mapping for OpenWakeWord prediction key to config name
+                base_name = os.path.basename(model_cfg.path).replace('.tflite', '').replace('.onnx', '')
+                model_name_mapping[base_name] = model_cfg.name
+                logger.debug(f"   Model name mapping: '{base_name}' -> '{model_cfg.name}'")
+            else:
+                logger.error(f"❌ Model file NOT found: {model_cfg.path}")
+
+        if not model_paths:
+            raise ValueError("No valid model files found")
+
+        logger.info(f"Creating OpenWakeWord with {len(model_paths)} models: {list(active_model_configs.keys())}")
+
+        model = openwakeword.Model(
+            wakeword_models=model_paths,
+            vad_threshold=system_config.vad_threshold,
+            enable_speex_noise_suppression=False
+        )
+
+        # Update shared data with loaded models info
+        shared_data['loaded_models'] = list(active_model_configs.keys())
+        shared_data['models_config'] = {name: {
+            'enabled': True,
+            'threshold': cfg.threshold,
+            'webhook_url': cfg.webhook_url
+        } for name, cfg in active_model_configs.items()}
+
+        logger.info("OpenWakeWord model initialized")
+
+        # Check what models are actually loaded
+        if hasattr(model, 'models'):
+            logger.info(f"Loaded models: {list(model.models.keys()) if model.models else 'None'}")
+        logger.info(f"Prediction buffer keys: {list(model.prediction_buffer.keys())}")
+
+        # Enhanced model verification - test with dummy audio
+        logger.info("🔍 Testing model with dummy audio to verify initialization...")
+        test_audio = np.zeros(constants.CHUNK_SIZE, dtype=np.float32)
+        try:
+            test_predictions = model.predict(test_audio)
+            logger.info(f"✅ Model test successful - prediction type: {type(test_predictions)}")
+            logger.info(f"   Test prediction content: {test_predictions}")
+            logger.info(f"   Test prediction keys: {list(test_predictions.keys())}")
+
+            # Check prediction_buffer after first prediction
+            if hasattr(model, 'prediction_buffer'):
+                logger.info(f"✅ Prediction buffer populated after test prediction")
+                logger.info(f"   Prediction buffer keys: {list(model.prediction_buffer.keys())}")
+                for key, scores in model.prediction_buffer.items():
+                    latest_score = scores[-1] if scores else 'N/A'
+                    logger.info(f"     Model '{key}': {len(scores)} scores, latest: {latest_score}")
+            else:
+                logger.warning("⚠️ Prediction buffer not available after test prediction")
+
+        except Exception as e:
+            logger.error(f"❌ Error testing model after creation: {e}")
+            raise
+
+        # Force log flush
+        sys.stdout.flush()
+
+        return model, active_model_configs, model_name_mapping, enabled_models
+
+    except Exception as e:
+        print(f"ERROR: Model creation failed: {e}", flush=True)
+        raise
+
+def setup_heartbeat_sender(enabled_models):
+    """
+    Initialize and start heartbeat sender for ORAC STT integration.
+
+    Args:
+        enabled_models: List of enabled ModelConfig objects
+
+    Returns:
+        HeartbeatSender: Started heartbeat sender instance
+    """
+    # Initialize heartbeat sender for ORAC STT integration
+    logger.info("💓 Initializing heartbeat sender for ORAC STT...")
+    heartbeat_sender = HeartbeatSender()
+
+    # Register all enabled models with the heartbeat sender
+    for model_cfg in enabled_models:
+        # Use the actual topic from the model configuration
+        heartbeat_sender.register_model(
+            name=model_cfg.name,
+            topic=model_cfg.topic,  # Use the configured topic (e.g., "general", "Alexa__5")
+            wake_word=model_cfg.name,  # Use the full model name as wake word
+            enabled=model_cfg.enabled
+        )
+        logger.info(f"   Registered model '{model_cfg.name}' with topic '{model_cfg.topic}'")
+
+    # Start heartbeat sender
+    heartbeat_sender.start()
+    logger.info("✅ Heartbeat sender started")
+
+    return heartbeat_sender
+
+def setup_web_server(settings_manager, shared_data, event_queue):
+    """
+    Initialize and start web server with WebSocket broadcaster.
+
+    Args:
+        settings_manager: SettingsManager instance for routes
+        shared_data: Shared data dict for web GUI
+        event_queue: Queue for detection events
+
+    Returns:
+        WebSocketBroadcaster: Started broadcaster instance
+    """
+    # Initialize web server in a separate thread
+    logger.info("🌐 Starting web server on port 7171...")
+
+    # Create Flask app FIRST
+    app = create_app()
+
+    # Then initialize routes with shared resources
+    init_routes(settings_manager, shared_data, event_queue)
+
+    # Create and start WebSocket broadcaster
+    broadcaster = WebSocketBroadcaster(socketio, shared_data, event_queue)
+    broadcaster.start()
+
+    # Start Flask-SocketIO server in a separate thread
+    web_thread = threading.Thread(
+        target=socketio.run,
+        args=(app,),
+        kwargs={'host': '0.0.0.0', 'port': 7171, 'debug': False, 'allow_unsafe_werkzeug': True}
+    )
+    web_thread.daemon = True
+    web_thread.start()
+
+    logger.info("✅ Web server started successfully")
+
+    # Update shared data
+    shared_data['status'] = 'Connected'
+    shared_data['is_active'] = True
+    shared_data['status_changed'] = True
+
+    return broadcaster
+
+def setup_stt_components(stt_config, audio_config, active_model_configs, shared_data):
+    """
+    Initialize STT components (ring buffer, client, speech recorder).
+
+    Args:
+        stt_config: STT configuration from SettingsManager
+        audio_config: Audio configuration from SettingsManager
+        active_model_configs: Dict of active model configurations
+        shared_data: Shared data dict for web GUI
+
+    Returns:
+        tuple: (ring_buffer, speech_recorder, stt_client, stt_health_status)
+            - ring_buffer: RingBuffer instance for pre-roll audio
+            - speech_recorder: SpeechRecorder instance
+            - stt_client: STTClient instance
+            - stt_health_status: Initial health status string
+    """
+    # Always initialize STT components
+    logger.info("🎙️ Initializing STT components...")
+    logger.debug(f"STT Configuration: base_url={stt_config.base_url}, timeout={stt_config.timeout}s")
+    logger.debug(f"STT Endpoint settings: pre_roll={stt_config.pre_roll_duration}s, silence_threshold={stt_config.silence_threshold}, silence_duration={stt_config.silence_duration}s")
+
+    # Initialize ring buffer for pre-roll audio
+    ring_buffer = RingBuffer(
+        capacity_seconds=constants.RING_BUFFER_SECONDS,  # Keep 10 seconds of audio history
+        sample_rate=audio_config.sample_rate
+    )
+    logger.debug(f"RingBuffer initialized with capacity={constants.RING_BUFFER_SECONDS}s, sample_rate={audio_config.sample_rate}Hz")
+
+    # Initialize STT client
+    stt_client = STTClient(
+        base_url=stt_config.base_url,
+        timeout=stt_config.timeout
+    )
+
+    # Check STT service health
+    logger.debug(f"Checking STT service health at {stt_config.base_url}/stt/v1/health")
+    if stt_client.health_check():
+        logger.info("✅ STT service is healthy")
+        logger.debug("STT health check passed, service is ready for transcription")
+    else:
+        logger.warning("⚠️ STT service is not healthy at startup, but will proceed with per-model webhook URLs")
+
+    # Always initialize speech recorder (for per-model webhook URLs)
+    endpoint_config = EndpointConfig(
+        silence_threshold=stt_config.silence_threshold,
+        silence_duration=stt_config.silence_duration,
+        grace_period=stt_config.grace_period,
+        max_duration=stt_config.max_recording_duration,
+        pre_roll=stt_config.pre_roll_duration
+    )
+
+    speech_recorder = SpeechRecorder(
+        ring_buffer=ring_buffer,
+        stt_client=stt_client,
+        endpoint_config=endpoint_config
+    )
+
+    logger.info("✅ STT components initialized successfully")
+
+    # Perform health checks for models with webhook URLs
+    logger.info("🏥 Performing per-model STT health checks...")
+    for name, cfg in active_model_configs.items():
+        if cfg.webhook_url:
+            logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
+            if stt_client.health_check(webhook_url=cfg.webhook_url):
+                logger.info(f"✅ STT healthy for model '{name}'")
+            else:
+                logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
+
+    # Update initial STT health status
+    stt_health_status = check_all_stt_health(active_model_configs, stt_client)
+    shared_data['stt_health'] = stt_health_status
+    shared_data['status_changed'] = True
+    logger.info(f"🏥 Initial STT health status: {stt_health_status}")
+
+    return ring_buffer, speech_recorder, stt_client, stt_health_status
+
 def main():
     """Main function to run the wake word detection system."""
     # Log git commit if available
@@ -548,18 +865,10 @@ def main():
             return
 
         # Initialize audio source - either WAV file or microphone
-        stream = None
         audio_manager = None
         usb_mic = None
-        
-        if args.input_wav:
-            # Use WAV file as input
-            logger.info(f"🎵 Using WAV file as input: {args.input_wav}")
-            if not os.path.exists(args.input_wav):
-                logger.error(f"❌ WAV file not found: {args.input_wav}")
-                return
-            stream = WavFileStream(args.input_wav)
-        else:
+
+        if not args.input_wav:
             # Initialize AudioManager for audio device handling
             audio_manager = AudioManager()
             logger.info("AudioManager initialized")
@@ -571,22 +880,22 @@ def main():
                 raise RuntimeError("No USB microphone detected")
 
             logger.info(f"Using USB microphone: {usb_mic.name} (index {usb_mic.index})")
-        
-        # Handle recording mode
+
+        # Handle recording mode (special mode that exits early)
         if args.record_test:
             # Generate timestamp filename if not provided
             if args.audio_file is None:
                 audio_filename = generate_timestamp_filename()
             else:
                 audio_filename = args.audio_file
-            
+
             # Initialize model for recording (needed for real-time detection)
             logger.info("Creating Model for recording with real-time detection...")
             model = openwakeword.Model(
                 wakeword_models=['hey_jarvis', 'alexa', 'hey_mycroft'],
                 vad_threshold=system_config.vad_threshold
             )
-            
+
             success, metadata = record_test_audio(audio_manager, usb_mic, model, settings_manager, audio_filename)
             if success:
                 logger.info("✅ Recording completed successfully. Exiting.")
@@ -594,238 +903,28 @@ def main():
                 logger.error("❌ Recording failed. Exiting.")
             return
 
-        # Start audio stream if using microphone (skip if using WAV file)
-        if not args.input_wav:
-            # Start audio stream with parameters from configuration
-            stream = audio_manager.start_stream(
-                device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
-                sample_rate=audio_config.sample_rate,
-                channels=audio_config.channels,
-                chunk_size=audio_config.chunk_size
-            )
-            if not stream:
-                logger.error("Failed to start audio stream. Exiting.")
-                raise RuntimeError("Failed to start audio stream")
+        # Setup audio input
+        stream = setup_audio_input(args, audio_config, audio_manager, usb_mic)
 
         # Initialize the OpenWakeWord model with enabled models from configuration
-        try:
-            # Get enabled models from configuration
-            enabled_models = [model for model in models_config if model.enabled]
-            if not enabled_models:
-                logger.warning("⚠️  No enabled models found in configuration")
-                # Auto-enable the first model if none are enabled
-                if models_config:
-                    first_model = models_config[0]
-                    logger.info(f"Auto-enabling first available model: {first_model.name}")
-                    settings_manager.update_model_config(first_model.name, enabled=True)
-                    settings_manager.save()
-                    # Refresh config
-                    models_config = settings_manager.get_models_config()
-                    enabled_models = [model for model in models_config if model.enabled]
-                else:
-                    raise ValueError("No models available in configuration")
-            
-            # Load ALL enabled models
-            model_paths = []
-            active_model_configs = {}
-            model_name_mapping = {}  # Maps OpenWakeWord prediction keys to config names
-            
-            for model_cfg in enabled_models:
-                if os.path.exists(model_cfg.path):
-                    logger.info(f"✅ Loading model: {model_cfg.name} from {model_cfg.path}")
-                    model_paths.append(model_cfg.path)
-                    active_model_configs[model_cfg.name] = model_cfg
-                    
-                    # Create mapping for OpenWakeWord prediction key to config name
-                    base_name = os.path.basename(model_cfg.path).replace('.tflite', '').replace('.onnx', '')
-                    model_name_mapping[base_name] = model_cfg.name
-                    logger.debug(f"   Model name mapping: '{base_name}' -> '{model_cfg.name}'")
-                else:
-                    logger.error(f"❌ Model file NOT found: {model_cfg.path}")
-            
-            if not model_paths:
-                raise ValueError("No valid model files found")
-            
-            logger.info(f"Creating OpenWakeWord with {len(model_paths)} models: {list(active_model_configs.keys())}")
-            
-            model = openwakeword.Model(
-                wakeword_models=model_paths,
-                vad_threshold=system_config.vad_threshold,
-                enable_speex_noise_suppression=False
-            )
-            
-            # Update shared data with loaded models info
-            shared_data['loaded_models'] = list(active_model_configs.keys())
-            shared_data['models_config'] = {name: {
-                'enabled': True,
-                'threshold': cfg.threshold,
-                'webhook_url': cfg.webhook_url
-            } for name, cfg in active_model_configs.items()}
-
-            logger.info("OpenWakeWord model initialized")
-            
-            # Check what models are actually loaded
-            if hasattr(model, 'models'):
-                logger.info(f"Loaded models: {list(model.models.keys()) if model.models else 'None'}")
-            logger.info(f"Prediction buffer keys: {list(model.prediction_buffer.keys())}")
-            
-            # Enhanced model verification - test with dummy audio like old working code
-            logger.info("🔍 Testing model with dummy audio to verify initialization...")
-            test_audio = np.zeros(constants.CHUNK_SIZE, dtype=np.float32)
-            try:
-                test_predictions = model.predict(test_audio)
-                logger.info(f"✅ Model test successful - prediction type: {type(test_predictions)}")
-                logger.info(f"   Test prediction content: {test_predictions}")
-                logger.info(f"   Test prediction keys: {list(test_predictions.keys())}")
-                
-                # Check prediction_buffer after first prediction (like old working code)
-                if hasattr(model, 'prediction_buffer'):
-                    logger.info(f"✅ Prediction buffer populated after test prediction")
-                    logger.info(f"   Prediction buffer keys: {list(model.prediction_buffer.keys())}")
-                    for key, scores in model.prediction_buffer.items():
-                        latest_score = scores[-1] if scores else 'N/A'
-                        logger.info(f"     Model '{key}': {len(scores)} scores, latest: {latest_score}")
-                else:
-                    logger.warning("⚠️ Prediction buffer not available after test prediction")
-                    
-            except Exception as e:
-                logger.error(f"❌ Error testing model after creation: {e}")
-                raise
-
-        except Exception as e:
-            print(f"ERROR: Model creation failed: {e}", flush=True)
-            raise
-        
-        # Force log flush
-        sys.stdout.flush()
+        model, active_model_configs, model_name_mapping, enabled_models = setup_wake_word_models(
+            models_config, system_config, settings_manager, shared_data
+        )
 
         # Initialize heartbeat sender for ORAC STT integration
-        logger.info("💓 Initializing heartbeat sender for ORAC STT...")
-        heartbeat_sender = HeartbeatSender()
-        
-        # Register all enabled models with the heartbeat sender
-        for model_cfg in enabled_models:
-            # Use the actual topic from the model configuration
-            heartbeat_sender.register_model(
-                name=model_cfg.name,
-                topic=model_cfg.topic,  # Use the configured topic (e.g., "general", "Alexa__5")
-                wake_word=model_cfg.name,  # Use the full model name as wake word
-                enabled=model_cfg.enabled
-            )
-            logger.info(f"   Registered model '{model_cfg.name}' with topic '{model_cfg.topic}'")
-        
-        # Start heartbeat sender
-        heartbeat_sender.start()
-        logger.info("✅ Heartbeat sender started")
-
-        # Test audio stream first
-        logger.info("🧪 Testing audio stream...")
-        sys.stdout.flush()
-        try:
-            test_data = stream.read(constants.CHUNK_SIZE, exception_on_overflow=False)
-            logger.info(f"✅ Audio stream test successful, read {len(test_data)} bytes")
-            sys.stdout.flush()
-        except Exception as e:
-            logger.error(f"❌ Audio stream test failed: {e}")
-            sys.stdout.flush()
-            raise
+        heartbeat_sender = setup_heartbeat_sender(enabled_models)
 
         # Initialize web server in a separate thread
-        logger.info("🌐 Starting web server on port 7171...")
-        
-        # Create Flask app FIRST
-        app = create_app()
-        
-        # Then initialize routes with shared resources
-        init_routes(settings_manager, shared_data, event_queue)
-        
-        # Create and start WebSocket broadcaster
-        broadcaster = WebSocketBroadcaster(socketio, shared_data, event_queue)
-        broadcaster.start()
-        
-        # Start Flask-SocketIO server in a separate thread
-        web_thread = threading.Thread(
-            target=socketio.run,
-            args=(app,),
-            kwargs={'host': '0.0.0.0', 'port': 7171, 'debug': False, 'allow_unsafe_werkzeug': True}
-        )
-        web_thread.daemon = True
-        web_thread.start()
-        
-        logger.info("✅ Web server started successfully")
-        
-        # Update shared data
-        shared_data['status'] = 'Connected'
-        shared_data['is_active'] = True
-        shared_data['status_changed'] = True
-        
-        # Initialize STT components if enabled
-        ring_buffer = None
-        speech_recorder = None
-        stt_client = None
-        
+        broadcaster = setup_web_server(settings_manager, shared_data, event_queue)
+
+        # Get STT configuration
         with settings_manager.get_config() as config:
             stt_config = config.stt
-        
-        # Always initialize STT components
-        logger.info("🎙️ Initializing STT components...")
-        logger.debug(f"STT Configuration: base_url={stt_config.base_url}, timeout={stt_config.timeout}s")
-        logger.debug(f"STT Endpoint settings: pre_roll={stt_config.pre_roll_duration}s, silence_threshold={stt_config.silence_threshold}, silence_duration={stt_config.silence_duration}s")
-        
-        # Initialize ring buffer for pre-roll audio
-        ring_buffer = RingBuffer(
-            capacity_seconds=constants.RING_BUFFER_SECONDS,  # Keep 10 seconds of audio history
-            sample_rate=audio_config.sample_rate
+
+        # Initialize STT components
+        ring_buffer, speech_recorder, stt_client, stt_health_status = setup_stt_components(
+            stt_config, audio_config, active_model_configs, shared_data
         )
-        logger.debug(f"RingBuffer initialized with capacity={constants.RING_BUFFER_SECONDS}s, sample_rate={audio_config.sample_rate}Hz")
-        
-        # Initialize STT client
-        stt_client = STTClient(
-            base_url=stt_config.base_url,
-            timeout=stt_config.timeout
-        )
-        
-        # Check STT service health
-        logger.debug(f"Checking STT service health at {stt_config.base_url}/stt/v1/health")
-        if stt_client.health_check():
-            logger.info("✅ STT service is healthy")
-            logger.debug("STT health check passed, service is ready for transcription")
-        else:
-            logger.warning("⚠️ STT service is not healthy at startup, but will proceed with per-model webhook URLs")
-        
-        # Always initialize speech recorder (for per-model webhook URLs)
-        endpoint_config = EndpointConfig(
-            silence_threshold=stt_config.silence_threshold,
-            silence_duration=stt_config.silence_duration,
-            grace_period=stt_config.grace_period,
-            max_duration=stt_config.max_recording_duration,
-            pre_roll=stt_config.pre_roll_duration
-        )
-        
-        speech_recorder = SpeechRecorder(
-            ring_buffer=ring_buffer,
-            stt_client=stt_client,
-            endpoint_config=endpoint_config
-        )
-        
-        logger.info("✅ STT components initialized successfully")
-        
-        # Perform health checks for models with webhook URLs
-        if stt_client:
-            logger.info("🏥 Performing per-model STT health checks...")
-            for name, cfg in active_model_configs.items():
-                if cfg.webhook_url:
-                    logger.debug(f"Checking STT health for model '{name}' at {cfg.webhook_url}")
-                    if stt_client.health_check(webhook_url=cfg.webhook_url):
-                        logger.info(f"✅ STT healthy for model '{name}'")
-                    else:
-                        logger.warning(f"⚠️ STT unhealthy for model '{name}' at {cfg.webhook_url}")
-            
-            # Update initial STT health status
-            stt_health_status = check_all_stt_health(active_model_configs, stt_client)
-            shared_data['stt_health'] = stt_health_status
-            shared_data['status_changed'] = True
-            logger.info(f"🏥 Initial STT health status: {stt_health_status}")
         
         # Function to reload models when configuration changes
         def reload_models():
