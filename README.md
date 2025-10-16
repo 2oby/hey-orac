@@ -193,6 +193,18 @@ Access the web interface at `http://your-pi:7171` for comprehensive monitoring a
 - **Mobile Responsive**: Works on desktop, tablet, and mobile devices
 - **Audio Playback**: Review recorded audio clips (when available)
 
+## Screenshots
+
+### Main Dashboard
+The main dashboard shows real-time audio levels, model status, and detection events.
+
+![Main Dashboard](docs/images/main_screen.jpg)
+
+### Model Configuration
+Each model can be configured individually with threshold, topic, webhook URL, and advanced endpoint settings.
+
+![Model Settings](docs/images/model_settings.jpg)
+
 ## Deployment
 
 ### Quick Deploy to Raspberry Pi
