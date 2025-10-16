@@ -176,6 +176,20 @@ The Hey ORAC web interface provides real-time monitoring and configuration:
 └─────────────────────────────────────────────┘
 ```
 
+### Screenshots
+
+**Main Dashboard**
+
+The main dashboard provides real-time monitoring with audio level visualization, model status cards, and system health indicators.
+
+![Main Dashboard](docs/images/main_screen.jpg)
+
+**Model Configuration**
+
+Each model can be configured with individual settings including threshold, topic routing, webhook URL, and advanced endpoint configuration (base URL and API paths).
+
+![Model Settings](docs/images/model_settings.jpg)
+
 ### UI Components
 
 **Audio Level Meter**
