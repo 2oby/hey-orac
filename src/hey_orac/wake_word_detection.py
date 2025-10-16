@@ -878,7 +878,8 @@ def run_detection_loop(
     speech_recorder,
     stt_client,
     heartbeat_sender,
-    reload_models_func
+    reload_models_func,
+    event_queue
 ):
     """
     Main wake word detection loop.
@@ -906,6 +907,7 @@ def run_detection_loop(
         stt_client: STTClient for health checks
         heartbeat_sender: HeartbeatSender for model activation tracking
         reload_models_func: Function to call when config changes detected
+        event_queue: Queue for detection events to web GUI
 
     Returns:
         int: Exit code (0 for normal, 1 for error requiring restart)
@@ -1086,16 +1088,13 @@ def run_detection_loop(
                 # Update shared data with latest detection
                 shared_data['last_detection'] = detection_event
 
-                # Add to event queue (use try/except for backward compatibility)
+                # Add to event queue
                 try:
-                    event_queue = shared_data.get('_event_queue')
-                    if event_queue:
-                        try:
-                            event_queue.put_nowait(detection_event)
-                        except queue.Full:
-                            logger.debug("Event queue full, skipping detection event")
-                except Exception:
-                    pass
+                    event_queue.put_nowait(detection_event)
+                except queue.Full:
+                    logger.debug("Event queue full, skipping detection event")
+                except Exception as e:
+                    logger.debug(f"Failed to add detection event to queue: {e}")
 
                 # Record activation in heartbeat sender
                 heartbeat_sender.record_activation(trigger_info['config_name'])
@@ -1206,16 +1205,13 @@ def run_detection_loop(
                 # Update shared data
                 shared_data['last_detection'] = detection_event
 
-                # Add to event queue if available (backward compatibility)
+                # Add to event queue
                 try:
-                    event_queue = shared_data.get('_event_queue')
-                    if event_queue:
-                        try:
-                            event_queue.put_nowait(detection_event)
-                        except queue.Full:
-                            logger.debug("Event queue full, skipping detection event")
-                except Exception:
-                    pass
+                    event_queue.put_nowait(detection_event)
+                except queue.Full:
+                    logger.debug("Event queue full, skipping detection event")
+                except Exception as e:
+                    logger.debug(f"Failed to add detection event to queue: {e}")
 
                 # Record activation in heartbeat sender
                 heartbeat_sender.record_activation(config_name or best_model)
@@ -1496,10 +1492,7 @@ def main():
         main_consumer_queue = audio_reader.register_consumer("main_loop")
         logger.info("✅ Main loop registered as audio consumer")
 
-        # Store event_queue in shared_data for detection loop access
-        shared_data['_event_queue'] = event_queue
-
-        # Run the detection loop
+        # Run the detection loop (pass event_queue directly instead of storing in shared_data)
         exit_code = run_detection_loop(
             model=model,
             active_model_configs=active_model_configs,
@@ -1512,7 +1505,8 @@ def main():
             speech_recorder=speech_recorder,
             stt_client=stt_client,
             heartbeat_sender=heartbeat_sender,
-            reload_models_func=reload_models
+            reload_models_func=reload_models,
+            event_queue=event_queue
         )
 
         # If detection loop exits with error code, exit with that code

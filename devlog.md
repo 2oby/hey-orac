@@ -807,3 +807,110 @@ def setup_stt_components(stt_config, audio_config, active_model_configs, shared_
 - ab23bc2: Sprint 8: Extract setup functions from main() - Part 1
 - 67e71fa: Fix audio_array undefined variable bug in logging code
 - Documentation updated (CLEANUP.md and devlog.md)
+## 2025-10-16 - Sprint 9: Extract Detection Loop and Model Reload from Main() - Part 2
+
+### Changes Made:
+- **Duration**: ~1 hour
+- **Sprint**: 9 of 14 in code cleanup project
+- **Status**: ✅ COMPLETE - Awaiting testing on Raspberry Pi
+
+### What Was Done:
+**Extracted 2 Major Functions from main()** in `wake_word_detection.py`:
+1. `reload_models_on_config_change()` - Dynamic model reload function, ~113 lines
+   - Handles configuration changes without restart
+   - Creates new OpenWakeWord Model instance with updated config
+   - Updates heartbeat sender with new models
+   - Performs health checks for reloaded models
+   - Returns tuple of (success, model, configs, mappings, enabled_models)
+
+2. `run_detection_loop()` - Main wake word detection loop, ~429 lines
+   - Continuously reads audio and processes wake words
+   - Monitors system health (config changes, STT health, thread health)
+   - Handles both multi-trigger and single-trigger modes
+   - Triggers webhooks and STT recording
+   - Returns exit code (0 for normal, 1 for error requiring restart)
+
+**Updated main() function**:
+- Replaced ~700 lines of loop and reload logic with ~25 lines of orchestration
+- Created nested `reload_models()` wrapper that updates nonlocal variables
+- Main function calls `run_detection_loop()` and handles exit codes
+- Reduced main() from ~900 lines to ~200 lines (78% reduction from Sprint 8)
+- Overall reduction from original ~1200 lines to ~200 lines (83% total reduction)
+
+**Removed Old Detection Loop Code**:
+- Cleaned up ~365 lines of orphaned detection loop code
+- Removed "while False:" wrapper that was left behind
+- Fixed exception handler structure for clean flow
+
+### Why This Matters:
+**Separation of Concerns**:
+- Detection loop is now a standalone, reusable function
+- Model reloading logic extracted and testable independently
+- Main function reduced to pure orchestration (setup → run → cleanup)
+- Each function has single, clear responsibility
+
+**Maintainability Win**:
+- Main function went from 900 lines to 200 lines
+- Detection loop can be tested in isolation
+- Model reload logic is reusable for future features
+- Clean function signatures with well-defined contracts
+
+**Code Organization**:
+- Setup functions (Sprint 8) handle initialization
+- Detection loop function handles runtime processing
+- Main function orchestrates the components
+- Clear separation between setup, execution, and cleanup phases
+
+### Testing & Verification:
+- Code changes complete and committed (201b142)
+- Deployment to Raspberry Pi in progress
+- Expecting no functionality changes (pure refactoring)
+- All existing tests should pass without modification
+
+### Technical Details:
+**New Function Signatures**:
+```python
+def reload_models_on_config_change(
+    settings_manager, heartbeat_sender, stt_client, shared_data
+) -> tuple[bool, Model, dict, dict, list]
+
+def run_detection_loop(
+    model, active_model_configs, model_name_mapping,
+    audio_reader, main_consumer_queue, settings_manager,
+    shared_data, ring_buffer, speech_recorder, stt_client,
+    heartbeat_sender, reload_models_func
+) -> int  # Exit code
+```
+
+**Main Function Flow Now**:
+```python
+def main():
+    # Parse arguments
+    # Initialize shared data
+    # Setup components (Sprint 8 functions)
+
+    # Create nested reload wrapper
+    def reload_models():
+        nonlocal model, active_model_configs, ...
+        success, new_model, ... = reload_models_on_config_change(...)
+        if success:
+            model = new_model  # Update nonlocal variables
+        return success
+
+    # Run detection loop
+    exit_code = run_detection_loop(
+        model, active_model_configs, ..., reload_models
+    )
+
+    if exit_code != 0:
+        sys.exit(exit_code)
+```
+
+### Progress Update:
+- **Sprints Completed**: 9/14 (64%)
+- **Main Function Refactoring**: ✅ COMPLETE (original goal achieved)
+- **Next**: Sprint 10 - Handle preprocessing module
+
+### Git Commits:
+- 201b142: Sprint 9: Extract detection loop and model reload from main() - Part 2
+- Documentation updated (CLEANUP.md and devlog.md)
