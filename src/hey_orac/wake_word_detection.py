@@ -11,6 +11,7 @@ import time
 import wave
 import json
 import signal
+import queue
 from datetime import datetime
 # Use environment variable for unbuffered output instead
 os.environ['PYTHONUNBUFFERED'] = '1'
@@ -1007,7 +1008,7 @@ def main():
                 # Get audio data from consumer queue with timeout
                 try:
                     data = main_consumer_queue.get(timeout=2.0)
-                except:
+                except queue.Empty:
                     data = None
                 
                 if data is None:
@@ -1148,7 +1149,8 @@ def main():
                     # Add to event queue
                     try:
                         event_queue.put_nowait(detection_event)
-                    except:
+                    except queue.Full:
+                        logger.debug("Event queue full, skipping detection event")
                         pass  # Queue full, skip
                     
                     # Record activation in heartbeat sender
@@ -1266,7 +1268,8 @@ def main():
                     # Add to event queue if not full
                     try:
                         event_queue.put_nowait(detection_event)
-                    except:
+                    except queue.Full:
+                        logger.debug("Event queue full, skipping detection event")
                         pass  # Queue full, skip
                     
                     # Record activation in heartbeat sender
