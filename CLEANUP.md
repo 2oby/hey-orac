@@ -388,16 +388,16 @@ VERY_WEAK_SIGNAL_THRESHOLD = 0.01
 - [x] Sprint 6: Extract Constants ✅ (Created constants.py with 42 named constants, replaced all magic numbers)
 - [x] Sprint 7: Consolidate Audio Conversion ✅ (Created conversion.py module, removed ~35 lines of duplicate code)
 - [x] Sprint 8: Refactor Main - Part 1 ✅ (Extracted 5 setup functions from main() - reduced main() from ~1200 to ~900 lines, fixed audio_array bug)
-- [x] Sprint 9: Refactor Main - Part 2 ✅ (Extracted reload_models_on_config_change() and run_detection_loop() functions - reduced main() from ~900 to ~200 lines)
-- [ ] Sprint 10: Handle Preprocessing Module
-- [ ] Sprint 11: Standardize Configuration
+- [x] Sprint 9: Refactor Main - Part 2 ✅ (Extracted reload_models_on_config_change() and run_detection_loop() functions - reduced main() from ~900 to ~200 lines, fixed Queue pickling bug)
+- [x] Sprint 10: Handle Preprocessing Module ✅ (Deleted unused wake_word_detection_preprocessing.py - 173 lines removed)
+- [ ] Sprint 11: Standardize Configuration (OBSOLETE - app.py was deleted in Sprint 5)
 - [ ] Sprint 12: Remove TODOs
 - [ ] Sprint 13: Standardize Naming
 - [ ] Sprint 14: Emoji Logging Standard
 
 ### Statistics
 - **Total Sprints**: 14
-- **Completed**: 9 (64%)
+- **Completed**: 10 (71%)
 - **In Progress**: None
 - **Blocked**: None
 
