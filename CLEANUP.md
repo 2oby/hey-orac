@@ -399,9 +399,14 @@ VERY_WEAK_SIGNAL_THRESHOLD = 0.01
 
 ## Git Branch Strategy
 
+### Branch Setup (COMPLETED ✅)
+- [x] Created `code-cleanup` branch
+- [x] Fixed `deploy_and_test.sh` to use current branch (not hardcoded master)
+- [x] Committed CLEANUP.md roadmap
+
 ### Branch Commands
 ```bash
-# Create cleanup branch
+# Create cleanup branch (ALREADY DONE)
 git checkout -b code-cleanup
 
 # After each sprint commit
@@ -411,6 +416,9 @@ git commit -m "Sprint X: [description]"
 # If something breaks
 git reset --hard HEAD^  # Undo last commit
 git reset --hard HEAD~3  # Undo last 3 commits
+
+# Deploy to Pi while on code-cleanup branch
+./scripts/deploy_and_test.sh "Sprint X: [description]"
 
 # When all sprints complete
 git checkout master
