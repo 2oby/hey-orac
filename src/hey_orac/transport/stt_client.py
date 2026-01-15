@@ -63,22 +63,26 @@ class STTClient:
         wav_buffer.seek(0)
         return wav_buffer.read()
     
-    def transcribe(self, 
-                   audio_data: np.ndarray, 
+    def transcribe(self,
+                   audio_data: np.ndarray,
                    language: Optional[str] = None,
                    task: str = "transcribe",
                    webhook_url: Optional[str] = None,
-                   topic: str = "general") -> Tuple[bool, Dict[str, Any]]:
+                   topic: str = "general",
+                   wake_word_time: Optional[datetime] = None,
+                   recording_end_time: Optional[datetime] = None) -> Tuple[bool, Dict[str, Any]]:
         """
         Send audio to STT service for transcription.
-        
+
         Args:
             audio_data: Audio samples as numpy array
             language: Language code (e.g., "en", "es", "fr")
             task: "transcribe" or "translate"
             webhook_url: Override base URL with specific webhook URL
             topic: Topic ID for ORAC Core routing (default: "general")
-            
+            wake_word_time: Timestamp when wake word was detected (for end-to-end timing)
+            recording_end_time: Timestamp when recording ended (for end-to-end timing)
+
         Returns:
             Tuple of (success, result_dict)
         """
@@ -112,12 +116,22 @@ class STTClient:
             else:
                 url = f"{self.base_url}/stt/v1/stream/{topic}"
             logger.debug(f"Making POST request to: {url} with topic: {topic}")
-            
+
+            # Build headers with timing information for end-to-end tracking
+            headers = {}
+            if wake_word_time:
+                headers['X-Wake-Word-Time'] = wake_word_time.isoformat()
+                logger.debug(f"Adding wake word time header: {wake_word_time.isoformat()}")
+            if recording_end_time:
+                headers['X-Recording-End-Time'] = recording_end_time.isoformat()
+                logger.debug(f"Adding recording end time header: {recording_end_time.isoformat()}")
+
             start_time = datetime.now()
             response = self.session.post(
                 url,
                 files=files,
                 data=data,
+                headers=headers if headers else None,
                 timeout=self.timeout
             )
             request_time = (datetime.now() - start_time).total_seconds()

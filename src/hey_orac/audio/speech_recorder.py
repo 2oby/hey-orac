@@ -6,6 +6,7 @@ import logging
 import numpy as np
 import threading
 import time
+from datetime import datetime
 from typing import Optional, Tuple, Dict, Any
 from .ring_buffer import RingBuffer
 from .endpointing import SpeechEndpointer, EndpointConfig
@@ -45,37 +46,44 @@ class SpeechRecorder:
         
         logger.info("Speech recorder initialized")
     
-    def start_recording(self, 
+    def start_recording(self,
                        audio_stream,
                        wake_word: str,
                        confidence: float,
                        language: Optional[str] = None,
                        webhook_url: Optional[str] = None,
-                       topic: str = "general") -> None:
+                       topic: str = "general",
+                       wake_word_time: Optional[datetime] = None) -> None:
         """
         Start recording speech in a separate thread.
-        
+
         Args:
             audio_stream: Audio stream to read from
             wake_word: The detected wake word
             confidence: Detection confidence
             language: Language code for STT
             webhook_url: Optional webhook URL for STT service
+            topic: Topic ID for routing
+            wake_word_time: Timestamp when wake word was detected (for end-to-end timing)
         """
         with self.recording_lock:
             if self.is_recording:
                 logger.warning("Recording already in progress, ignoring new request")
                 return
-            
+
             self.is_recording = True
-            
+
+        # Use current time if wake_word_time not provided
+        if wake_word_time is None:
+            wake_word_time = datetime.now()
+
         logger.info(f"🎤 Starting speech recording thread for wake word '{wake_word}'")
-        logger.debug(f"Recording parameters: confidence={confidence:.3f}, language={language}")
-        
+        logger.debug(f"Recording parameters: confidence={confidence:.3f}, language={language}, wake_word_time={wake_word_time.isoformat()}")
+
         # Start recording in a separate thread
         self.recording_thread = threading.Thread(
             target=self._record_and_transcribe,
-            args=(audio_stream, wake_word, confidence, language, webhook_url, topic),
+            args=(audio_stream, wake_word, confidence, language, webhook_url, topic, wake_word_time),
             daemon=True
         )
         self.recording_thread.start()
@@ -87,16 +95,19 @@ class SpeechRecorder:
                               confidence: float,
                               language: Optional[str] = None,
                               webhook_url: Optional[str] = None,
-                              topic: str = "general") -> None:
+                              topic: str = "general",
+                              wake_word_time: Optional[datetime] = None) -> None:
         """
         Record speech and send to STT (runs in separate thread).
-        
+
         Args:
             audio_stream: Audio stream to read from
             wake_word: The detected wake word
             confidence: Detection confidence
             language: Language code for STT
             webhook_url: Optional webhook URL for STT service
+            topic: Topic ID for routing
+            wake_word_time: Timestamp when wake word was detected (for end-to-end timing)
         """
         try:
             logger.info(f"🎙️ Starting speech recording after '{wake_word}' (confidence: {confidence:.3f})")
@@ -194,17 +205,23 @@ class SpeechRecorder:
                 duration = len(full_audio) / 16000
                 logger.info(f"Recorded {duration:.2f}s of audio, sending to STT...")
                 
-                # Send to STT
+                # Send to STT with timing information
+                recording_end_time = datetime.now()
                 logger.info(f"📤 Sending {duration:.2f}s audio to STT service...")
                 logger.debug(f"Audio format: 16kHz, mono, {len(full_audio)} samples")
                 if webhook_url:
                     logger.debug(f"Using webhook URL for STT: {webhook_url}")
-                
+                if wake_word_time:
+                    elapsed_since_wake = (recording_end_time - wake_word_time).total_seconds()
+                    logger.info(f"⏱️ Time from wake word to recording end: {elapsed_since_wake:.2f}s")
+
                 success, result = self.stt_client.transcribe(
                     full_audio,
                     language=language,
                     webhook_url=webhook_url,
-                    topic=topic
+                    topic=topic,
+                    wake_word_time=wake_word_time,
+                    recording_end_time=recording_end_time
                 )
                 logger.debug(f"STT response received: success={success}")
                 
