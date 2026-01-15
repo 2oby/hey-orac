@@ -34,6 +34,7 @@ services:
       - AUDIO_DEVICE=/dev/snd
       - PULSE_RUNTIME_PATH=/tmp
       - ORAC_STT_URL=http://192.168.8.192:7272  # Updated Orin IP address
+      - TZ=Europe/Zurich  # Match timezone with Orin for accurate E2E timing
     
     # Port mappings for web GUI
     ports:
