@@ -66,12 +66,20 @@ class AudioConfig:
 
 
 @dataclass
+class STTStreamingConfig:
+    """WebSocket streaming configuration for STT."""
+    enabled: bool = False  # Default to HTTP mode for backward compatibility
+    ws_path: str = "/stt/v1/ws/stream"  # WebSocket endpoint path
+    fallback_to_http: bool = True  # Fall back to HTTP if WebSocket fails
+
+
+@dataclass
 class STTConfig:
     """Speech-to-Text configuration."""
     enabled: bool = True
     base_url: str = "http://localhost:8000"
     default_base_url: str = "http://192.168.8.192:7272"  # Default base URL for all models
-    stream_path: str = "/stt/v1/stream"  # Default stream path
+    stream_path: str = "/stt/v1/stream"  # Default stream path (HTTP)
     heartbeat_path: str = "/stt/v1/heartbeat"  # Default heartbeat path
     timeout: int = 30
     language: Optional[str] = None
@@ -81,6 +89,11 @@ class STTConfig:
     grace_period: float = 0.4
     max_recording_duration: float = 15.0
     enable_per_model: bool = True
+    streaming: Optional[STTStreamingConfig] = None  # WebSocket streaming config
+
+    def __post_init__(self):
+        if self.streaming is None:
+            self.streaming = STTStreamingConfig()
 
 
 @dataclass
@@ -398,6 +411,18 @@ class SettingsManager:
             
             # Convert STT config
             stt_dict = config_dict.get('stt', {})
+
+            # Handle streaming config
+            streaming_dict = stt_dict.get('streaming', {})
+            if streaming_dict:
+                streaming = STTStreamingConfig(
+                    enabled=streaming_dict.get('enabled', False),
+                    ws_path=streaming_dict.get('ws_path', '/stt/v1/ws/stream'),
+                    fallback_to_http=streaming_dict.get('fallback_to_http', True)
+                )
+            else:
+                streaming = None
+
             stt = STTConfig(
                 enabled=stt_dict.get('enabled', True),
                 base_url=stt_dict.get('base_url', 'http://localhost:8000'),
@@ -411,7 +436,8 @@ class SettingsManager:
                 silence_duration=stt_dict.get('silence_duration', 0.3),
                 grace_period=stt_dict.get('grace_period', 0.4),
                 max_recording_duration=stt_dict.get('max_recording_duration', 15.0),
-                enable_per_model=stt_dict.get('enable_per_model', True)
+                enable_per_model=stt_dict.get('enable_per_model', True),
+                streaming=streaming
             )
             
             return HeyOracConfig(

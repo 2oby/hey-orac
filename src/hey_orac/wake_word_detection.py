@@ -751,11 +751,29 @@ def setup_stt_components(stt_config, audio_config, active_model_configs, shared_
     )
     logger.debug(f"RingBuffer initialized with capacity={constants.RING_BUFFER_SECONDS}s, sample_rate={audio_config.sample_rate}Hz")
 
-    # Initialize STT client
+    # Initialize STT client (HTTP mode)
     stt_client = STTClient(
         base_url=stt_config.base_url,
         timeout=stt_config.timeout
     )
+
+    # Initialize WebSocket streaming client if enabled
+    streaming_client = None
+    use_streaming = False
+    fallback_to_http = True
+
+    if stt_config.streaming and stt_config.streaming.enabled:
+        from .transport.stt_client import WebSocketSTTClient
+        streaming_client = WebSocketSTTClient(
+            base_url=stt_config.default_base_url,
+            ws_path=stt_config.streaming.ws_path,
+            timeout=stt_config.timeout
+        )
+        use_streaming = True
+        fallback_to_http = stt_config.streaming.fallback_to_http
+        logger.info(f"🌊 WebSocket streaming enabled: {stt_config.default_base_url}{stt_config.streaming.ws_path}")
+    else:
+        logger.info("📦 Using HTTP bulk mode for STT")
 
     # Check STT service health
     logger.debug(f"Checking STT service health at {stt_config.base_url}/stt/v1/health")
@@ -777,7 +795,10 @@ def setup_stt_components(stt_config, audio_config, active_model_configs, shared_
     speech_recorder = SpeechRecorder(
         ring_buffer=ring_buffer,
         stt_client=stt_client,
-        endpoint_config=endpoint_config
+        endpoint_config=endpoint_config,
+        streaming_client=streaming_client,
+        use_streaming=use_streaming,
+        fallback_to_http=fallback_to_http
     )
 
     logger.info("✅ STT components initialized successfully")

@@ -1,16 +1,189 @@
 """
 STT (Speech-to-Text) client for sending audio to transcription service.
+
+Supports two modes:
+- HTTP (bulk): Record all audio, then send complete WAV file
+- WebSocket (streaming): Stream audio chunks as they're recorded
 """
 
+import asyncio
 import io
+import json
 import wave
 import logging
 import requests
 import numpy as np
 from typing import Optional, Dict, Any, Tuple
 from datetime import datetime
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
+
+
+class WebSocketSTTClient:
+    """WebSocket client for streaming audio to STT service."""
+
+    def __init__(self, base_url: str = "http://192.168.8.192:7272",
+                 ws_path: str = "/stt/v1/ws/stream",
+                 timeout: int = 30):
+        """
+        Initialize WebSocket STT client.
+
+        Args:
+            base_url: Base URL of the STT service (http:// will be converted to ws://)
+            ws_path: WebSocket endpoint path
+            timeout: Connection timeout in seconds
+        """
+        # Convert HTTP URL to WebSocket URL
+        parsed = urlparse(base_url)
+        ws_scheme = "wss" if parsed.scheme == "https" else "ws"
+        self.ws_base_url = f"{ws_scheme}://{parsed.netloc}"
+        self.ws_path = ws_path
+        self.timeout = timeout
+
+        logger.info(f"WebSocket STT client initialized: {self.ws_base_url}{self.ws_path}")
+
+    def get_ws_url(self, topic: str) -> str:
+        """Get full WebSocket URL for a topic."""
+        return f"{self.ws_base_url}{self.ws_path}/{topic}"
+
+    async def stream_transcribe(self,
+                                audio_generator,
+                                topic: str = "general",
+                                wake_word_time: Optional[datetime] = None,
+                                on_chunk_sent: Optional[callable] = None) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Stream audio chunks and get transcription.
+
+        Args:
+            audio_generator: Generator yielding (audio_chunk, is_end) tuples
+                           audio_chunk: numpy array of int16 samples
+                           is_end: True when speech endpoint detected
+            topic: Topic ID for ORAC Core routing
+            wake_word_time: Timestamp when wake word was detected
+            on_chunk_sent: Optional callback(chunk_count, total_samples) after each chunk
+
+        Returns:
+            Tuple of (success, result_dict)
+        """
+        try:
+            import websockets
+        except ImportError:
+            logger.error("websockets package not installed. Install with: pip install websockets")
+            return False, {'error': 'websockets package not installed'}
+
+        ws_url = self.get_ws_url(topic)
+        logger.info(f"🔌 Connecting to WebSocket: {ws_url}")
+
+        start_time = datetime.now()
+        chunk_count = 0
+        total_samples = 0
+
+        try:
+            async with websockets.connect(ws_url, close_timeout=self.timeout) as ws:
+                logger.info("✅ WebSocket connected")
+
+                # Send config with timing info
+                config_msg = {"type": "config"}
+                if wake_word_time:
+                    config_msg["wake_word_time"] = wake_word_time.isoformat()
+                await ws.send(json.dumps(config_msg))
+                logger.debug(f"Sent config: {config_msg}")
+
+                # Stream audio chunks
+                for audio_chunk, is_end in audio_generator:
+                    if audio_chunk is not None and len(audio_chunk) > 0:
+                        # Convert to int16 bytes if needed
+                        if audio_chunk.dtype == np.float32:
+                            audio_int16 = np.clip(audio_chunk * 32767, -32768, 32767).astype(np.int16)
+                        elif audio_chunk.dtype == np.int16:
+                            audio_int16 = audio_chunk
+                        else:
+                            audio_int16 = audio_chunk.astype(np.int16)
+
+                        # Send binary audio data
+                        await ws.send(audio_int16.tobytes())
+                        chunk_count += 1
+                        total_samples += len(audio_int16)
+
+                        if on_chunk_sent:
+                            on_chunk_sent(chunk_count, total_samples)
+
+                        if chunk_count % 25 == 0:  # Log every ~2 seconds
+                            duration = total_samples / 16000
+                            logger.debug(f"Streamed {chunk_count} chunks ({duration:.1f}s)")
+
+                    if is_end:
+                        break
+
+                # Send end signal
+                end_signal = {"type": "end"}
+                await ws.send(json.dumps(end_signal))
+                stream_duration = (datetime.now() - start_time).total_seconds()
+                audio_duration = total_samples / 16000
+                logger.info(f"📤 Sent end signal. Streamed {audio_duration:.2f}s audio in {stream_duration:.2f}s ({chunk_count} chunks)")
+
+                # Wait for transcription result
+                logger.info("⏳ Waiting for transcription...")
+                response = await asyncio.wait_for(ws.recv(), timeout=self.timeout)
+                result = json.loads(response)
+
+                total_time = (datetime.now() - start_time).total_seconds()
+                transcription = result.get('text', '')
+
+                logger.info(f"✅ WebSocket transcription successful: '{transcription}'")
+                logger.info(f"⏱️ Total WebSocket session: {total_time:.2f}s")
+
+                return True, {
+                    'text': transcription,
+                    'confidence': result.get('confidence', 0.0),
+                    'language': result.get('language'),
+                    'duration': result.get('duration', audio_duration),
+                    'processing_time': result.get('processing_time', 0.0),
+                    'streaming': True,
+                    'chunks_sent': chunk_count
+                }
+
+        except asyncio.TimeoutError:
+            logger.error(f"WebSocket transcription timed out after {self.timeout}s")
+            return False, {'error': 'WebSocket transcription timed out'}
+
+        except Exception as e:
+            logger.error(f"WebSocket error: {e}", exc_info=True)
+            return False, {'error': str(e)}
+
+    def transcribe_sync(self,
+                        audio_generator,
+                        topic: str = "general",
+                        wake_word_time: Optional[datetime] = None) -> Tuple[bool, Dict[str, Any]]:
+        """
+        Synchronous wrapper for stream_transcribe.
+
+        Args:
+            audio_generator: Generator yielding (audio_chunk, is_end) tuples
+            topic: Topic ID for ORAC Core routing
+            wake_word_time: Timestamp when wake word was detected
+
+        Returns:
+            Tuple of (success, result_dict)
+        """
+        try:
+            # Get or create event loop
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            return loop.run_until_complete(
+                self.stream_transcribe(audio_generator, topic, wake_word_time)
+            )
+        except Exception as e:
+            logger.error(f"Error in synchronous WebSocket transcribe: {e}")
+            return False, {'error': str(e)}
 
 
 class STTClient:
