@@ -873,7 +873,9 @@ class SettingsManager:
                 config.system.vad_threshold = float(updates['vad_threshold'])
             if 'multi_trigger' in updates:
                 config.system.multi_trigger = bool(updates['multi_trigger'])
-            
+            if 'enable_audio_preprocessing' in updates:
+                config.system.enable_audio_preprocessing = bool(updates['enable_audio_preprocessing'])
+
             logger.info(f"Updated system config: {updates}")
             return config
         

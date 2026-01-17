@@ -66,6 +66,8 @@ def update_global_config():
             settings_manager.update_system_config(vad_threshold=data['vad_threshold'])
         if 'multi_trigger' in data:
             settings_manager.update_system_config(multi_trigger=data['multi_trigger'])
+        if 'enable_audio_preprocessing' in data:
+            settings_manager.update_system_config(enable_audio_preprocessing=data['enable_audio_preprocessing'])
 
         # Update STT config fields
         if 'default_base_url' in data:

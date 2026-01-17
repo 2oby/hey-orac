@@ -505,17 +505,20 @@ async function openGlobalSettings() {
     document.getElementById('volume-stream-path').value = sttConfig.stream_path;
     document.getElementById('volume-heartbeat-path').value = sttConfig.heartbeat_path;
 
-    // Fetch and set multi-trigger value
+    // Fetch and set multi-trigger and audio enhancement values
     try {
         const response = await fetch(`${API_BASE}/config`);
         if (response.ok) {
             const config = await response.json();
             const multiTrigger = config.system?.multi_trigger || false;
             document.getElementById('multi-trigger-checkbox').checked = multiTrigger;
+            const audioEnhancement = config.system?.enable_audio_preprocessing || false;
+            document.getElementById('audio-enhancement-checkbox').checked = audioEnhancement;
         }
     } catch (error) {
         console.error('Error fetching config:', error);
         document.getElementById('multi-trigger-checkbox').checked = false;
+        document.getElementById('audio-enhancement-checkbox').checked = false;
     }
 
     // Show modal
@@ -528,6 +531,7 @@ async function closeGlobalSettings() {
     const cooldownValue = parseFloat(document.getElementById('volume-cooldown').value);
     const vadThreshold = parseFloat(document.getElementById('volume-vad-threshold').value);
     const multiTrigger = document.getElementById('multi-trigger-checkbox').checked;
+    const audioEnhancement = document.getElementById('audio-enhancement-checkbox').checked;
     const defaultBaseUrl = document.getElementById('volume-default-base-url').value;
     const streamPath = document.getElementById('volume-stream-path').value;
     const heartbeatPath = document.getElementById('volume-heartbeat-path').value;
@@ -541,6 +545,7 @@ async function closeGlobalSettings() {
                 cooldown: cooldownValue,
                 vad_threshold: vadThreshold,
                 multi_trigger: multiTrigger,
+                enable_audio_preprocessing: audioEnhancement,
                 default_base_url: defaultBaseUrl,
                 stream_path: streamPath,
                 heartbeat_path: heartbeatPath
