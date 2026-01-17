@@ -11,6 +11,16 @@ from typing import Optional, Tuple
 from dataclasses import dataclass
 import collections
 
+# Import scipy.signal at module load time to avoid delays during audio processing
+try:
+    from scipy.signal import butter, lfilter, savgol_filter
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+    butter = None
+    lfilter = None
+    savgol_filter = None
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,8 +53,9 @@ class AudioPreprocessorConfig:
     limiter_lookahead: float = 0.005  # Lookahead time in seconds
 
     # Noise gate to cut background noise during silence
-    enable_noise_gate: bool = True  # Now enabled by default
-    noise_gate_threshold: float = 0.015  # Slightly higher threshold
+    # CAUTION: Enabling noise gate can cause RMS=0 issues if threshold is too high
+    enable_noise_gate: bool = False  # Disabled by default - can cause issues
+    noise_gate_threshold: float = 0.005  # Very low threshold to avoid gating speech
 
     sample_rate: int = 16000
 
@@ -101,7 +112,10 @@ class AudioPreprocessor:
 
     def _init_highpass_filter(self):
         """Initialize high-pass filter coefficients (Butterworth 2nd order)."""
-        from scipy.signal import butter
+        if not SCIPY_AVAILABLE:
+            logger.warning("scipy not available, disabling high-pass filter")
+            self.config.enable_highpass = False
+            return
         nyquist = self.config.sample_rate / 2.0
         normalized_cutoff = self.config.highpass_cutoff / nyquist
         # Clamp to valid range
@@ -200,9 +214,14 @@ class AudioPreprocessor:
         Returns:
             High-pass filtered audio
         """
-        from scipy.signal import lfilter
-        filtered, self.hp_zi = lfilter(self.hp_b, self.hp_a, audio, zi=self.hp_zi)
-        return filtered.astype(np.float32)
+        if not SCIPY_AVAILABLE or not hasattr(self, 'hp_b'):
+            return audio
+        try:
+            filtered, self.hp_zi = lfilter(self.hp_b, self.hp_a, audio, zi=self.hp_zi)
+            return filtered.astype(np.float32)
+        except Exception as e:
+            logger.warning(f"High-pass filter failed: {e}")
+            return audio
 
     def _apply_presence_boost(self, audio: np.ndarray) -> np.ndarray:
         """
@@ -214,9 +233,14 @@ class AudioPreprocessor:
         Returns:
             Presence-boosted audio
         """
-        from scipy.signal import lfilter
-        filtered, self.pres_zi = lfilter(self.pres_b, self.pres_a, audio, zi=self.pres_zi)
-        return filtered.astype(np.float32)
+        if not SCIPY_AVAILABLE or not hasattr(self, 'pres_b'):
+            return audio
+        try:
+            filtered, self.pres_zi = lfilter(self.pres_b, self.pres_a, audio, zi=self.pres_zi)
+            return filtered.astype(np.float32)
+        except Exception as e:
+            logger.warning(f"Presence boost filter failed: {e}")
+            return audio
     
     def _apply_agc(self, audio: np.ndarray) -> np.ndarray:
         """
@@ -332,29 +356,44 @@ class AudioPreprocessor:
     def _apply_noise_gate(self, audio: np.ndarray) -> np.ndarray:
         """
         Apply noise gate to reduce low-level noise.
-        
+
         Args:
             audio: Input audio
-            
+
         Returns:
             Gated audio
         """
         # Calculate envelope
         envelope = np.abs(audio)
-        
+
         # Apply gate
         gate_mask = envelope > self.config.noise_gate_threshold
-        
-        # Smooth gate transitions to avoid clicks
-        from scipy.signal import savgol_filter
-        try:
-            gate_smooth = savgol_filter(gate_mask.astype(float), 
-                                       window_length=min(51, len(audio) if len(audio) % 2 == 1 else len(audio) - 1),
-                                       polyorder=3)
-            return audio * gate_smooth
-        except:
-            # Fallback to simple gating if smoothing fails
-            return audio * gate_mask
+
+        # Check if any samples pass the gate - if not, return original audio
+        # to avoid zeroing everything out
+        if not np.any(gate_mask):
+            return audio
+
+        # Smooth gate transitions to avoid clicks (only if scipy available)
+        if SCIPY_AVAILABLE and savgol_filter is not None and len(audio) >= 7:
+            try:
+                # Ensure window_length is odd and at least 5, and > polyorder
+                window_length = min(51, len(audio))
+                if window_length % 2 == 0:
+                    window_length -= 1
+                window_length = max(window_length, 5)  # Must be > polyorder (3)
+
+                gate_smooth = savgol_filter(gate_mask.astype(float),
+                                           window_length=window_length,
+                                           polyorder=3)
+                # Clip to 0-1 range
+                gate_smooth = np.clip(gate_smooth, 0.0, 1.0)
+                return (audio * gate_smooth).astype(np.float32)
+            except Exception as e:
+                logger.debug(f"Noise gate smoothing failed, using simple gate: {e}")
+
+        # Fallback to simple gating
+        return (audio * gate_mask).astype(np.float32)
     
     def _update_metrics(self, audio: np.ndarray) -> None:
         """
