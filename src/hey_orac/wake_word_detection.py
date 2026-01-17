@@ -1546,7 +1546,7 @@ def main():
                 channels=audio_config.channels,
                 chunk_size=audio_config.chunk_size,
                 device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
-                enable_preprocessing=False,  # Phase 0: No preprocessing yet
+                enable_preprocessing=True,  # Phase 2: Enable AGC, compression, limiting
             )
             if not audio_pipeline.start():
                 logger.error("Failed to start AudioPipeline")
