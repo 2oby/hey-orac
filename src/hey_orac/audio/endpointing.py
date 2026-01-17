@@ -15,15 +15,14 @@ logger = logging.getLogger(__name__)
 class EndpointConfig:
     """Configuration for speech endpointing.
 
-    Note: These values are set to minimum - whisper.cpp's VAD handles
-    the real end-of-speech detection. We just need a trigger to send.
-    Whisper VAD settings: --vad-min-silence-duration-ms 100
+    These values control how long to wait for silence before ending capture.
+    Total silence before cutoff = silence_duration + grace_period
     """
     silence_threshold: float = 0.01  # RMS threshold for silence
-    silence_duration: float = 0.1    # Minimal - just detect any pause (was 0.3)
-    grace_period: float = 0.1        # Minimal grace period (was 0.4)
+    silence_duration: float = 0.4    # Wait for pause before considering end of speech
+    grace_period: float = 0.5        # Additional time to allow speech to resume
     max_duration: float = 15.0       # Maximum recording duration
-    pre_roll: float = 1.0           # Pre-roll duration to include
+    pre_roll: float = 1.0            # Pre-roll duration to include
 
 
 class SpeechEndpointer:
