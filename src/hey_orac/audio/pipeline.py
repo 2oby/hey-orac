@@ -41,6 +41,7 @@ from typing import Optional, Dict, Any, Callable
 import numpy as np
 
 from .utils import AudioManager, AudioDevice
+from .preprocessor import AudioPreprocessor, AudioPreprocessorConfig
 from hey_orac import constants
 
 logger = logging.getLogger(__name__)
@@ -87,6 +88,7 @@ class AudioPipeline:
         device_index: Optional[int] = None,
         queue_maxsize: int = constants.AUDIO_READER_QUEUE_MAXSIZE,
         enable_preprocessing: bool = False,  # Phase 1/2 - disabled by default
+        preprocessor_config: Optional[AudioPreprocessorConfig] = None,
     ):
         """
         Initialize audio pipeline.
@@ -97,7 +99,8 @@ class AudioPipeline:
             chunk_size: Samples per chunk (default 1280 = 80ms)
             device_index: Specific device index, or None for auto-detect USB mic
             queue_maxsize: Maximum chunks buffered per consumer
-            enable_preprocessing: Enable audio preprocessing (Phase 1/2)
+            enable_preprocessing: Enable audio preprocessing (AGC, compression, limiting)
+            preprocessor_config: Configuration for audio preprocessing
         """
         self.sample_rate = sample_rate
         self.channels = channels
@@ -125,10 +128,16 @@ class AudioPipeline:
         self._error_count = 0
         self._restart_count = 0
 
-        # Preprocessing (Phase 1/2 - placeholder)
-        self._preprocessor = None
+        # Preprocessing
+        self._preprocessor_config = preprocessor_config or AudioPreprocessorConfig(sample_rate=sample_rate)
+        self._preprocessor: Optional[AudioPreprocessor] = None
+        if self.enable_preprocessing:
+            self._preprocessor = AudioPreprocessor(self._preprocessor_config)
+            logger.info(f"AudioPreprocessor enabled: AGC={self._preprocessor_config.enable_agc}, "
+                       f"compression={self._preprocessor_config.enable_compression}")
 
-        logger.info(f"AudioPipeline initialized: rate={sample_rate}, channels={channels}, chunk={chunk_size}")
+        logger.info(f"AudioPipeline initialized: rate={sample_rate}, channels={channels}, "
+                   f"chunk={chunk_size}, preprocessing={enable_preprocessing}")
 
     def start(self) -> bool:
         """
@@ -346,29 +355,60 @@ class AudioPipeline:
         """
         Process audio data through the pipeline.
 
-        Phase 0: Pass-through (no changes)
-        Phase 1/2: Will apply preprocessing (AGC, compression, etc.)
+        When preprocessing is disabled: Pass-through (no changes)
+        When preprocessing is enabled: Apply AGC, compression, limiting
+
+        Format conversion flow (when preprocessing enabled):
+        1. bytes (stereo int16) -> mono int16 -> normalized float32 (-1.0 to 1.0)
+        2. Apply preprocessing (AGC, compression, limiting)
+        3. normalized float32 -> mono int16 -> stereo int16 (duplicated) -> bytes
+
+        Note: OpenWakeWord conversion happens in the consumer, not here.
+        We maintain stereo int16 bytes as the distribution format for compatibility.
 
         Args:
-            data: Raw audio bytes from stream (int16)
+            data: Raw audio bytes from stream (stereo int16)
 
         Returns:
-            Processed audio bytes (int16)
+            Processed audio bytes (stereo int16)
         """
-        # Phase 0: Pass-through - no processing
-        if not self.enable_preprocessing:
+        # Pass-through when preprocessing is disabled
+        if not self.enable_preprocessing or self._preprocessor is None:
             return data
 
-        # Phase 1/2: Preprocessing will be implemented here
-        # The flow will be:
-        # 1. bytes (int16) -> normalized float32 (-1.0 to 1.0)
-        # 2. Apply preprocessing (AGC, compression, limiting)
-        # 3. normalized float32 -> bytes (int16)
-        #
-        # Note: OpenWakeWord conversion happens in the consumer,
-        # not here. We maintain int16 bytes as the distribution format.
+        try:
+            # Step 1: Convert bytes to numpy array (stereo int16)
+            audio_stereo = np.frombuffer(data, dtype=np.int16)
 
-        return data
+            # Step 2: Convert stereo to mono by averaging channels
+            # Stereo data is interleaved: [L0, R0, L1, R1, ...]
+            if len(audio_stereo) > self.chunk_size:
+                stereo_reshaped = audio_stereo.reshape(-1, 2)
+                audio_mono = np.mean(stereo_reshaped, axis=1).astype(np.float32)
+            else:
+                # Already mono
+                audio_mono = audio_stereo.astype(np.float32)
+
+            # Step 3: Normalize to -1.0 to 1.0 range (required by AudioPreprocessor)
+            audio_normalized = audio_mono / 32768.0
+
+            # Step 4: Apply preprocessing (AGC, compression, limiting)
+            audio_processed = self._preprocessor.process(audio_normalized)
+
+            # Step 5: Convert back to int16 range
+            audio_int16 = (audio_processed * 32768.0).clip(-32768, 32767).astype(np.int16)
+
+            # Step 6: Convert mono back to stereo (duplicate to both channels)
+            # This maintains compatibility with consumers expecting stereo
+            audio_stereo_out = np.column_stack((audio_int16, audio_int16)).flatten()
+
+            # Step 7: Convert back to bytes
+            return audio_stereo_out.tobytes()
+
+        except Exception as e:
+            logger.error(f"Error in audio preprocessing: {e}")
+            # Fall back to pass-through on error
+            return data
 
     def _distribute_audio(self, data: bytes) -> None:
         """
@@ -414,7 +454,7 @@ class AudioPipeline:
 
     def get_stats(self) -> dict:
         """Get pipeline statistics."""
-        return {
+        stats = {
             'running': self._running,
             'thread_alive': self._reader_thread.is_alive() if self._reader_thread else False,
             'last_read_age': time.time() - self._last_read_time,
@@ -425,6 +465,23 @@ class AudioPipeline:
             'consumers': list(self._consumers.keys()),
             'preprocessing_enabled': self.enable_preprocessing,
         }
+
+        # Add preprocessing metrics if enabled
+        if self._preprocessor is not None:
+            stats['preprocessing_metrics'] = self._preprocessor.get_metrics()
+
+        return stats
+
+    def get_preprocessing_metrics(self) -> Optional[dict]:
+        """
+        Get audio preprocessing metrics (AGC gain, peak level, etc.).
+
+        Returns:
+            Dict of preprocessing metrics, or None if preprocessing disabled
+        """
+        if self._preprocessor is None:
+            return None
+        return self._preprocessor.get_metrics()
 
     def get_device_info(self) -> Optional[AudioDevice]:
         """Get information about the audio device being used."""
