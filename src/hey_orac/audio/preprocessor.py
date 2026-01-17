@@ -112,17 +112,17 @@ class AudioPreprocessor:
 
     def _init_presence_filter(self):
         """Initialize presence boost filter (peaking EQ at 3kHz)."""
-        # Peaking EQ filter design
+        # Peaking EQ filter design using Q factor instead of bandwidth
         center_freq = 3000.0  # 3kHz - speech presence range
-        bandwidth = 2000.0  # Wide bandwidth for natural sound
+        Q = 1.0  # Quality factor (lower = wider bandwidth)
         gain_db = self.config.presence_gain_db
 
-        # Calculate filter coefficients
+        # Calculate filter coefficients (peaking EQ)
         A = 10 ** (gain_db / 40.0)
         omega = 2 * np.pi * center_freq / self.config.sample_rate
         sin_omega = np.sin(omega)
         cos_omega = np.cos(omega)
-        alpha = sin_omega * np.sinh(np.log(2) / 2 * bandwidth * omega / sin_omega)
+        alpha = sin_omega / (2 * Q)
 
         b0 = 1 + alpha * A
         b1 = -2 * cos_omega
