@@ -17,23 +17,35 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AudioPreprocessorConfig:
     """Configuration for audio preprocessing."""
+    # High-pass filter to remove low frequency rumble/hum
+    enable_highpass: bool = True
+    highpass_cutoff: float = 80.0  # Cutoff frequency in Hz
+
+    # Presence boost for speech clarity (2-4kHz range)
+    enable_presence_boost: bool = True
+    presence_gain_db: float = 3.0  # Boost in dB (subtle enhancement)
+
+    # AGC settings
     enable_agc: bool = True
     agc_target_level: float = 0.3  # Target RMS level (0.0-1.0)
-    agc_max_gain: float = 10.0  # Maximum gain in dB
+    agc_max_gain: float = 20.0  # Maximum gain in dB (increased from 10)
     agc_attack_time: float = 0.01  # AGC attack time in seconds
     agc_release_time: float = 0.1  # AGC release time in seconds
-    
+
+    # Compression settings
     enable_compression: bool = True
     compression_threshold: float = 0.5  # Threshold for compression (0.0-1.0)
     compression_ratio: float = 4.0  # Compression ratio (e.g., 4:1)
-    
+
+    # Limiter settings
     enable_limiter: bool = True
     limiter_threshold: float = 0.95  # Hard limit threshold (0.0-1.0)
     limiter_lookahead: float = 0.005  # Lookahead time in seconds
-    
-    enable_noise_gate: bool = False
-    noise_gate_threshold: float = 0.01  # Noise gate threshold (0.0-1.0)
-    
+
+    # Noise gate to cut background noise during silence
+    enable_noise_gate: bool = True  # Now enabled by default
+    noise_gate_threshold: float = 0.015  # Slightly higher threshold
+
     sample_rate: int = 16000
 
 
@@ -47,74 +59,164 @@ class AudioPreprocessor:
     def __init__(self, config: Optional[AudioPreprocessorConfig] = None):
         """
         Initialize audio preprocessor.
-        
+
         Args:
             config: Preprocessing configuration
         """
         self.config = config or AudioPreprocessorConfig()
-        
+
+        # High-pass filter coefficients (Butterworth 2nd order)
+        if self.config.enable_highpass:
+            self._init_highpass_filter()
+
+        # Presence boost filter coefficients (peaking EQ at 3kHz)
+        if self.config.enable_presence_boost:
+            self._init_presence_filter()
+
         # AGC state
         self.agc_gain = 1.0
         self.agc_target_rms = self.config.agc_target_level
         self.agc_attack_coeff = 1.0 - np.exp(-1.0 / (self.config.agc_attack_time * self.config.sample_rate))
         self.agc_release_coeff = 1.0 - np.exp(-1.0 / (self.config.agc_release_time * self.config.sample_rate))
-        
+
         # Compression state
         self.comp_threshold = self.config.compression_threshold
         self.comp_ratio = self.config.compression_ratio
         self.comp_knee_width = 0.1  # Soft knee width
-        
+
         # Limiter state
         self.limiter_threshold = self.config.limiter_threshold
         self.limiter_buffer_size = int(self.config.limiter_lookahead * self.config.sample_rate)
         self.limiter_buffer = collections.deque(maxlen=self.limiter_buffer_size)
-        
+
         # RMS calculation buffer
         self.rms_window_size = int(0.02 * self.config.sample_rate)  # 20ms window
         self.rms_buffer = collections.deque(maxlen=self.rms_window_size)
-        
+
         # Metrics
         self.clipping_count = 0
         self.peak_level = 0.0
-        
+
         logger.info(f"Audio preprocessor initialized with config: {self.config}")
+
+    def _init_highpass_filter(self):
+        """Initialize high-pass filter coefficients (Butterworth 2nd order)."""
+        from scipy.signal import butter
+        nyquist = self.config.sample_rate / 2.0
+        normalized_cutoff = self.config.highpass_cutoff / nyquist
+        # Clamp to valid range
+        normalized_cutoff = min(max(normalized_cutoff, 0.001), 0.99)
+        self.hp_b, self.hp_a = butter(2, normalized_cutoff, btype='high')
+        # Filter state for continuous processing
+        self.hp_zi = np.zeros(max(len(self.hp_a), len(self.hp_b)) - 1)
+
+    def _init_presence_filter(self):
+        """Initialize presence boost filter (peaking EQ at 3kHz)."""
+        # Peaking EQ filter design
+        center_freq = 3000.0  # 3kHz - speech presence range
+        bandwidth = 2000.0  # Wide bandwidth for natural sound
+        gain_db = self.config.presence_gain_db
+
+        # Calculate filter coefficients
+        A = 10 ** (gain_db / 40.0)
+        omega = 2 * np.pi * center_freq / self.config.sample_rate
+        sin_omega = np.sin(omega)
+        cos_omega = np.cos(omega)
+        alpha = sin_omega * np.sinh(np.log(2) / 2 * bandwidth * omega / sin_omega)
+
+        b0 = 1 + alpha * A
+        b1 = -2 * cos_omega
+        b2 = 1 - alpha * A
+        a0 = 1 + alpha / A
+        a1 = -2 * cos_omega
+        a2 = 1 - alpha / A
+
+        # Normalize coefficients
+        self.pres_b = np.array([b0/a0, b1/a0, b2/a0])
+        self.pres_a = np.array([1.0, a1/a0, a2/a0])
+        # Filter state for continuous processing
+        self.pres_zi = np.zeros(2)
     
     def process(self, audio_chunk: np.ndarray) -> np.ndarray:
         """
         Process audio chunk through the preprocessing pipeline.
-        
+
+        Processing order:
+        1. High-pass filter (remove rumble/hum)
+        2. Noise gate (cut background noise)
+        3. Presence boost (add clarity)
+        4. AGC (normalize levels)
+        5. Compression (even out dynamics)
+        6. Limiter (prevent clipping)
+
         Args:
             audio_chunk: Audio data as float32 numpy array (-1.0 to 1.0)
-            
+
         Returns:
             Processed audio chunk
         """
         if audio_chunk.dtype != np.float32:
             raise ValueError(f"Expected float32 audio, got {audio_chunk.dtype}")
-        
+
         # Make a copy to avoid modifying the original
         audio = audio_chunk.copy()
-        
-        # Apply noise gate first (if enabled)
+
+        # Apply high-pass filter first (remove low frequency rumble)
+        if self.config.enable_highpass:
+            audio = self._apply_highpass(audio)
+
+        # Apply noise gate (cut background noise during silence)
         if self.config.enable_noise_gate:
             audio = self._apply_noise_gate(audio)
-        
-        # Apply AGC (if enabled)
+
+        # Apply presence boost (add clarity to speech frequencies)
+        if self.config.enable_presence_boost:
+            audio = self._apply_presence_boost(audio)
+
+        # Apply AGC (normalize levels - boost quiet, tame loud)
         if self.config.enable_agc:
             audio = self._apply_agc(audio)
-        
-        # Apply compression (if enabled)
+
+        # Apply compression (even out dynamics)
         if self.config.enable_compression:
             audio = self._apply_compression(audio)
-        
-        # Apply limiter (if enabled)
+
+        # Apply limiter (prevent clipping)
         if self.config.enable_limiter:
             audio = self._apply_limiter(audio)
-        
+
         # Update metrics
         self._update_metrics(audio)
-        
+
         return audio
+
+    def _apply_highpass(self, audio: np.ndarray) -> np.ndarray:
+        """
+        Apply high-pass filter to remove low frequency rumble/hum.
+
+        Args:
+            audio: Input audio
+
+        Returns:
+            High-pass filtered audio
+        """
+        from scipy.signal import lfilter
+        filtered, self.hp_zi = lfilter(self.hp_b, self.hp_a, audio, zi=self.hp_zi)
+        return filtered.astype(np.float32)
+
+    def _apply_presence_boost(self, audio: np.ndarray) -> np.ndarray:
+        """
+        Apply presence boost filter for speech clarity.
+
+        Args:
+            audio: Input audio
+
+        Returns:
+            Presence-boosted audio
+        """
+        from scipy.signal import lfilter
+        filtered, self.pres_zi = lfilter(self.pres_b, self.pres_a, audio, zi=self.pres_zi)
+        return filtered.astype(np.float32)
     
     def _apply_agc(self, audio: np.ndarray) -> np.ndarray:
         """
