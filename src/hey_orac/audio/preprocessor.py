@@ -274,15 +274,16 @@ class AudioPreprocessor:
     def get_metrics(self) -> dict:
         """
         Get current audio quality metrics.
-        
+
         Returns:
-            Dictionary of metrics
+            Dictionary of metrics (all values JSON-serializable)
         """
+        agc_gain_db = float(20 * np.log10(self.agc_gain)) if self.agc_gain > 0 else float('-inf')
         return {
-            "agc_gain": self.agc_gain,
-            "peak_level": self.peak_level,
-            "clipping_count": self.clipping_count,
-            "agc_gain_db": 20 * np.log10(self.agc_gain) if self.agc_gain > 0 else -np.inf
+            "agc_gain": float(self.agc_gain),
+            "peak_level": float(self.peak_level),
+            "clipping_count": int(self.clipping_count),
+            "agc_gain_db": agc_gain_db
         }
     
     def reset_metrics(self) -> None:
