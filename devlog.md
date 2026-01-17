@@ -914,3 +914,53 @@ def main():
 ### Git Commits:
 - 201b142: Sprint 9: Extract detection loop and model reload from main() - Part 2
 - Documentation updated (CLEANUP.md and devlog.md)
+
+## 2026-01-18 - Audio Pipeline Fixes & Whisper Model Upgrade
+
+### Session Summary
+Fixed critical audio issues in the preprocessing pipeline and upgraded the STT model.
+
+### Issues Fixed:
+
+#### 1. Container Restart Loop (RMS=0)
+**Problem**: Hey ORAC container kept restarting with "RMS stuck at 0.0 for 10 iterations"
+**Root Cause**: Noise gate was enabled by default with threshold too high (0.015), gating ALL quiet audio to zeros
+**Fix**:
+- Disabled noise gate by default
+- Lowered threshold from 0.015 to 0.005
+- Added safety check to return original audio if all samples would be gated
+- Moved scipy imports to module load time (avoid processing delays)
+- Added error handling around filter operations
+
+**Commit**: a6d472b
+
+#### 2. Audio Dropouts Mid-Sentence
+**Problem**: Words being dropped mid-sentence (e.g., "computer turn on the lounge cabinet" → "computer t'lounge cabinet")
+**Root Cause**: Race condition - speech recorder queue was registered AFTER recording thread started, causing audio to be lost during thread startup
+**Fix**:
+- Pre-register speech recorder queue BEFORE starting recording thread
+- Increased queue buffer from 10 chunks (800ms) to 25 chunks (2 seconds)
+
+**Commit**: d190792
+
+### Audio Preprocessing Config (current):
+```python
+enable_highpass=True        # 80Hz cutoff (removes rumble)
+enable_presence_boost=True  # 3kHz +3dB (adds clarity)
+enable_agc=True             # 20dB max gain
+enable_compression=True     # 4:1 ratio
+enable_limiter=True         # 0.95 threshold
+enable_noise_gate=False     # DISABLED by default
+```
+
+### STT Model Upgrade
+- Changed from whisper-tiny (75MB) to whisper-small (466MB)
+- whisper-small provides better transcription accuracy
+- Model can be changed via ORAC STT Admin UI with restart button
+
+### Files Changed:
+- `src/hey_orac/audio/preprocessor.py` - Noise gate fix, scipy imports, error handling
+- `src/hey_orac/audio/speech_recorder.py` - Pre-register queue fix
+- `src/hey_orac/constants.py` - Queue buffer increase (10→25)
+
+### Branch: feature/audio-pipeline
