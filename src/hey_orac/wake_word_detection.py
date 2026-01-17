@@ -28,7 +28,8 @@ from hey_orac.audio.ring_buffer import RingBuffer  # Import RingBuffer for pre-r
 from hey_orac.audio.speech_recorder import SpeechRecorder  # Import SpeechRecorder
 from hey_orac.audio.endpointing import EndpointConfig  # Import EndpointConfig
 from hey_orac.audio.preprocessor import AudioPreprocessorConfig  # Import preprocessor config
-from hey_orac.audio.audio_reader_thread import AudioReaderThread  # Import audio reader thread
+from hey_orac.audio.audio_reader_thread import AudioReaderThread  # Import audio reader thread (legacy)
+from hey_orac.audio.pipeline import AudioPipeline  # Import unified audio pipeline
 from hey_orac.transport.stt_client import STTClient  # Import STT client
 from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
 from hey_orac.web.app import create_app, socketio
@@ -1528,8 +1529,33 @@ def main():
                 logger.error("❌ Recording failed. Exiting.")
             return
 
-        # Setup audio input
-        stream = setup_audio_input(args, audio_config, audio_manager, usb_mic)
+        # Setup audio input using AudioPipeline (Capture -> Clean -> Distribute)
+        if args.input_wav:
+            # WAV file input - use legacy setup for file playback
+            stream = setup_audio_input(args, audio_config, audio_manager, usb_mic)
+            # Create AudioReaderThread for WAV file (legacy mode)
+            audio_pipeline = AudioReaderThread(stream, chunk_size=constants.CHUNK_SIZE, queue_maxsize=constants.AUDIO_READER_QUEUE_MAXSIZE)
+            if not audio_pipeline.start():
+                logger.error("Failed to start audio reader for WAV file")
+                raise RuntimeError("Failed to start audio reader")
+        else:
+            # Live microphone - use new AudioPipeline
+            logger.info("Initializing AudioPipeline...")
+            audio_pipeline = AudioPipeline(
+                sample_rate=audio_config.sample_rate,
+                channels=audio_config.channels,
+                chunk_size=audio_config.chunk_size,
+                device_index=usb_mic.index if audio_config.device_index is None else audio_config.device_index,
+                enable_preprocessing=False,  # Phase 0: No preprocessing yet
+            )
+            if not audio_pipeline.start():
+                logger.error("Failed to start AudioPipeline")
+                raise RuntimeError("Failed to start AudioPipeline")
+            logger.info("AudioPipeline started successfully")
+
+        # Register main loop as a consumer
+        main_consumer_queue = audio_pipeline.register_consumer("main_loop")
+        logger.info("Main loop registered as audio consumer")
 
         # Initialize the OpenWakeWord model with enabled models from configuration
         model, active_model_configs, model_name_mapping, enabled_models = setup_wake_word_models(
@@ -1550,7 +1576,7 @@ def main():
         ring_buffer, speech_recorder, stt_client, stt_health_status = setup_stt_components(
             stt_config, audio_config, active_model_configs, shared_data
         )
-        
+
         # Function to reload models when configuration changes
         def reload_models():
             nonlocal model, active_model_configs, model_name_mapping, enabled_models
@@ -1566,23 +1592,13 @@ def main():
                 enabled_models = new_enabled
                 del old_model
             return success
-        
-        # Initialize audio reader thread for non-blocking audio capture
-        audio_reader = AudioReaderThread(stream, chunk_size=constants.CHUNK_SIZE, queue_maxsize=constants.AUDIO_READER_QUEUE_MAXSIZE)
-        if not audio_reader.start():
-            logger.error("Failed to start audio reader thread")
-            raise RuntimeError("Failed to start audio reader thread")
-        
-        # Register main loop as a consumer
-        main_consumer_queue = audio_reader.register_consumer("main_loop")
-        logger.info("✅ Main loop registered as audio consumer")
 
         # Run the detection loop (pass event_queue directly instead of storing in shared_data)
         exit_code = run_detection_loop(
             model=model,
             active_model_configs=active_model_configs,
             model_name_mapping=model_name_mapping,
-            audio_reader=audio_reader,
+            audio_reader=audio_pipeline,  # AudioPipeline has same interface as AudioReaderThread
             main_consumer_queue=main_consumer_queue,
             settings_manager=settings_manager,
             shared_data=shared_data,
@@ -1600,65 +1616,53 @@ def main():
 
     except KeyboardInterrupt:
         # Handle graceful shutdown on Ctrl+C
-        logger.info("Stopping audio stream and terminating AudioManager...")
-        
-        # Unregister main loop consumer and stop audio reader thread
-        if 'audio_reader' in locals():
-            audio_reader.unregister_consumer("main_loop")
+        logger.info("Stopping AudioPipeline...")
+
+        # Unregister main loop consumer and stop audio pipeline
+        if 'audio_pipeline' in locals():
+            audio_pipeline.unregister_consumer("main_loop")
             logger.info("Main loop unregistered as audio consumer")
-            audio_reader.stop()
-            logger.info("Audio reader thread stopped")
-        
+            audio_pipeline.stop()
+            logger.info("AudioPipeline stopped")
+
         # Stop heartbeat sender
         if 'heartbeat_sender' in locals():
             heartbeat_sender.stop()
             logger.info("Heartbeat sender stopped")
-        
+
         # Stop speech recorder if active
         if speech_recorder:
             speech_recorder.stop()
-        
+
         # Close STT client
         if stt_client:
             stt_client.close()
-        
-        if stream:
-            stream.stop_stream()
-            stream.close()
-        if audio_manager:
-            audio_manager.close()  # Explicitly clean up AudioManager
 
     except Exception as e:
         # Log any other errors and clean up
         import traceback
         logger.error(f"Error during execution: {e}")
         logger.error(f"Traceback: {traceback.format_exc()}")
-        
-        # Unregister main loop consumer and stop audio reader thread
-        if 'audio_reader' in locals():
-            audio_reader.unregister_consumer("main_loop")
+
+        # Unregister main loop consumer and stop audio pipeline
+        if 'audio_pipeline' in locals():
+            audio_pipeline.unregister_consumer("main_loop")
             logger.info("Main loop unregistered as audio consumer")
-            audio_reader.stop()
-            logger.info("Audio reader thread stopped")
-        
+            audio_pipeline.stop()
+            logger.info("AudioPipeline stopped")
+
         # Stop heartbeat sender
         if 'heartbeat_sender' in locals():
             heartbeat_sender.stop()
             logger.info("Heartbeat sender stopped")
-        
+
         # Stop speech recorder if active
         if speech_recorder:
             speech_recorder.stop()
-        
+
         # Close STT client
         if stt_client:
             stt_client.close()
-        
-        if stream:
-            stream.stop_stream()
-            stream.close()
-        if audio_manager:
-            audio_manager.close()
 
 if __name__ == "__main__":
     main()
