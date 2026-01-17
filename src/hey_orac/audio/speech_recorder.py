@@ -96,10 +96,18 @@ class SpeechRecorder:
         logger.info(f"🎤 Starting speech recording thread for wake word '{wake_word}'")
         logger.debug(f"Recording parameters: confidence={confidence:.3f}, language={language}, wake_word_time={wake_word_time.isoformat()}")
 
-        # Start recording in a separate thread
+        # IMPORTANT: Register as consumer BEFORE starting thread to avoid missing audio
+        # This prevents the race condition where the thread starts but hasn't registered yet,
+        # causing audio chunks to be missed during the gap
+        recorder_queue = None
+        if hasattr(audio_stream, 'register_consumer'):
+            recorder_queue = audio_stream.register_consumer("speech_recorder")
+            logger.info("✅ Speech recorder pre-registered as audio consumer (avoiding gap)")
+
+        # Start recording in a separate thread, passing the pre-registered queue
         self.recording_thread = threading.Thread(
             target=self._record_and_transcribe,
-            args=(audio_stream, wake_word, confidence, language, webhook_url, topic, wake_word_time),
+            args=(audio_stream, wake_word, confidence, language, webhook_url, topic, wake_word_time, recorder_queue),
             daemon=True
         )
         self.recording_thread.start()
@@ -112,7 +120,8 @@ class SpeechRecorder:
                               language: Optional[str] = None,
                               webhook_url: Optional[str] = None,
                               topic: str = "general",
-                              wake_word_time: Optional[datetime] = None) -> None:
+                              wake_word_time: Optional[datetime] = None,
+                              pre_registered_queue = None) -> None:
         """
         Record speech and send to STT (runs in separate thread).
 
@@ -124,16 +133,18 @@ class SpeechRecorder:
             webhook_url: Optional webhook URL for STT service
             topic: Topic ID for routing
             wake_word_time: Timestamp when wake word was detected (for end-to-end timing)
+            pre_registered_queue: Queue pre-registered before thread start (avoids audio gap)
         """
-        recorder_queue = None
+        # Use pre-registered queue if available (prevents audio gap race condition)
+        recorder_queue = pre_registered_queue
 
         try:
             logger.info(f"🎙️ Starting speech recording after '{wake_word}' (confidence: {confidence:.3f})")
 
-            # Register as consumer if using AudioReaderThread
-            if hasattr(audio_stream, 'register_consumer'):
+            # Only register if not already pre-registered
+            if recorder_queue is None and hasattr(audio_stream, 'register_consumer'):
                 recorder_queue = audio_stream.register_consumer("speech_recorder")
-                logger.info("✅ Speech recorder registered as audio consumer")
+                logger.info("✅ Speech recorder registered as audio consumer (late registration)")
 
             # Choose transcription mode
             if self.use_streaming:

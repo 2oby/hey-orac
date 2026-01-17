@@ -28,7 +28,7 @@ STUCK_RMS_THRESHOLD = 0.0001  # threshold for detecting identical RMS values
 # Queue Configuration
 QUEUE_TIMEOUT_SECONDS = 2.0  # timeout for queue.get() operations
 EVENT_QUEUE_MAXSIZE = 100  # maximum size of event queue
-AUDIO_READER_QUEUE_MAXSIZE = 10  # maximum size of audio reader queue
+AUDIO_READER_QUEUE_MAXSIZE = 25  # maximum size of audio reader queue (2 seconds at 80ms/chunk)
 
 # Network Timeouts
 WEBHOOK_TIMEOUT_SECONDS = 5  # timeout for webhook HTTP requests
