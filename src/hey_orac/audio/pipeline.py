@@ -491,3 +491,125 @@ class AudioPipeline:
     def stream(self) -> Optional[Any]:
         """Get the underlying PyAudio stream (for legacy compatibility)."""
         return self._stream
+
+    # === AUTO-CALIBRATION ===
+
+    def calibrate_noise_floor(self, duration: float = 3.0, callback: Optional[Callable[[dict], None]] = None) -> dict:
+        """
+        Measure ambient noise floor and auto-calibrate thresholds.
+
+        Measures RMS over the specified duration and sets:
+        - silence_threshold = noise_floor × 1.5
+        - noise_gate_threshold = noise_floor × 1.2
+
+        Args:
+            duration: Measurement duration in seconds (default 3.0)
+            callback: Optional callback with calibration results
+
+        Returns:
+            Dict with calibration results:
+            {
+                'noise_floor_rms': float,
+                'recommended_silence_threshold': float,
+                'recommended_noise_gate_threshold': float,
+                'samples_measured': int,
+                'peak_level': float,
+                'calibration_time': float
+            }
+        """
+        if not self._running:
+            logger.warning("Cannot calibrate - pipeline not running")
+            return {'error': 'Pipeline not running'}
+
+        logger.info(f"Starting noise floor calibration ({duration}s)...")
+
+        # Register temporary consumer for calibration
+        cal_queue = self.register_consumer("_calibration")
+
+        rms_samples = []
+        peak_level = 0.0
+        start_time = time.time()
+        samples_measured = 0
+
+        try:
+            while time.time() - start_time < duration:
+                try:
+                    data = cal_queue.get(timeout=0.5)
+                    if data is None or len(data) == 0:
+                        continue
+
+                    # Convert to numpy and calculate RMS
+                    audio_array = np.frombuffer(data, dtype=np.int16)
+
+                    # Handle stereo to mono
+                    if len(audio_array) > self.chunk_size:
+                        stereo_data = audio_array.reshape(-1, 2)
+                        audio_mono = np.mean(stereo_data, axis=1).astype(np.float32)
+                    else:
+                        audio_mono = audio_array.astype(np.float32)
+
+                    # Normalize for RMS calculation
+                    audio_normalized = audio_mono / 32768.0
+
+                    # Calculate RMS
+                    rms = float(np.sqrt(np.mean(audio_normalized ** 2)))
+                    rms_samples.append(rms)
+
+                    # Track peak
+                    current_peak = float(np.max(np.abs(audio_normalized)))
+                    peak_level = max(peak_level, current_peak)
+
+                    samples_measured += 1
+
+                except queue.Empty:
+                    continue
+
+        finally:
+            # Unregister calibration consumer
+            self.unregister_consumer("_calibration")
+
+        if not rms_samples:
+            logger.error("No audio samples collected during calibration")
+            return {'error': 'No samples collected'}
+
+        # Calculate noise floor (use median to ignore outliers)
+        noise_floor_rms = float(np.median(rms_samples))
+        avg_rms = float(np.mean(rms_samples))
+        std_rms = float(np.std(rms_samples))
+
+        # Calculate recommended thresholds
+        # Silence threshold: 1.5x noise floor (for STT endpointing)
+        # Noise gate: 1.2x noise floor (for gating)
+        recommended_silence_threshold = noise_floor_rms * 1.5
+        recommended_noise_gate_threshold = noise_floor_rms * 1.2
+
+        calibration_time = time.time() - start_time
+
+        result = {
+            'noise_floor_rms': noise_floor_rms,
+            'avg_rms': avg_rms,
+            'std_rms': std_rms,
+            'recommended_silence_threshold': recommended_silence_threshold,
+            'recommended_noise_gate_threshold': recommended_noise_gate_threshold,
+            'samples_measured': samples_measured,
+            'peak_level': peak_level,
+            'calibration_time': calibration_time,
+            'timestamp': time.time()
+        }
+
+        logger.info(f"Calibration complete: noise_floor={noise_floor_rms:.4f}, "
+                   f"silence_threshold={recommended_silence_threshold:.4f}, "
+                   f"peak={peak_level:.4f}")
+
+        # Store calibration results
+        self._last_calibration = result
+
+        # Call callback if provided
+        if callback:
+            callback(result)
+
+        return result
+
+    def get_last_calibration(self) -> Optional[dict]:
+        """Get results from the last calibration run."""
+        return getattr(self, '_last_calibration', None)

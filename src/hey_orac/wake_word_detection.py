@@ -1553,6 +1553,9 @@ def main():
                 raise RuntimeError("Failed to start AudioPipeline")
             logger.info("AudioPipeline started successfully")
 
+        # Store audio_pipeline in shared_data for API access (calibration, etc.)
+        shared_data['audio_pipeline'] = audio_pipeline
+
         # Register main loop as a consumer
         main_consumer_queue = audio_pipeline.register_consumer("main_loop")
         logger.info("Main loop registered as audio consumer")

@@ -227,6 +227,70 @@ def get_activation():
         return jsonify({'error': str(e)}), 500
 
 
+@api_bp.route('/audio/calibrate', methods=['POST'])
+def calibrate_audio():
+    """
+    Trigger audio calibration to measure noise floor.
+
+    Returns recommended thresholds based on ambient noise.
+    """
+    try:
+        audio_pipeline = shared_data.get('audio_pipeline') if shared_data else None
+        if not audio_pipeline:
+            return jsonify({'error': 'Audio pipeline not available'}), 503
+
+        # Get duration from request (default 3 seconds)
+        data = request.get_json() or {}
+        duration = float(data.get('duration', 3.0))
+        duration = max(1.0, min(10.0, duration))  # Clamp to 1-10 seconds
+
+        # Run calibration
+        result = audio_pipeline.calibrate_noise_floor(duration=duration)
+
+        if 'error' in result:
+            return jsonify(result), 500
+
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error during calibration: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/audio/calibration', methods=['GET'])
+def get_calibration():
+    """Get the last calibration results."""
+    try:
+        audio_pipeline = shared_data.get('audio_pipeline') if shared_data else None
+        if not audio_pipeline:
+            return jsonify({'error': 'Audio pipeline not available'}), 503
+
+        result = audio_pipeline.get_last_calibration()
+        if result is None:
+            return jsonify({'status': 'not_calibrated', 'message': 'No calibration has been performed'})
+
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Error getting calibration: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/audio/enhancement', methods=['GET'])
+def get_audio_enhancement():
+    """Get audio enhancement (AGC) status."""
+    try:
+        audio_pipeline = shared_data.get('audio_pipeline') if shared_data else None
+        if not audio_pipeline:
+            return jsonify({'enabled': False, 'error': 'Audio pipeline not available'})
+
+        return jsonify({
+            'enabled': audio_pipeline.enable_preprocessing,
+            'preprocessing_metrics': audio_pipeline.get_preprocessing_metrics()
+        })
+    except Exception as e:
+        logger.error(f"Error getting audio enhancement status: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
 # WebSocket handlers
 
 def register_socketio_handlers(socketio):
