@@ -16,6 +16,7 @@ api_bp = Blueprint('api', __name__)
 settings_manager = None
 shared_data = None
 event_queue = None
+audio_pipeline = None  # Stored separately (can't pickle into shared_data)
 
 
 def init_routes(sm, sd, eq):
@@ -24,6 +25,13 @@ def init_routes(sm, sd, eq):
     settings_manager = sm
     shared_data = sd
     event_queue = eq
+
+
+def set_audio_pipeline(pipeline):
+    """Set the audio pipeline reference for API access."""
+    global audio_pipeline
+    audio_pipeline = pipeline
+    logger.info("Audio pipeline registered with web routes")
 
 
 # REST API Routes
@@ -235,7 +243,6 @@ def calibrate_audio():
     Returns recommended thresholds based on ambient noise.
     """
     try:
-        audio_pipeline = shared_data.get('audio_pipeline') if shared_data else None
         if not audio_pipeline:
             return jsonify({'error': 'Audio pipeline not available'}), 503
 
@@ -260,7 +267,6 @@ def calibrate_audio():
 def get_calibration():
     """Get the last calibration results."""
     try:
-        audio_pipeline = shared_data.get('audio_pipeline') if shared_data else None
         if not audio_pipeline:
             return jsonify({'error': 'Audio pipeline not available'}), 503
 
@@ -278,7 +284,6 @@ def get_calibration():
 def get_audio_enhancement():
     """Get audio enhancement (AGC) status."""
     try:
-        audio_pipeline = shared_data.get('audio_pipeline') if shared_data else None
         if not audio_pipeline:
             return jsonify({'enabled': False, 'error': 'Audio pipeline not available'})
 

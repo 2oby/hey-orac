@@ -33,7 +33,7 @@ from hey_orac.audio.pipeline import AudioPipeline  # Import unified audio pipeli
 from hey_orac.transport.stt_client import STTClient  # Import STT client
 from hey_orac.config.manager import SettingsManager  # Import the SettingsManager
 from hey_orac.web.app import create_app, socketio
-from hey_orac.web.routes import init_routes
+from hey_orac.web.routes import init_routes, set_audio_pipeline
 from hey_orac.web.broadcaster import WebSocketBroadcaster
 from hey_orac.heartbeat_sender import HeartbeatSender  # Import heartbeat sender
 from hey_orac import constants  # Import constants
@@ -1553,8 +1553,8 @@ def main():
                 raise RuntimeError("Failed to start AudioPipeline")
             logger.info("AudioPipeline started successfully")
 
-        # Store audio_pipeline in shared_data for API access (calibration, etc.)
-        shared_data['audio_pipeline'] = audio_pipeline
+        # Register audio_pipeline with web routes for API access (calibration, etc.)
+        set_audio_pipeline(audio_pipeline)
 
         # Register main loop as a consumer
         main_consumer_queue = audio_pipeline.register_consumer("main_loop")
